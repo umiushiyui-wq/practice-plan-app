@@ -5,6 +5,8 @@ node_modules
 dist
 coverage
 src/generated/prisma
+*.log
+*.tsbuildinfo
 
 certificates
 .data

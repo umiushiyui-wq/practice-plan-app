@@ -61,12 +61,15 @@ SLACK_REMINDER_CHANNEL_ID
 ### 必要な環境変数
 
 ```text
+DATABASE_URL
 UPSTASH_REDIS_REST_URL
 UPSTASH_REDIS_REST_TOKEN
 LOCAL_STATE_KEY
 ```
 
 Vercel KVを使う場合は、Vercel側が作る `KV_REST_API_URL` と `KV_REST_API_TOKEN` でも動きます。
+
+ローカル保存版だけをまず公開する場合でも、Prisma client生成のために `DATABASE_URL` は必要です。最初は `file:./dev.db` を入れてください。
 
 `LOCAL_STATE_KEY` は省略できます。複数の団体やテスト環境を分けたいときだけ、例えば `nagosui:2026-spring` のように変えてください。
 
