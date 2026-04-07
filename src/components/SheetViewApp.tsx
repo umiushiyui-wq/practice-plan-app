@@ -3,6 +3,12 @@
 import Link from "next/link";
 import { getSelectedPracticeDay, useLocalPracticeState, usePieceMap } from "@/components/LocalPracticeApp";
 
+function formatPracticeDateLabel(date: string) {
+  const parsed = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return `${date}練習内容`;
+  return `${parsed.getMonth() + 1}月${parsed.getDate()}日練習内容`;
+}
+
 export function SheetViewApp() {
   const { state, updateState } = useLocalPracticeState();
   const selectedDay = getSelectedPracticeDay(state);
@@ -36,7 +42,7 @@ export function SheetViewApp() {
       </section>
 
       <section className="panel stack">
-        <h2>Excel風の表</h2>
+        <h2>{formatPracticeDateLabel(selectedDay.practiceDate)}</h2>
         {selectedDay.plan.length === 0 ? (
           <p className="muted">まだこの日の計画がありません。管理者用URLで自動計画を生成してください。</p>
         ) : (
