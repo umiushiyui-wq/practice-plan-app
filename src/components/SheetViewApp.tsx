@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { getSelectedPracticeDay, sortPlanByTime, useLocalPracticeState, usePieceMap } from "@/components/LocalPracticeApp";
+import {
+  getPlanSlotLabel,
+  getSelectedPracticeDay,
+  sortPlanByTime,
+  useLocalPracticeState,
+  usePieceMap
+} from "@/components/LocalPracticeApp";
 
 function formatPracticeDateLabel(date: string) {
   const parsed = new Date(`${date}T00:00:00`);
@@ -74,11 +80,11 @@ export function SheetViewApp() {
                       <td>{slot.start}</td>
                       <td>{slot.end}</td>
                       <td>{slot.duration}</td>
-                      <td>{piece?.title ?? "休憩"}</td>
+                      <td>{getPlanSlotLabel(slot, piece?.title)}</td>
                       <td>{conductor?.name ?? ""}</td>
                       <td>{piece ? `${piece.memberIds.length}人` : ""}</td>
                       <td>{slot.score ?? ""}</td>
-                      <td>{slot.reason ?? ""}</td>
+                      <td>{piece ? slot.reason ?? "" : ""}</td>
                     </tr>
                   );
                 })}

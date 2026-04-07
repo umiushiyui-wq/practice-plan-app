@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   getSelectedPracticeDay,
+  getPlanSlotLabel,
   sortPlanByTime,
   toMinutes,
   toTime,
@@ -280,7 +281,7 @@ export function PlayerApp() {
                         <td>{slot.start}</td>
                         <td>{slot.end}</td>
                         <td>{slot.duration}</td>
-                        <td>{slot.pieceId ? pieceMap.get(slot.pieceId)?.title : "休憩"}</td>
+                        <td>{getPlanSlotLabel(slot, slot.pieceId ? pieceMap.get(slot.pieceId)?.title : undefined)}</td>
                       </tr>
                     ))}
                   </tbody>

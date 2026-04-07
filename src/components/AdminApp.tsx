@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import {
   generatePracticePlan,
   findOverlappingPlanSlots,
+  getPlanSlotLabel,
   getSelectedPracticeDay,
   makeId,
   sortPlanByTime,
@@ -210,10 +211,7 @@ export function AdminApp() {
   }
 
   function getSlotLabel(slot: typeof selectedDay.plan[number]) {
-    if (slot.pieceId) return pieceMap.get(slot.pieceId)?.title ?? "曲";
-    if (slot.reason?.includes("準備")) return "準備時間";
-    if (slot.reason?.includes("片付け")) return "片付け時間";
-    return "休憩";
+    return getPlanSlotLabel(slot, slot.pieceId ? pieceMap.get(slot.pieceId)?.title : undefined);
   }
 
   return (

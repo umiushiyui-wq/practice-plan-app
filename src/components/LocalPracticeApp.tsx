@@ -227,6 +227,13 @@ export function findOverlappingPlanSlots(plan: PlanSlot[]) {
   return overlappingIds;
 }
 
+export function getPlanSlotLabel(slot: PlanSlot, pieceTitle?: string) {
+  if (slot.pieceId) return pieceTitle ?? "曲";
+  if (slot.reason?.includes("準備")) return "準備時間";
+  if (slot.reason?.includes("片付け")) return "片付け時間";
+  return "休憩";
+}
+
 export function isAvailable(availabilities: Availability[], memberId: string, start: number, end: number) {
   return availabilities.some(
     (item) => item.memberId === memberId && toMinutes(item.start) <= start && toMinutes(item.end) >= end
