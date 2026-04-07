@@ -1,0 +1,215 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  member
+  admin
+}
+
+enum PracticeDayStatus {
+  draft
+  collecting
+  proposed
+  confirmed
+  archived
+}
+
+enum PlanStatus {
+  proposed
+  confirmed
+}
+
+enum SlotType {
+  piece
+  break
+}
+
+enum SlotSource {
+  auto
+  manual
+}
+
+model Workspace {
+  id                String        @id @default(cuid())
+  slackTeamId       String        @unique
+  name              String
+  allowed           Boolean       @default(true)
+  reminderChannelId String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  users             User[]
+  pieces            Piece[]
+  practiceDays      PracticeDay[]
+}
+
+model User {
+  id             String         @id @default(cuid())
+  workspaceId    String
+  slackUserId    String
+  slackTeamId    String
+  displayName    String
+  realName       String?
+  avatarUrl      String?
+  instrument     String?
+  part           String?
+  role           UserRole       @default(member)
+  isActive       Boolean        @default(true)
+  lastLoginAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  workspace      Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  conducting     Piece[]        @relation("PieceConductor")
+  pieceMembers   PieceMember[]
+  availabilities Availability[]
+  generatedPlans Plan[]         @relation("GeneratedPlans")
+  confirmedPlans Plan[]         @relation("ConfirmedPlans")
+  reminderLogs   ReminderLog[]
+
+  @@unique([workspaceId, slackUserId])
+  @@index([workspaceId])
+}
+
+model Piece {
+  id                    String             @id @default(cuid())
+  workspaceId           String
+  title                 String
+  conductorUserId       String?
+  targetMinutesInWindow Int                @default(60)
+  dailyMaxMinutes       Int                @default(45)
+  isActive              Boolean            @default(true)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  workspace             Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  conductor             User?              @relation("PieceConductor", fields: [conductorUserId], references: [id], onDelete: SetNull)
+  members               PieceMember[]
+  practiceDayPieces     PracticeDayPiece[]
+  planSlots             PlanSlot[]
+
+  @@index([workspaceId])
+}
+
+model PieceMember {
+  id        String   @id @default(cuid())
+  pieceId   String
+  userId    String
+  weight    Decimal  @default(1.0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  piece     Piece    @relation(fields: [pieceId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([pieceId, userId])
+  @@index([userId])
+}
+
+model PracticeDay {
+  id                String             @id @default(cuid())
+  workspaceId       String
+  practiceDate      DateTime
+  startMinutes      Int
+  endMinutes        Int
+  responseDeadline  DateTime?
+  status            PracticeDayStatus  @default(draft)
+  scoringWindowSize Int                @default(5)
+  allowBreaks       Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  pieces            PracticeDayPiece[]
+  availabilities    Availability[]
+  plans             Plan[]
+  reminderLogs      ReminderLog[]
+
+  @@index([workspaceId, practiceDate])
+}
+
+model PracticeDayPiece {
+  id            String      @id @default(cuid())
+  practiceDayId String
+  pieceId       String
+  createdAt     DateTime    @default(now())
+  practiceDay   PracticeDay @relation(fields: [practiceDayId], references: [id], onDelete: Cascade)
+  piece         Piece       @relation(fields: [pieceId], references: [id], onDelete: Cascade)
+
+  @@unique([practiceDayId, pieceId])
+  @@index([pieceId])
+}
+
+model Availability {
+  id            String      @id @default(cuid())
+  practiceDayId String
+  userId        String
+  startMinutes  Int
+  endMinutes    Int
+  note          String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  practiceDay   PracticeDay @relation(fields: [practiceDayId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([practiceDayId, userId])
+}
+
+model Plan {
+  id                String      @id @default(cuid())
+  practiceDayId     String
+  status            PlanStatus  @default(proposed)
+  generatedAt       DateTime?
+  confirmedAt       DateTime?
+  generatedByUserId String?
+  confirmedByUserId String?
+  algorithmVersion  String      @default("heuristic-v1")
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  practiceDay       PracticeDay @relation(fields: [practiceDayId], references: [id], onDelete: Cascade)
+  generatedBy       User?       @relation("GeneratedPlans", fields: [generatedByUserId], references: [id], onDelete: SetNull)
+  confirmedBy       User?       @relation("ConfirmedPlans", fields: [confirmedByUserId], references: [id], onDelete: SetNull)
+  slots             PlanSlot[]
+
+  @@index([practiceDayId, status])
+}
+
+model PlanSlot {
+  id                 String     @id @default(cuid())
+  planId             String
+  slotType           SlotType
+  pieceId            String?
+  startMinutes       Int
+  endMinutes         Int
+  durationMinutes    Int
+  position           Int
+  isLocked           Boolean    @default(false)
+  source             SlotSource @default(auto)
+  scoreTotal         Decimal?
+  scoreAttendance    Decimal?
+  scoreProgress      Decimal?
+  scorePenalty       Decimal?
+  explanationJson    Json?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  plan               Plan       @relation(fields: [planId], references: [id], onDelete: Cascade)
+  piece              Piece?     @relation(fields: [pieceId], references: [id], onDelete: SetNull)
+
+  @@index([planId, position])
+  @@index([pieceId])
+}
+
+model ReminderLog {
+  id                  String      @id @default(cuid())
+  practiceDayId       String
+  slackChannelId      String
+  sentByUserId        String?
+  sentAt              DateTime    @default(now())
+  slackTs             String?
+  unansweredUserCount Int
+  messageSnapshot     String
+  practiceDay         PracticeDay @relation(fields: [practiceDayId], references: [id], onDelete: Cascade)
+  sentBy              User?       @relation(fields: [sentByUserId], references: [id], onDelete: SetNull)
+}

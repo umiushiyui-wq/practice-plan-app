@@ -1,0 +1,14 @@
+▲ Next.js 16.2.2 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.0.106:3000
+- Environments: .env
+✓ Ready in 423ms
+Creating turbopack project {
+  dir: 'C:\\Users\\yuito\\.vscode\\cli\\practice-plan-app',
+  testMode: true
+}
+
+ HEAD /player 200 in 354ms (next.js: 181ms, application-code: 174ms)
+ HEAD /player 200 in 40ms (next.js: 3ms, application-code: 37ms)
+ HEAD /player 200 in 36ms (next.js: 2ms, application-code: 33ms)
+ HEAD /player 200 in 35ms (next.js: 3ms, application-code: 33ms)
