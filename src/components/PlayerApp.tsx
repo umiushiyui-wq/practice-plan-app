@@ -235,7 +235,6 @@ export function PlayerApp() {
                 onChange={setDraftEnd}
               />
             </div>
-            <button type="button" onClick={saveAvailability}>保存</button>
             <div className="notice">
               {saveMessage || (hasSaved ? "保存済みです。" : "まだ保存されていないため、欠席扱いです。")}
             </div>
@@ -255,6 +254,7 @@ export function PlayerApp() {
                 {piece.title}
               </label>
             ))}
+            <button type="button" onClick={saveAvailability}>保存</button>
           </section>
 
           <section className="panel stack">
