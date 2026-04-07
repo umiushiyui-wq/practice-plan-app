@@ -14,9 +14,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <header className="topbar">
           <div className="topbar-inner">
             <Link href="/dashboard">吹奏楽 練習計画</Link>
-            <form action="/api/auth/logout" method="post">
-              <button className="secondary" type="submit">ログアウト</button>
-            </form>
           </div>
         </header>
         {children}
