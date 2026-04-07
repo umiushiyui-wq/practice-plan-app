@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import {
   generatePracticePlan,
   getSelectedPracticeDay,
@@ -26,6 +26,7 @@ const INSTRUMENT_OPTIONS = [
 
 export function AdminApp() {
   const { state, updateState } = useLocalPracticeState();
+  const [planMessage, setPlanMessage] = useState("");
   const selectedDay = getSelectedPracticeDay(state);
   const pieceMap = usePieceMap(state.pieces);
   const utilityMinutesRef = useRef<HTMLInputElement>(null);
@@ -175,6 +176,35 @@ export function AdminApp() {
     });
   }
 
+  function handleGeneratePlan() {
+    const generatedPlan = generatePracticePlan(state);
+    updateSelectedDay({ plan: generatedPlan });
+
+    if (generatedPlan.length > 0) {
+      setPlanMessage(`${generatedPlan.length}件の練習枠を生成しました。`);
+      return;
+    }
+
+    const presentMemberIds = new Set(
+      selectedDay.respondedMemberIds.filter((id) => !selectedDay.absentMemberIds.includes(id))
+    );
+    const readyPieceCount = state.pieces.filter(
+      (piece) => piece.conductorId && piece.memberIds.length > 0
+    ).length;
+
+    if (readyPieceCount === 0) {
+      setPlanMessage("計画を作れませんでした。曲に指揮者と出演者を設定してください。");
+      return;
+    }
+
+    if (presentMemberIds.size === 0) {
+      setPlanMessage("計画を作れませんでした。奏者側で出席として保存された人がまだいません。");
+      return;
+    }
+
+    setPlanMessage("計画を作れませんでした。指揮者・出演者の参加可能時間が重なる時間帯を確認してください。");
+  }
+
   function getSlotLabel(slot: typeof selectedDay.plan[number]) {
     if (slot.pieceId) return pieceMap.get(slot.pieceId)?.title ?? "曲";
     if (slot.reason?.includes("準備")) return "準備時間";
@@ -192,10 +222,11 @@ export function AdminApp() {
           <Link className="button secondary" href="/player">奏者入力URLへ</Link>
           <Link className="button secondary" href="/availability">参加可能時間表</Link>
           <Link className="button secondary" href="/sheet">表で見る</Link>
-          <button type="button" onClick={() => updateSelectedDay({ plan: generatePracticePlan(state) })}>
+          <button type="button" onClick={handleGeneratePlan}>
             選択中の日付で自動計画を生成
           </button>
         </div>
+        {planMessage ? <div className="notice">{planMessage}</div> : null}
       </section>
 
       <section className="panel stack">
