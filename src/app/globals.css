@@ -292,11 +292,101 @@ td {
 }
 
 @media (max-width: 720px) {
+  body {
+    font-size: 15px;
+  }
+
+  main {
+    width: min(100% - 20px, 1120px);
+    padding: 18px 0 40px;
+  }
+
+  h1 {
+    font-size: 26px;
+    line-height: 1.25;
+    margin: 0;
+  }
+
+  h2 {
+    font-size: 20px;
+    line-height: 1.3;
+    margin: 0;
+  }
+
+  .topbar {
+    padding: 12px 10px;
+  }
+
+  .topbar-inner {
+    justify-content: flex-start;
+  }
+
+  .panel {
+    padding: 14px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
   .date-time-grid {
     grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .time-parts {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .row {
+    gap: 8px;
+  }
+
+  .row > .button,
+  .row > button,
+  .utility-slot-form > button,
+  form > button {
+    width: 100%;
+    text-align: center;
+  }
+
+  input,
+  select,
+  textarea,
+  .button,
+  button {
+    min-height: 44px;
   }
 
   .utility-slot-form {
     grid-template-columns: 1fr;
+  }
+
+  th,
+  td {
+    padding: 8px;
+  }
+
+  .sheet-table,
+  .player-plan-table {
+    font-size: 13px;
+  }
+
+  .player-plan-table {
+    min-width: 0;
+  }
+
+  .availability-table {
+    font-size: 11px;
+    min-width: 640px;
+  }
+
+  .availability-table th,
+  .availability-table td {
+    padding: 3px;
+  }
+
+  .availability-table td {
+    min-width: 32px;
   }
 }
