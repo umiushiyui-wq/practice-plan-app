@@ -11,7 +11,7 @@
     "prisma:migrate": "prisma migrate dev"
   },
   "dependencies": {
-    "@prisma/client": "5.22.0",
+    "@prisma/client": "6.19.1",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest",
@@ -21,7 +21,7 @@
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "prisma": "5.22.0",
+    "prisma": "6.19.1",
     "typescript": "latest"
   }
 }
