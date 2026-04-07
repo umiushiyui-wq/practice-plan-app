@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRef } from "react";
 import {
   generatePracticePlan,
   getSelectedPracticeDay,
@@ -27,6 +28,9 @@ export function AdminApp() {
   const { state, updateState } = useLocalPracticeState();
   const selectedDay = getSelectedPracticeDay(state);
   const pieceMap = usePieceMap(state.pieces);
+  const utilityMinutesRef = useRef<HTMLInputElement>(null);
+  const plannedMinutes = selectedDay.plan.reduce((total, slot) => total + slot.duration, 0);
+  const practiceMinutes = toMinutes(selectedDay.endTime) - toMinutes(selectedDay.startTime);
 
   function updateSelectedDay(patch: Partial<typeof selectedDay>) {
     updateState({ practiceDays: updatePracticeDay(state, selectedDay.id, patch) });
@@ -154,6 +158,30 @@ export function AdminApp() {
     });
   }
 
+  function addUtilitySlot(label: string, minutes: number) {
+    const duration = Number.isFinite(minutes) ? Math.max(1, Math.floor(minutes)) : 1;
+    updateSelectedDay({
+      plan: [
+        ...selectedDay.plan,
+        {
+          id: makeId("s"),
+          pieceId: null,
+          start: selectedDay.startTime,
+          end: toTime(toMinutes(selectedDay.startTime) + duration),
+          duration,
+          reason: `${label}です。`
+        }
+      ]
+    });
+  }
+
+  function getSlotLabel(slot: typeof selectedDay.plan[number]) {
+    if (slot.pieceId) return pieceMap.get(slot.pieceId)?.title ?? "曲";
+    if (slot.reason?.includes("準備")) return "準備時間";
+    if (slot.reason?.includes("片付け")) return "片付け時間";
+    return "休憩";
+  }
+
   return (
     <main className="stack">
       <section className="panel stack">
@@ -172,55 +200,65 @@ export function AdminApp() {
 
       <section className="panel stack">
         <h2>練習日</h2>
-        <label>
-          編集する日付
-          <select
-            value={selectedDay.id}
-            onChange={(event) => updateState({ selectedPracticeDayId: event.target.value })}
-          >
-            {state.practiceDays.map((day) => (
-              <option key={day.id} value={day.id}>
-                {day.practiceDate} {day.startTime}-{day.endTime}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="date-time-grid">
+        <div className="section-block">
           <label>
-            日付
-            <input
-              type="date"
-              value={selectedDay.practiceDate}
-              onChange={(event) => updateSelectedDay({ practiceDate: event.target.value })}
-            />
-          </label>
-          <label>
-            開始
-            <input
-              type="time"
-              step="300"
-              value={selectedDay.startTime}
-              onChange={(event) => updateSelectedDay({ startTime: event.target.value })}
-            />
-          </label>
-          <label>
-            終了
-            <input
-              type="time"
-              step="300"
-              value={selectedDay.endTime}
-              onChange={(event) => updateSelectedDay({ endTime: event.target.value })}
-            />
+            編集する日付
+            <select
+              value={selectedDay.id}
+              onChange={(event) => updateState({ selectedPracticeDayId: event.target.value })}
+            >
+              {state.practiceDays.map((day) => (
+                <option key={day.id} value={day.id}>
+                  {day.practiceDate} {day.startTime}-{day.endTime}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
+
+        <div className="section-block stack">
+          <h3>編集中の日付設定</h3>
+          <div className="date-time-grid">
+            <label>
+              日付
+              <input
+                type="date"
+                value={selectedDay.practiceDate}
+                onChange={(event) => updateSelectedDay({ practiceDate: event.target.value })}
+              />
+            </label>
+            <label>
+              開始
+              <input
+                type="time"
+                step="300"
+                value={selectedDay.startTime}
+                onChange={(event) => updateSelectedDay({ startTime: event.target.value })}
+              />
+            </label>
+            <label>
+              終了
+              <input
+                type="time"
+                step="300"
+                value={selectedDay.endTime}
+                onChange={(event) => updateSelectedDay({ endTime: event.target.value })}
+              />
+            </label>
+          </div>
+          <p className="muted">
+            練習時間: {practiceMinutes}分 / 計画に追加済み: {plannedMinutes}分
+          </p>
+        </div>
         <form
-          className="stack"
+          className="section-block stack"
           onSubmit={(event) => {
             event.preventDefault();
             addPracticeDay(new FormData(event.currentTarget));
             event.currentTarget.reset();
           }}
         >
+          <h3>新しい練習日を追加</h3>
           <div className="date-time-grid">
             <label>
               追加する日付
@@ -237,7 +275,7 @@ export function AdminApp() {
           </div>
           <button type="submit">練習日を追加</button>
         </form>
-        <div className="row">
+        <div className="section-block row">
           <button className="danger" type="button" onClick={() => deletePracticeDay(selectedDay.id)}>
             選択中の日付を削除
           </button>
@@ -274,8 +312,14 @@ export function AdminApp() {
               <option value="">指揮者を選択</option>
               {state.members.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
             </select>
-            <input name="targetMinutes" type="number" min="0" step="5" defaultValue="60" placeholder="目標累積分" />
-            <input name="dailyMaxMinutes" type="number" min="15" step="5" defaultValue="45" placeholder="1日上限分" />
+            <label>
+              目標累積練習時間（全練習日で合計したい分）
+              <input name="targetMinutes" type="number" min="0" step="5" defaultValue="60" />
+            </label>
+            <label>
+              1日の最大練習時間（この曲を1日に入れる上限分）
+              <input name="dailyMaxMinutes" type="number" min="15" step="5" defaultValue="45" />
+            </label>
             <div className="stack">
               <strong>出演者</strong>
               {state.members.map((member) => (
@@ -312,22 +356,29 @@ export function AdminApp() {
       <section className="panel stack">
         <div className="row">
           <h2>{selectedDay.practiceDate} の計画編集</h2>
-          <button type="button" className="secondary" onClick={() => updateSelectedDay({ plan: [...selectedDay.plan, { id: makeId("s"), pieceId: null, start: selectedDay.startTime, end: toTime(toMinutes(selectedDay.startTime) + 5), duration: 5, reason: "休憩です。" }] })}>
-            5分休憩を追加
-          </button>
+          <span className="muted">合計 {plannedMinutes}分 / 練習時間 {practiceMinutes}分</span>
+        </div>
+        <div className="utility-slot-form">
+          <label>
+            追加する時間（分）
+            <input ref={utilityMinutesRef} name="minutes" type="number" min="1" step="1" defaultValue="5" />
+          </label>
+          <button type="button" className="secondary" onClick={() => addUtilitySlot("休憩", Number(utilityMinutesRef.current?.value ?? 5))}>休憩を追加</button>
+          <button type="button" className="secondary" onClick={() => addUtilitySlot("準備時間", Number(utilityMinutesRef.current?.value ?? 5))}>準備時間を追加</button>
+          <button type="button" className="secondary" onClick={() => addUtilitySlot("片付け時間", Number(utilityMinutesRef.current?.value ?? 5))}>片付け時間を追加</button>
         </div>
         {selectedDay.plan.map((slot) => (
           <article className="panel stack" key={slot.id}>
             <div className="grid">
               <select value={slot.pieceId ?? ""} onChange={(e) => updateSlot(slot.id, { pieceId: e.target.value || null })}>
-                <option value="">休憩</option>
+                <option value="">{getSlotLabel(slot)}</option>
                 {state.pieces.map((piece) => <option key={piece.id} value={piece.id}>{piece.title}</option>)}
               </select>
-              <input type="time" step="300" value={slot.start} onChange={(e) => updateSlot(slot.id, { start: e.target.value })} />
-              <input type="time" step="300" value={slot.end} onChange={(e) => updateSlot(slot.id, { end: e.target.value })} />
+              <input type="time" step="60" value={slot.start} onChange={(e) => updateSlot(slot.id, { start: e.target.value })} />
+              <input type="time" step="60" value={slot.end} onChange={(e) => updateSlot(slot.id, { end: e.target.value })} />
               <button className="danger" type="button" onClick={() => updateSelectedDay({ plan: selectedDay.plan.filter((item) => item.id !== slot.id) })}>削除</button>
             </div>
-            <p>{slot.pieceId ? pieceMap.get(slot.pieceId)?.title : "休憩"} / {slot.duration}分{slot.score ? `/ スコア ${slot.score}` : ""}</p>
+            <p>{getSlotLabel(slot)} / {slot.duration}分{slot.score ? `/ スコア ${slot.score}` : ""}</p>
             <div className="notice">{slot.reason ?? "管理者が手動修正した枠です。"}</div>
           </article>
         ))}
