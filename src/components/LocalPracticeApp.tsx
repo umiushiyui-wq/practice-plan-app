@@ -207,6 +207,26 @@ export function updatePracticeDay(
   return state.practiceDays.map((day) => (day.id === dayId ? { ...day, ...patch } : day));
 }
 
+export function sortPlanByTime(plan: PlanSlot[]) {
+  return [...plan].sort((a, b) => toMinutes(a.start) - toMinutes(b.start) || toMinutes(a.end) - toMinutes(b.end));
+}
+
+export function findOverlappingPlanSlots(plan: PlanSlot[]) {
+  const sortedPlan = sortPlanByTime(plan);
+  const overlappingIds = new Set<string>();
+
+  for (let index = 1; index < sortedPlan.length; index += 1) {
+    const previous = sortedPlan[index - 1];
+    const current = sortedPlan[index];
+    if (toMinutes(previous.end) > toMinutes(current.start)) {
+      overlappingIds.add(previous.id);
+      overlappingIds.add(current.id);
+    }
+  }
+
+  return overlappingIds;
+}
+
 export function isAvailable(availabilities: Availability[], memberId: string, start: number, end: number) {
   return availabilities.some(
     (item) => item.memberId === memberId && toMinutes(item.start) <= start && toMinutes(item.end) >= end

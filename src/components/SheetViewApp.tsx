@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { getSelectedPracticeDay, useLocalPracticeState, usePieceMap } from "@/components/LocalPracticeApp";
+import { getSelectedPracticeDay, sortPlanByTime, useLocalPracticeState, usePieceMap } from "@/components/LocalPracticeApp";
 
 function formatPracticeDateLabel(date: string) {
   const parsed = new Date(`${date}T00:00:00`);
@@ -13,6 +13,7 @@ export function SheetViewApp() {
   const { state, updateState } = useLocalPracticeState();
   const selectedDay = getSelectedPracticeDay(state);
   const pieceMap = usePieceMap(state.pieces);
+  const sortedPlan = sortPlanByTime(selectedDay.plan);
 
   return (
     <main className="stack">
@@ -62,7 +63,7 @@ export function SheetViewApp() {
                 </tr>
               </thead>
               <tbody>
-                {selectedDay.plan.map((slot, index) => {
+                {sortedPlan.map((slot, index) => {
                   const piece = slot.pieceId ? pieceMap.get(slot.pieceId) : null;
                   const conductor = piece
                     ? state.members.find((member) => member.id === piece.conductorId)

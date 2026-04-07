@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import {
   generatePracticePlan,
+  findOverlappingPlanSlots,
   getSelectedPracticeDay,
   makeId,
+  sortPlanByTime,
   toMinutes,
   toTime,
   updatePracticeDay,
@@ -32,6 +34,8 @@ export function AdminApp() {
   const utilityMinutesRef = useRef<HTMLInputElement>(null);
   const plannedMinutes = selectedDay.plan.reduce((total, slot) => total + slot.duration, 0);
   const practiceMinutes = toMinutes(selectedDay.endTime) - toMinutes(selectedDay.startTime);
+  const sortedPlan = sortPlanByTime(selectedDay.plan);
+  const overlappingSlotIds = findOverlappingPlanSlots(selectedDay.plan);
 
   function updateSelectedDay(patch: Partial<typeof selectedDay>) {
     updateState({ practiceDays: updatePracticeDay(state, selectedDay.id, patch) });
@@ -389,6 +393,7 @@ export function AdminApp() {
           <h2>{selectedDay.practiceDate} の計画編集</h2>
           <span className="muted">合計 {plannedMinutes}分 / 練習時間 {practiceMinutes}分</span>
         </div>
+        {overlappingSlotIds.size > 0 ? <div className="error">時間がかぶってます。</div> : null}
         <div className="utility-slot-form">
           <label>
             追加する時間（分）
@@ -398,8 +403,8 @@ export function AdminApp() {
           <button type="button" className="secondary" onClick={() => addUtilitySlot("準備時間", Number(utilityMinutesRef.current?.value ?? 5))}>準備時間を追加</button>
           <button type="button" className="secondary" onClick={() => addUtilitySlot("片付け時間", Number(utilityMinutesRef.current?.value ?? 5))}>片付け時間を追加</button>
         </div>
-        {selectedDay.plan.map((slot) => (
-          <article className="panel stack" key={slot.id}>
+        {sortedPlan.map((slot) => (
+          <article className={`panel stack${overlappingSlotIds.has(slot.id) ? " overlap-slot" : ""}`} key={slot.id}>
             <div className="grid">
               <select value={slot.pieceId ?? ""} onChange={(e) => updateSlot(slot.id, { pieceId: e.target.value || null })}>
                 <option value="">{getSlotLabel(slot)}</option>
@@ -409,6 +414,7 @@ export function AdminApp() {
               <input type="time" step="60" value={slot.end} onChange={(e) => updateSlot(slot.id, { end: e.target.value })} />
               <button className="danger" type="button" onClick={() => updateSelectedDay({ plan: selectedDay.plan.filter((item) => item.id !== slot.id) })}>削除</button>
             </div>
+            {overlappingSlotIds.has(slot.id) ? <div className="error">この枠の時間が他の枠とかぶっています。</div> : null}
             <p>{getSlotLabel(slot)} / {slot.duration}分{slot.score ? `/ スコア ${slot.score}` : ""}</p>
             <div className="notice">{slot.reason ?? "管理者が手動修正した枠です。"}</div>
           </article>

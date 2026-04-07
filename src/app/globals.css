@@ -185,6 +185,11 @@ td {
   padding: 12px;
 }
 
+.overlap-slot {
+  border-color: #efb4ae;
+  background: #fff8f7;
+}
+
 .utility-slot-form {
   display: grid;
   grid-template-columns: minmax(160px, 220px) repeat(3, max-content);

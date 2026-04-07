@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   getSelectedPracticeDay,
+  sortPlanByTime,
   toMinutes,
   toTime,
   updatePracticeDay,
@@ -105,6 +106,7 @@ export function PlayerApp() {
   const filteredMembers = state.members.filter((member) => (member.instrument || "未設定") === activePart);
   const selected = filteredMembers.find((member) => member.id === memberId) ?? filteredMembers[0] ?? state.members[0];
   const availabilityRecord = selectedDay.availabilities.find((item) => item.memberId === selected?.id);
+  const sortedPlan = sortPlanByTime(selectedDay.plan);
   const availability =
     availabilityRecord ?? {
       memberId: selected?.id ?? "",
@@ -273,7 +275,7 @@ export function PlayerApp() {
                     </tr>
                   </thead>
                   <tbody>
-                    {selectedDay.plan.map((slot) => (
+                    {sortedPlan.map((slot) => (
                       <tr key={slot.id}>
                         <td>{slot.start}</td>
                         <td>{slot.end}</td>
