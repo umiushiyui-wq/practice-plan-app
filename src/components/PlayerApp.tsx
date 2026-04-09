@@ -110,7 +110,7 @@ function TimePartSelect({
 export function PlayerApp() {
   const { state, updateState } = useLocalPracticeState();
   const pieceMap = usePieceMap(state.pieces);
-  const sortedPracticeDays = getSortedPracticeDays(state.practiceDays);
+  const sortedPracticeDays = useMemo(() => getSortedPracticeDays(state.practiceDays), [state.practiceDays]);
   const [selectedPart, setSelectedPart] = useState("");
   const [memberId, setMemberId] = useState("m1");
   const [selectedInputDayId, setSelectedInputDayId] = useState("");
