@@ -146,9 +146,35 @@ export function MemberPieceManagerApp() {
     });
   }
 
+  function clearPieceSettings(pieceId: string) {
+    const piece = state.pieces.find((item) => item.id === pieceId);
+    if (!piece || !confirm(`${piece.title} の設定を消去しますか？`)) return;
+
+    updateState({
+      pieces: state.pieces.map((item) =>
+        item.id === pieceId
+          ? {
+              ...item,
+              conductorId: "",
+              memberIds: [],
+              targetMinutes: 60,
+              dailyMaxMinutes: 45,
+              targetRangeStartDayId: sortedPracticeDays[0]?.id ?? null,
+              targetRangeEndDayId: sortedPracticeDays[sortedPracticeDays.length - 1]?.id ?? null
+            }
+          : item
+      ),
+      practiceDays: state.practiceDays.map((day) => ({
+        ...day,
+        plan: day.plan.filter((slot) => slot.pieceId !== pieceId)
+      })),
+      recentMinutes: Object.fromEntries(Object.entries(state.recentMinutes).filter(([id]) => id !== pieceId))
+    });
+  }
+
   function deletePiece(pieceId: string) {
     const piece = state.pieces.find((item) => item.id === pieceId);
-    if (!piece || !confirm(`${piece.title} を削除しますか？`)) return;
+    if (!piece || !confirm(`${piece.title} を曲一覧から完全に削除しますか？`)) return;
 
     const nextPieces = state.pieces.filter((item) => item.id !== piece.id);
     updateState({
@@ -329,9 +355,14 @@ export function MemberPieceManagerApp() {
                   <p className="muted">選択中の曲</p>
                   <h3>{selectedPiece.title}</h3>
                 </div>
-                <button className="danger" type="button" onClick={() => deletePiece(selectedPiece.id)}>
-                  この曲を削除
-                </button>
+                <div className="row">
+                  <button className="secondary" type="button" onClick={() => clearPieceSettings(selectedPiece.id)}>
+                    この曲の設定を消去
+                  </button>
+                  <button className="danger" type="button" onClick={() => deletePiece(selectedPiece.id)}>
+                    曲自体を削除
+                  </button>
+                </div>
               </div>
 
               <form
@@ -428,9 +459,14 @@ export function MemberPieceManagerApp() {
                       期間目標 {piece.targetMinutes}分 / 現在 {plannedMinutes}分 / 残り {remainingMinutes}分
                     </div>
                   </div>
-                  <button className="danger" type="button" onClick={() => deletePiece(piece.id)}>
-                    削除
-                  </button>
+                  <div className="row">
+                    <button className="secondary" type="button" onClick={() => clearPieceSettings(piece.id)}>
+                      設定を消去
+                    </button>
+                    <button className="danger" type="button" onClick={() => deletePiece(piece.id)}>
+                      曲を削除
+                    </button>
+                  </div>
                 </div>
               );
             })}
