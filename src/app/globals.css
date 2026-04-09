@@ -668,7 +668,7 @@ td {
 
 .color-map-summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -694,31 +694,35 @@ td {
 }
 
 .color-map-table thead th {
-  min-width: 14px;
-  padding: 4px 1px;
-  font-size: 9px;
+  min-width: 18px;
+  padding: 6px 2px;
+  font-size: 10px;
+  position: sticky;
+  top: 0;
+  z-index: 4;
 }
 
 .color-map-table tbody th {
-  min-width: 150px;
-  max-width: 150px;
-  z-index: 2;
+  min-width: 220px;
+  max-width: 220px;
+  z-index: 3;
+  text-align: left;
 }
 
 .color-map-table td {
-  min-width: 14px;
-  width: 14px;
-  height: 26px;
+  min-width: 18px;
+  width: 18px;
+  height: 30px;
   padding: 0;
   border: 0;
 }
 
 .color-map-table .practice-window-cell {
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
 }
 
 .color-map-table .hour-divider-cell {
-  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.5);
+  box-shadow: inset 2px 0 0 rgba(255, 255, 255, 0.55);
 }
 
 .color-map-table .hovered-slot-cell {

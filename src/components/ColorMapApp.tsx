@@ -39,6 +39,12 @@ export function ColorMapApp() {
   const { state, updateState } = useLocalPracticeState();
   const selectedDay = getSelectedPracticeDay(state);
   const [hoveredCell, setHoveredCell] = useState<HoveredCell | null>(null);
+  const practiceStart = toMinutes(selectedDay.startTime);
+  const practiceEnd = toMinutes(selectedDay.endTime);
+  const visibleSlots = useMemo(
+    () => HEATMAP_SLOTS.filter((minutes) => practiceStart <= minutes && minutes < practiceEnd),
+    [practiceEnd, practiceStart]
+  );
 
   const memberAvailabilityMap = useMemo(() => {
     const respondedMemberIds = new Set(selectedDay.respondedMemberIds);
@@ -57,25 +63,28 @@ export function ColorMapApp() {
   }, [selectedDay]);
 
   const heatmapRows = useMemo(() => {
-    return state.pieces.map((piece) => {
+    return state.pieces
+      .map((piece) => {
       const participantIds = Array.from(new Set([piece.conductorId, ...piece.memberIds].filter(Boolean)));
-      const counts = HEATMAP_SLOTS.map((minutes) => {
+      const counts = visibleSlots.map((minutes) => {
         const slotEnd = minutes + 10;
         return participantIds.filter((memberId) =>
           (memberAvailabilityMap.get(memberId) ?? []).some((window) => window.start < slotEnd && minutes < window.end)
         ).length;
       });
+      const peakCount = counts.length > 0 ? Math.max(...counts) : 0;
+      const averageCount = counts.length > 0 ? Math.round((counts.reduce((total, count) => total + count, 0) / counts.length) * 10) / 10 : 0;
 
       return {
         piece,
         participantTotal: participantIds.length,
-        counts
+        counts,
+        peakCount,
+        averageCount
       };
-    });
-  }, [memberAvailabilityMap, state.pieces]);
-
-  const practiceStart = toMinutes(selectedDay.startTime);
-  const practiceEnd = toMinutes(selectedDay.endTime);
+      })
+      .sort((a, b) => b.peakCount - a.peakCount || b.averageCount - a.averageCount || a.piece.title.localeCompare(b.piece.title, "ja"));
+  }, [memberAvailabilityMap, state.pieces, visibleSlots]);
 
   return (
     <main className="stack">
@@ -127,6 +136,11 @@ export function ColorMapApp() {
             <span className="muted">{selectedDay.practiceDate}</span>
           </article>
           <article className="plan-stat-card">
+            <span className="plan-stat-label">表示幅</span>
+            <strong>{visibleSlots.length}マス</strong>
+            <span className="muted">練習時間だけ表示</span>
+          </article>
+          <article className="plan-stat-card">
             <span className="plan-stat-label">色の目安</span>
             <strong>青 → 緑 → 赤茶</strong>
             <span className="muted">0人 / 20人 / 40人以上</span>
@@ -161,26 +175,27 @@ export function ColorMapApp() {
               <thead>
                 <tr>
                   <th>曲</th>
-                  {HEATMAP_SLOTS.map((minutes) => (
+                  {visibleSlots.map((minutes) => (
                     <th key={minutes} className={minutes % 60 === 0 ? "hour-divider-cell" : ""}>
-                      {minutes % 60 === 0 ? `${String(Math.floor(minutes / 60)).padStart(2, "0")}:00` : ""}
+                      {minutes % 60 === 0 || minutes === practiceStart
+                        ? `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`
+                        : ""}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {heatmapRows.map(({ piece, participantTotal, counts }) => (
+                {heatmapRows.map(({ piece, participantTotal, counts, peakCount, averageCount }) => (
                   <tr key={piece.id}>
                     <th>
                       {piece.title}
-                      <span className="muted">対象 {participantTotal}人</span>
+                      <span className="muted">対象 {participantTotal}人 / 最大 {peakCount}人 / 平均 {averageCount}人</span>
                     </th>
-                    {HEATMAP_SLOTS.map((minutes, index) => {
+                    {visibleSlots.map((minutes, index) => {
                       const count = counts[index];
-                      const inPractice = practiceStart <= minutes && minutes < practiceEnd;
                       const classNames = [
                         minutes % 60 === 0 ? "hour-divider-cell" : "",
-                        inPractice ? "practice-window-cell" : "",
+                        "practice-window-cell",
                         hoveredCell?.pieceId === piece.id && hoveredCell.minutes === minutes ? "hovered-slot-cell" : ""
                       ]
                         .filter(Boolean)
