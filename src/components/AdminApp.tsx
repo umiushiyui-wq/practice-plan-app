@@ -16,16 +16,37 @@ import {
   usePieceMap
 } from "@/components/LocalPracticeApp";
 
+function formatMinutesLabel(minutes: number) {
+  const safeMinutes = Math.max(0, minutes);
+  const hours = Math.floor(safeMinutes / 60);
+  const rest = safeMinutes % 60;
+  if (hours === 0) return `${rest}分`;
+  if (rest === 0) return `${hours}時間`;
+  return `${hours}時間${rest}分`;
+}
+
+function getSlotVariant(slotLabel: string) {
+  if (slotLabel.includes("休憩")) return "break";
+  if (slotLabel.includes("準備")) return "setup";
+  if (slotLabel.includes("片付け")) return "cleanup";
+  return "piece";
+}
+
 export function AdminApp() {
   const { state, updateState } = useLocalPracticeState();
   const [planMessage, setPlanMessage] = useState("");
   const selectedDay = getSelectedPracticeDay(state);
   const pieceMap = usePieceMap(state.pieces);
   const utilityMinutesRef = useRef<HTMLInputElement>(null);
-  const plannedMinutes = selectedDay.plan.reduce((total, slot) => total + slot.duration, 0);
   const practiceMinutes = toMinutes(selectedDay.endTime) - toMinutes(selectedDay.startTime);
   const sortedPlan = sortPlanByTime(selectedDay.plan);
+  const plannedMinutes = sortedPlan.reduce((total, slot) => total + slot.duration, 0);
+  const freeMinutes = Math.max(0, practiceMinutes - plannedMinutes);
   const overlappingSlotIds = findOverlappingPlanSlots(selectedDay.plan);
+  const pieceSlotCount = sortedPlan.filter((slot) => slot.pieceId).length;
+  const utilitySlotCount = sortedPlan.length - pieceSlotCount;
+  const coverageRatio = practiceMinutes > 0 ? Math.min(1, plannedMinutes / practiceMinutes) : 0;
+  const usedPieceCount = new Set(sortedPlan.map((slot) => slot.pieceId).filter(Boolean)).size;
 
   function updateSelectedDay(patch: Partial<typeof selectedDay>) {
     updateState({ practiceDays: updatePracticeDay(state, selectedDay.id, patch) });
@@ -62,40 +83,6 @@ export function AdminApp() {
     updateState({
       practiceDays: nextDays,
       selectedPracticeDayId: state.selectedPracticeDayId === dayId ? nextDays[0].id : state.selectedPracticeDayId
-    });
-  }
-
-  function deleteMember(memberId: string) {
-    const member = state.members.find((item) => item.id === memberId);
-    if (!member || !confirm(`${member.name} を削除しますか？`)) return;
-
-    updateState({
-      members: state.members.filter((item) => item.id !== memberId),
-      practiceDays: state.practiceDays.map((day) => ({
-        ...day,
-        availabilities: day.availabilities.filter((item) => item.memberId !== memberId),
-        absentMemberIds: day.absentMemberIds.filter((id) => id !== memberId),
-        respondedMemberIds: day.respondedMemberIds.filter((id) => id !== memberId)
-      })),
-      pieces: state.pieces.map((piece) => ({
-        ...piece,
-        conductorId: piece.conductorId === memberId ? "" : piece.conductorId,
-        memberIds: piece.memberIds.filter((id) => id !== memberId)
-      }))
-    });
-  }
-
-  function deletePiece(pieceId: string) {
-    const piece = state.pieces.find((item) => item.id === pieceId);
-    if (!piece || !confirm(`${piece.title} を削除しますか？`)) return;
-
-    updateState({
-      pieces: state.pieces.filter((item) => item.id !== pieceId),
-      practiceDays: state.practiceDays.map((day) => ({
-        ...day,
-        plan: day.plan.filter((slot) => slot.pieceId !== pieceId)
-      })),
-      recentMinutes: Object.fromEntries(Object.entries(state.recentMinutes).filter(([id]) => id !== pieceId))
     });
   }
 
@@ -170,7 +157,7 @@ export function AdminApp() {
       <section className="panel stack">
         <p className="muted">管理者用URL</p>
         <h1>管理者用 練習計画</h1>
-        <p>練習日と練習計画を管理する画面です。</p>
+        <p>練習日を選んで、自動生成と手動調整を組み合わせながら当日の流れを整えます。</p>
         <div className="row">
           <Link className="button" href="/admin/setup">
             メンバー・曲の追加
@@ -240,7 +227,7 @@ export function AdminApp() {
             </label>
           </div>
           <p className="muted">
-            練習時間 {practiceMinutes}分 / 計画に割り当て済み {plannedMinutes}分
+            練習時間 {formatMinutesLabel(practiceMinutes)} / 計画済み {formatMinutesLabel(plannedMinutes)}
           </p>
         </div>
 
@@ -279,68 +266,162 @@ export function AdminApp() {
 
       <section className="panel stack">
         <div className="row">
-          <h2>{selectedDay.practiceDate} の練習計画</h2>
+          <div>
+            <p className="muted">Practice Flow</p>
+            <h2>{selectedDay.practiceDate} の練習計画</h2>
+          </div>
           <span className="muted">
-            割り当て {plannedMinutes}分 / 練習時間 {practiceMinutes}分
+            {selectedDay.startTime} - {selectedDay.endTime}
           </span>
         </div>
-        {overlappingSlotIds.size > 0 ? <div className="error">時間が重なっている枠があります。</div> : null}
-        <div className="utility-slot-form">
-          <label>
-            追加する補助枠の分数
-            <input ref={utilityMinutesRef} name="minutes" type="number" min="1" step="1" defaultValue="5" />
-          </label>
-          <button
-            type="button"
-            className="secondary"
-            onClick={() => addUtilitySlot("休憩", Number(utilityMinutesRef.current?.value ?? 5))}
-          >
-            休憩を追加
-          </button>
-          <button
-            type="button"
-            className="secondary"
-            onClick={() => addUtilitySlot("合奏準備", Number(utilityMinutesRef.current?.value ?? 5))}
-          >
-            合奏準備を追加
-          </button>
-          <button
-            type="button"
-            className="secondary"
-            onClick={() => addUtilitySlot("片付け", Number(utilityMinutesRef.current?.value ?? 5))}
-          >
-            片付けを追加
-          </button>
-        </div>
-        {sortedPlan.map((slot) => (
-          <article className={`panel stack${overlappingSlotIds.has(slot.id) ? " overlap-slot" : ""}`} key={slot.id}>
-            <div className="grid">
-              <select value={slot.pieceId ?? ""} onChange={(event) => updateSlot(slot.id, { pieceId: event.target.value || null })}>
-                <option value="">{getSlotLabel(slot)}</option>
-                {state.pieces.map((piece) => (
-                  <option key={piece.id} value={piece.id}>
-                    {piece.title}
-                  </option>
-                ))}
-              </select>
-              <input type="time" step="60" value={slot.start} onChange={(event) => updateSlot(slot.id, { start: event.target.value })} />
-              <input type="time" step="60" value={slot.end} onChange={(event) => updateSlot(slot.id, { end: event.target.value })} />
-              <button
-                className="danger"
-                type="button"
-                onClick={() => updateSelectedDay({ plan: selectedDay.plan.filter((item) => item.id !== slot.id) })}
-              >
-                削除
-              </button>
-            </div>
-            {overlappingSlotIds.has(slot.id) ? <div className="error">この枠は別の枠と時間が重なっています。</div> : null}
-            <p>
-              {getSlotLabel(slot)} / {slot.duration}分
-              {slot.score ? ` / スコア ${slot.score}` : ""}
-            </p>
-            <div className="notice">{slot.reason ?? "管理者が手動で調整した枠です。"}</div>
+
+        <div className="plan-summary-grid">
+          <article className="plan-stat-card">
+            <span className="plan-stat-label">進行率</span>
+            <strong>{Math.round(coverageRatio * 100)}%</strong>
+            <span className="muted">
+              {formatMinutesLabel(plannedMinutes)} / {formatMinutesLabel(practiceMinutes)}
+            </span>
           </article>
-        ))}
+          <article className="plan-stat-card">
+            <span className="plan-stat-label">曲の枠</span>
+            <strong>{pieceSlotCount}</strong>
+            <span className="muted">{usedPieceCount}曲を使用</span>
+          </article>
+          <article className="plan-stat-card">
+            <span className="plan-stat-label">補助枠</span>
+            <strong>{utilitySlotCount}</strong>
+            <span className="muted">休憩・準備・片付け</span>
+          </article>
+          <article className="plan-stat-card">
+            <span className="plan-stat-label">空き時間</span>
+            <strong>{formatMinutesLabel(freeMinutes)}</strong>
+            <span className="muted">{overlappingSlotIds.size > 0 ? "要調整" : "まだ追加できます"}</span>
+          </article>
+        </div>
+
+        <div className="plan-progress-card">
+          <div className="plan-progress-header">
+            <strong>時間の使い方</strong>
+            <span className="muted">{overlappingSlotIds.size > 0 ? "時間重複あり" : "重複なし"}</span>
+          </div>
+          <div className="plan-progress-track" aria-hidden="true">
+            <div className="plan-progress-fill" style={{ width: `${coverageRatio * 100}%` }} />
+          </div>
+          <div className="plan-progress-meta muted">
+            計画済み {formatMinutesLabel(plannedMinutes)} / 空き {formatMinutesLabel(freeMinutes)}
+          </div>
+        </div>
+
+        {overlappingSlotIds.size > 0 ? <div className="error">時間が重なっている枠があります。開始・終了時刻を見直してください。</div> : null}
+
+        <div className="plan-toolbar">
+          <div className="plan-toolbar-head">
+            <strong>補助枠を追加</strong>
+            <span className="muted">短い休憩や準備時間を先に置くと、全体の流れを整えやすいです。</span>
+          </div>
+          <div className="utility-slot-form">
+            <label>
+              追加する分数
+              <input ref={utilityMinutesRef} name="minutes" type="number" min="1" step="1" defaultValue="5" />
+            </label>
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => addUtilitySlot("休憩", Number(utilityMinutesRef.current?.value ?? 5))}
+            >
+              休憩を追加
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => addUtilitySlot("合奏準備", Number(utilityMinutesRef.current?.value ?? 5))}
+            >
+              合奏準備を追加
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => addUtilitySlot("片付け", Number(utilityMinutesRef.current?.value ?? 5))}
+            >
+              片付けを追加
+            </button>
+          </div>
+        </div>
+
+        {sortedPlan.length === 0 ? (
+          <div className="plan-empty-state">
+            <strong>まだ計画がありません。</strong>
+            <p className="muted">自動生成を使うか、補助枠を追加してここから流れを組み立ててください。</p>
+          </div>
+        ) : (
+          <div className="plan-timeline">
+            {sortedPlan.map((slot, index) => {
+              const slotLabel = getSlotLabel(slot);
+              const slotVariant = getSlotVariant(slotLabel);
+
+              return (
+                <article
+                  className={`plan-slot-card plan-slot-${slotVariant}${overlappingSlotIds.has(slot.id) ? " overlap-slot" : ""}`}
+                  key={slot.id}
+                >
+                  <div className="plan-slot-rail">
+                    <span className="plan-slot-index">{String(index + 1).padStart(2, "0")}</span>
+                  </div>
+
+                  <div className="plan-slot-main">
+                    <div className="plan-slot-top">
+                      <div className="plan-slot-heading">
+                        <span className="plan-slot-time">
+                          {slot.start} - {slot.end}
+                        </span>
+                        <h3>{slotLabel}</h3>
+                      </div>
+                      <div className="plan-slot-badges">
+                        <span className="plan-badge">{formatMinutesLabel(slot.duration)}</span>
+                        {slot.score ? <span className="plan-badge accent">スコア {slot.score}</span> : null}
+                        {overlappingSlotIds.has(slot.id) ? <span className="plan-badge danger">重複</span> : null}
+                      </div>
+                    </div>
+
+                    <div className="plan-slot-editor">
+                      <label>
+                        内容
+                        <select value={slot.pieceId ?? ""} onChange={(event) => updateSlot(slot.id, { pieceId: event.target.value || null })}>
+                          <option value="">{slotLabel}</option>
+                          {state.pieces.map((piece) => (
+                            <option key={piece.id} value={piece.id}>
+                              {piece.title}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        開始
+                        <input type="time" step="60" value={slot.start} onChange={(event) => updateSlot(slot.id, { start: event.target.value })} />
+                      </label>
+                      <label>
+                        終了
+                        <input type="time" step="60" value={slot.end} onChange={(event) => updateSlot(slot.id, { end: event.target.value })} />
+                      </label>
+                      <button
+                        className="danger"
+                        type="button"
+                        onClick={() => updateSelectedDay({ plan: selectedDay.plan.filter((item) => item.id !== slot.id) })}
+                      >
+                        削除
+                      </button>
+                    </div>
+
+                    <div className="plan-slot-footer">
+                      <div className="notice">{slot.reason ?? "管理者が手動で調整した枠です。"}</div>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
       </section>
     </main>
   );

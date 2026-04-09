@@ -197,6 +197,218 @@ td {
   align-items: end;
 }
 
+.plan-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.plan-stat-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgb(15 111 143 / 0.05), transparent 70%),
+    #fdfefe;
+}
+
+.plan-stat-card strong {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.plan-stat-label {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.plan-progress-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fbfdff;
+}
+
+.plan-progress-header,
+.plan-progress-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.plan-progress-track {
+  overflow: hidden;
+  height: 12px;
+  border-radius: 999px;
+  background: #dfe8ef;
+}
+
+.plan-progress-fill {
+  height: 100%;
+  min-width: 8px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0f6f8f, #49a7c2);
+}
+
+.plan-toolbar {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fcfcfb;
+}
+
+.plan-toolbar-head {
+  display: grid;
+  gap: 4px;
+}
+
+.plan-empty-state {
+  display: grid;
+  place-items: center;
+  min-height: 180px;
+  border: 1px dashed #bfd0db;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at top left, rgb(15 111 143 / 0.08), transparent 35%),
+    #fbfdff;
+  text-align: center;
+  padding: 24px;
+}
+
+.plan-timeline {
+  display: grid;
+  gap: 14px;
+}
+
+.plan-slot-card {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 8px 22px rgb(15 31 51 / 0.05);
+}
+
+.plan-slot-piece {
+  background:
+    linear-gradient(135deg, rgb(15 111 143 / 0.08), transparent 42%),
+    #fff;
+}
+
+.plan-slot-break {
+  background:
+    linear-gradient(135deg, rgb(57 143 78 / 0.08), transparent 42%),
+    #fff;
+}
+
+.plan-slot-setup,
+.plan-slot-cleanup {
+  background:
+    linear-gradient(135deg, rgb(214 139 43 / 0.08), transparent 42%),
+    #fff;
+}
+
+.plan-slot-rail {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+}
+
+.plan-slot-index {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: #0d2f3f;
+  color: white;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.plan-slot-main {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.plan-slot-top {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.plan-slot-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.plan-slot-heading h3 {
+  font-size: 22px;
+}
+
+.plan-slot-time {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.plan-slot-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.plan-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #eef3f7;
+  color: #234;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.plan-badge.accent {
+  background: #e1f3f8;
+  color: #0c566f;
+}
+
+.plan-badge.danger {
+  background: #fff1f0;
+  color: var(--danger);
+}
+
+.plan-slot-editor {
+  display: grid;
+  grid-template-columns: minmax(220px, 2fr) repeat(2, minmax(110px, 140px)) 120px;
+  gap: 12px;
+  align-items: end;
+}
+
+.plan-slot-footer {
+  display: grid;
+  gap: 10px;
+}
+
 .sheet-wrap {
   width: 100%;
   overflow-x: auto;
@@ -367,6 +579,33 @@ td {
     grid-template-columns: 1fr;
   }
 
+  .plan-summary-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .plan-slot-card {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .plan-slot-rail {
+    justify-items: start;
+  }
+
+  .plan-slot-index {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+  }
+
+  .plan-slot-heading h3 {
+    font-size: 18px;
+  }
+
+  .plan-slot-editor {
+    grid-template-columns: 1fr;
+  }
+
   th,
   td {
     padding: 8px;
@@ -393,5 +632,11 @@ td {
 
   .availability-table td {
     min-width: 32px;
+  }
+}
+
+@media (max-width: 520px) {
+  .plan-summary-grid {
+    grid-template-columns: 1fr;
   }
 }
