@@ -277,56 +277,6 @@ export function AdminApp() {
         </div>
       </section>
 
-      <div className="grid">
-        <section className="panel stack">
-          <div className="row">
-            <h2>メンバー一覧</h2>
-            <Link className="button secondary" href="/admin/setup">
-              追加ページへ
-            </Link>
-          </div>
-          {state.members.length === 0 ? <p className="muted">まだメンバーがいません。</p> : null}
-          {state.members.map((member) => (
-            <div className="row" key={member.id}>
-              <div>
-                <strong>{member.name}</strong>
-                <div className="muted">
-                  {member.instrument || "楽器未設定"}
-                  {member.part ? ` / ${member.part}` : ""}
-                </div>
-              </div>
-              <button className="danger" type="button" onClick={() => deleteMember(member.id)}>
-                削除
-              </button>
-            </div>
-          ))}
-        </section>
-
-        <section className="panel stack">
-          <div className="row">
-            <h2>曲一覧</h2>
-            <Link className="button secondary" href="/admin/setup">
-              追加ページへ
-            </Link>
-          </div>
-          {state.pieces.length === 0 ? <p className="muted">まだ曲がありません。</p> : null}
-          {state.pieces.map((piece) => (
-            <div className="row" key={piece.id}>
-              <div>
-                <strong>{piece.title}</strong>
-                <div className="muted">
-                  指揮者: {state.members.find((member) => member.id === piece.conductorId)?.name ?? "未設定"} / 参加者{" "}
-                  {piece.memberIds.length}人 / 目標 {piece.targetMinutes}分 / 1日上限 {piece.dailyMaxMinutes}分
-                </div>
-              </div>
-              <button className="danger" type="button" onClick={() => deletePiece(piece.id)}>
-                削除
-              </button>
-            </div>
-          ))}
-        </section>
-      </div>
-
       <section className="panel stack">
         <div className="row">
           <h2>{selectedDay.practiceDate} の練習計画</h2>
