@@ -601,6 +601,53 @@ td {
   box-shadow: inset 0 0 0 1px #1f7a33;
 }
 
+.player-availability-table .practice-window-cell {
+  background: #eef6ff;
+  box-shadow: inset 0 0 0 2px #4f8fdd;
+}
+
+.player-availability-table .practice-window-cell.available-cell {
+  background: #2f9e44;
+  box-shadow:
+    inset 0 0 0 2px #4f8fdd,
+    inset 0 0 0 999px rgb(47 158 68 / 0.92);
+}
+
+.legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #f2f6fa;
+  color: #183241;
+  font-weight: 700;
+}
+
+.legend-chip.practice::before,
+.legend-chip.available::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  border-radius: 6px;
+}
+
+.legend-chip.practice::before {
+  background: #eef6ff;
+  box-shadow: inset 0 0 0 2px #4f8fdd;
+}
+
+.legend-chip.available::before {
+  background: #2f9e44;
+  box-shadow: inset 0 0 0 1px #1f7a33;
+}
+
 @media (max-width: 720px) {
   body {
     font-size: 15px;

@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  getSelectedPracticeDay,
   getPlanSlotLabel,
+  getSortedPracticeDays,
   sortPlanByTime,
   toMinutes,
   toTime,
@@ -12,6 +12,17 @@ import {
   useLocalPracticeState,
   usePieceMap
 } from "@/components/LocalPracticeApp";
+
+const AVAILABILITY_HOURS = Array.from({ length: 15 }, (_, index) => index + 8);
+
+type DraftByDay = Record<
+  string,
+  {
+    start: string;
+    end: string;
+    absent: boolean;
+  }
+>;
 
 function buildTimeOptions(startTime: string, endTime: string) {
   const startMinutes = Math.ceil(toMinutes(startTime) / 10) * 10;
@@ -74,7 +85,9 @@ function TimePartSelect({
           disabled={disabled}
         >
           {hourOptions.map((hour) => (
-            <option key={hour} value={hour}>{hour}時</option>
+            <option key={hour} value={hour}>
+              {hour}時
+            </option>
           ))}
         </select>
         <select
@@ -84,7 +97,9 @@ function TimePartSelect({
           disabled={disabled}
         >
           {minuteOptions.map((minute) => (
-            <option key={minute} value={minute}>{minute}分</option>
+            <option key={minute} value={minute}>
+              {minute}分
+            </option>
           ))}
         </select>
       </div>
@@ -94,29 +109,17 @@ function TimePartSelect({
 
 export function PlayerApp() {
   const { state, updateState } = useLocalPracticeState();
+  const pieceMap = usePieceMap(state.pieces);
+  const sortedPracticeDays = getSortedPracticeDays(state.practiceDays);
   const [selectedPart, setSelectedPart] = useState("");
   const [memberId, setMemberId] = useState("m1");
-  const [draftStart, setDraftStart] = useState("");
-  const [draftEnd, setDraftEnd] = useState("");
-  const [draftAbsent, setDraftAbsent] = useState(true);
+  const [draftsByDay, setDraftsByDay] = useState<DraftByDay>({});
   const [saveMessage, setSaveMessage] = useState("");
-  const selectedDay = getSelectedPracticeDay(state);
-  const pieceMap = usePieceMap(state.pieces);
+
   const partOptions = Array.from(new Set(state.members.map((member) => member.instrument || "未設定")));
   const activePart = partOptions.includes(selectedPart) ? selectedPart : partOptions[0] ?? "";
   const filteredMembers = state.members.filter((member) => (member.instrument || "未設定") === activePart);
-  const selected = filteredMembers.find((member) => member.id === memberId) ?? filteredMembers[0] ?? state.members[0];
-  const availabilityRecord = selectedDay.availabilities.find((item) => item.memberId === selected?.id);
-  const sortedPlan = sortPlanByTime(selectedDay.plan);
-  const availability =
-    availabilityRecord ?? {
-      memberId: selected?.id ?? "",
-      start: selectedDay.startTime,
-      end: selectedDay.endTime
-    };
-  const hasSaved = selected ? selectedDay.respondedMemberIds.includes(selected.id) : false;
-  const savedAsAbsent = selected ? selectedDay.absentMemberIds.includes(selected.id) : false;
-  const timeOptions = buildTimeOptions(selectedDay.startTime, selectedDay.endTime);
+  const selected = filteredMembers.find((member) => member.id === memberId) ?? filteredMembers[0] ?? state.members[0] ?? null;
 
   useEffect(() => {
     if (activePart && selectedPart !== activePart) {
@@ -131,35 +134,70 @@ export function PlayerApp() {
   }, [memberId, selected]);
 
   useEffect(() => {
-    setDraftStart(availability.start);
-    setDraftEnd(availability.end);
-    setDraftAbsent(hasSaved ? savedAsAbsent : false);
-    setSaveMessage("");
-  }, [availability.start, availability.end, hasSaved, savedAsAbsent, selected?.id, selectedDay.id]);
+    if (!selected) return;
 
-  function updateSelectedDay(patch: Partial<typeof selectedDay>) {
-    updateState({ practiceDays: updatePracticeDay(state, selectedDay.id, patch) });
+    const nextDrafts = Object.fromEntries(
+      sortedPracticeDays.map((day) => {
+        const savedAvailability = day.availabilities.find((item) => item.memberId === selected.id);
+        const hasSaved = day.respondedMemberIds.includes(selected.id);
+        const isAbsent = !hasSaved || day.absentMemberIds.includes(selected.id);
+
+        return [
+          day.id,
+          {
+            start: savedAvailability?.start ?? day.startTime,
+            end: savedAvailability?.end ?? day.endTime,
+            absent: isAbsent
+          }
+        ];
+      })
+    ) as DraftByDay;
+
+    setDraftsByDay(nextDrafts);
+    setSaveMessage("");
+  }, [selected, sortedPracticeDays]);
+
+  function updateDayDraft(dayId: string, patch: Partial<DraftByDay[string]>) {
+    setDraftsByDay((current) => ({
+      ...current,
+      [dayId]: {
+        ...current[dayId],
+        ...patch
+      }
+    }));
   }
 
-  function saveAvailability() {
+  function saveAvailability(dayId: string) {
     if (!selected) return;
-    updateSelectedDay({
-      availabilities: draftAbsent
-        ? selectedDay.availabilities.filter((item) => item.memberId !== selected.id)
+
+    const day = state.practiceDays.find((item) => item.id === dayId);
+    const draft = draftsByDay[dayId];
+    if (!day || !draft) return;
+
+    const nextPracticeDays = updatePracticeDay(state, dayId, {
+      availabilities: draft.absent
+        ? day.availabilities.filter((item) => item.memberId !== selected.id)
         : [
-            ...selectedDay.availabilities.filter((item) => item.memberId !== selected.id),
-            { memberId: selected.id, start: draftStart, end: draftEnd }
+            ...day.availabilities.filter((item) => item.memberId !== selected.id),
+            { memberId: selected.id, start: draft.start, end: draft.end }
           ],
-      absentMemberIds: draftAbsent
-        ? Array.from(new Set([...selectedDay.absentMemberIds, selected.id]))
-        : selectedDay.absentMemberIds.filter((id) => id !== selected.id),
-      respondedMemberIds: Array.from(new Set([...selectedDay.respondedMemberIds, selected.id]))
+      absentMemberIds: draft.absent
+        ? Array.from(new Set([...day.absentMemberIds, selected.id]))
+        : day.absentMemberIds.filter((id) => id !== selected.id),
+      respondedMemberIds: Array.from(new Set([...day.respondedMemberIds, selected.id]))
     });
-    setSaveMessage(draftAbsent ? "欠席で保存しました。" : `${draftStart}-${draftEnd} で保存しました。`);
+
+    updateState({ practiceDays: nextPracticeDays });
+    setSaveMessage(
+      draft.absent
+        ? `${day.practiceDate} を欠席で保存しました。`
+        : `${day.practiceDate} を ${draft.start}-${draft.end} で保存しました。`
+    );
   }
 
   function togglePiece(pieceId: string, checked: boolean) {
     if (!selected) return;
+
     updateState({
       pieces: state.pieces.map((piece) =>
         piece.id === pieceId
@@ -174,77 +212,215 @@ export function PlayerApp() {
     });
   }
 
+  function isPracticeHour(dayId: string, hour: number) {
+    const day = sortedPracticeDays.find((item) => item.id === dayId);
+    if (!day) return false;
+
+    const slotStart = hour * 60;
+    const slotEnd = hour === 22 ? slotStart : slotStart + 60;
+    const practiceStart = toMinutes(day.startTime);
+    const practiceEnd = toMinutes(day.endTime);
+
+    return hour === 22 ? practiceStart <= slotStart && slotStart <= practiceEnd : practiceStart < slotEnd && slotStart < practiceEnd;
+  }
+
+  function isMemberAvailableAtHour(dayId: string, hour: number) {
+    if (!selected) return false;
+
+    const day = sortedPracticeDays.find((item) => item.id === dayId);
+    const draft = draftsByDay[dayId];
+    if (!day || !draft || draft.absent) return false;
+
+    const slotStart = hour * 60;
+    const slotEnd = hour === 22 ? slotStart : slotStart + 60;
+    const availabilityStart = toMinutes(draft.start);
+    const availabilityEnd = toMinutes(draft.end);
+
+    return hour === 22
+      ? availabilityStart <= slotStart && availabilityEnd >= slotStart
+      : availabilityStart < slotEnd && slotStart < availabilityEnd;
+  }
+
+  const visiblePlans = useMemo(
+    () =>
+      Object.fromEntries(
+        sortedPracticeDays.map((day) => [day.id, sortPlanByTime(day.plan)])
+      ) as Record<string, ReturnType<typeof sortPlanByTime>>,
+    [sortedPracticeDays]
+  );
+
   return (
     <main className="stack">
       <section className="panel stack">
-        <p className="muted">奏者入力URL</p>
-        <h1>参加可能時間と出演曲の入力</h1>
-        <p>練習日を選んで、その日の参加可能時間を入力します。</p>
+        <p className="muted">奏者ページ</p>
+        <h1>参加可能時間と参加曲の入力</h1>
+        <p>自分の名前を選ぶと、登録済みのすべての練習日について入力できます。青い枠が練習時間、緑が自分が出席する時間です。</p>
         <div className="row">
-          <Link className="button secondary" href="/admin">管理者用URLへ</Link>
-          <a className="button secondary" href="#practice-plan">練習計画表へ</a>
+          <Link className="button secondary" href="/admin">
+            管理画面へ
+          </Link>
+          <a className="button secondary" href="#my-availability">
+            参加可能時間表へ
+          </a>
         </div>
       </section>
 
       <section className="panel stack">
-        <h2>練習日と自分を選択</h2>
-        <select
-          value={selectedDay.id}
-          onChange={(event) => updateState({ selectedPracticeDayId: event.target.value })}
-        >
-          {state.practiceDays.map((day) => (
-            <option key={day.id} value={day.id}>
-              {day.practiceDate} {day.startTime}-{day.endTime}
+        <h2>自分を選ぶ</h2>
+        <select value={activePart} onChange={(event) => setSelectedPart(event.target.value)}>
+          {partOptions.map((part) => (
+            <option key={part} value={part}>
+              {part}
             </option>
           ))}
         </select>
-        <select value={activePart} onChange={(event) => setSelectedPart(event.target.value)}>
-          {partOptions.map((part) => (
-            <option key={part} value={part}>{part}</option>
+        <select value={selected?.id ?? ""} onChange={(event) => setMemberId(event.target.value)}>
+          {filteredMembers.map((member) => (
+            <option key={member.id} value={member.id}>
+              {member.name}
+            </option>
           ))}
         </select>
-        <select value={selected?.id ?? ""} onChange={(e) => setMemberId(e.target.value)}>
-          {filteredMembers.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
-        </select>
-        <p className="muted">名前がない場合は、管理者にメンバー追加してもらってください。</p>
+        <p className="muted">名前がなければ、管理者側でメンバーを追加してもらってください。</p>
       </section>
 
       {selected ? (
         <>
-          <section id="practice-plan" className="panel stack">
-            <h2>{selectedDay.practiceDate} の参加可能時間</h2>
-            <label className="row">
-              <input
-                style={{ width: "auto" }}
-                type="checkbox"
-                checked={draftAbsent}
-                onChange={(event) => setDraftAbsent(event.target.checked)}
-              />
-              欠席
-            </label>
-            <div className="grid">
-              <TimePartSelect
-                label="開始"
-                value={draftStart}
-                options={timeOptions}
-                disabled={draftAbsent}
-                onChange={setDraftStart}
-              />
-              <TimePartSelect
-                label="終了"
-                value={draftEnd}
-                options={timeOptions}
-                disabled={draftAbsent}
-                onChange={setDraftEnd}
-              />
+          <section id="my-availability" className="panel stack">
+            <h2>{selected.name} の参加可能時間表</h2>
+            <div className="availability-wrap">
+              <table className="availability-table player-availability-table">
+                <thead>
+                  <tr>
+                    <th>練習日</th>
+                    {AVAILABILITY_HOURS.map((hour) => (
+                      <th key={hour}>{hour}:00</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedPracticeDays.map((day) => {
+                    const draft = draftsByDay[day.id];
+                    const label = draft
+                      ? draft.absent
+                        ? "欠席"
+                        : `${draft.start}-${draft.end}`
+                      : "未入力";
+
+                    return (
+                      <tr key={day.id}>
+                        <th>
+                          {day.practiceDate}
+                          <span className="muted">
+                            練習 {day.startTime}-{day.endTime} / 自分 {label}
+                          </span>
+                        </th>
+                        {AVAILABILITY_HOURS.map((hour) => {
+                          const classNames = [
+                            isPracticeHour(day.id, hour) ? "practice-window-cell" : "",
+                            isMemberAvailableAtHour(day.id, hour) ? "available-cell" : ""
+                          ]
+                            .filter(Boolean)
+                            .join(" ");
+
+                          return <td key={`${day.id}-${hour}`} className={classNames} />;
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-            <div className="notice">
-              {saveMessage || (hasSaved ? "保存済みです。" : "まだ保存されていないため、欠席扱いです。")}
+            <div className="legend-row">
+              <span className="legend-chip practice">青枠: 練習時間</span>
+              <span className="legend-chip available">緑: 出席する時間</span>
             </div>
           </section>
 
           <section className="panel stack">
-            <h2>自分が出演する曲</h2>
+            <h2>練習日ごとの入力</h2>
+            {saveMessage ? <div className="notice">{saveMessage}</div> : null}
+            {sortedPracticeDays.map((day) => {
+              const draft = draftsByDay[day.id];
+              const timeOptions = buildTimeOptions(day.startTime, day.endTime);
+              const dayPlan = visiblePlans[day.id] ?? [];
+
+              if (!draft) return null;
+
+              return (
+                <section className="panel subtle-panel stack" key={day.id}>
+                  <div className="row page-section-head">
+                    <div>
+                      <h3>{day.practiceDate}</h3>
+                      <p className="muted">
+                        練習時間 {day.startTime}-{day.endTime}
+                      </p>
+                    </div>
+                    <button type="button" onClick={() => saveAvailability(day.id)}>
+                      この日の入力を保存
+                    </button>
+                  </div>
+
+                  <label className="row">
+                    <input
+                      style={{ width: "auto" }}
+                      type="checkbox"
+                      checked={draft.absent}
+                      onChange={(event) => updateDayDraft(day.id, { absent: event.target.checked })}
+                    />
+                    欠席
+                  </label>
+
+                  <div className="grid">
+                    <TimePartSelect
+                      label="開始"
+                      value={draft.start}
+                      options={timeOptions}
+                      disabled={draft.absent}
+                      onChange={(value) => updateDayDraft(day.id, { start: value })}
+                    />
+                    <TimePartSelect
+                      label="終了"
+                      value={draft.end}
+                      options={timeOptions}
+                      disabled={draft.absent}
+                      onChange={(value) => updateDayDraft(day.id, { end: value })}
+                    />
+                  </div>
+
+                  {dayPlan.length > 0 ? (
+                    <div className="sheet-wrap">
+                      <table className="player-plan-table">
+                        <thead>
+                          <tr>
+                            <th>開始</th>
+                            <th>終了</th>
+                            <th>分</th>
+                            <th>内容</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dayPlan.map((slot) => (
+                            <tr key={slot.id}>
+                              <td>{slot.start}</td>
+                              <td>{slot.end}</td>
+                              <td>{slot.duration}</td>
+                              <td>{getPlanSlotLabel(slot, slot.pieceId ? pieceMap.get(slot.pieceId)?.title : undefined)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="muted">まだこの日の練習計画はありません。</p>
+                  )}
+                </section>
+              );
+            })}
+          </section>
+
+          <section className="panel stack">
+            <h2>自分が出る曲</h2>
             {state.pieces.length === 0 ? <p className="muted">まだ曲が登録されていません。</p> : null}
             {state.pieces.map((piece) => (
               <label className="row" key={piece.id}>
@@ -252,42 +428,11 @@ export function PlayerApp() {
                   style={{ width: "auto" }}
                   type="checkbox"
                   checked={piece.memberIds.includes(selected.id)}
-                  onChange={(e) => togglePiece(piece.id, e.target.checked)}
+                  onChange={(event) => togglePiece(piece.id, event.target.checked)}
                 />
                 {piece.title}
               </label>
             ))}
-            <button type="button" onClick={saveAvailability}>保存</button>
-          </section>
-
-          <section className="panel stack">
-            <h2>{selectedDay.practiceDate} の練習計画表</h2>
-            {selectedDay.plan.length === 0 ? (
-              <p className="muted">まだこの日の計画がありません。</p>
-            ) : (
-              <div className="sheet-wrap">
-                <table className="player-plan-table">
-                  <thead>
-                    <tr>
-                      <th>開始</th>
-                      <th>終了</th>
-                      <th>分</th>
-                      <th>曲</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedPlan.map((slot) => (
-                      <tr key={slot.id}>
-                        <td>{slot.start}</td>
-                        <td>{slot.end}</td>
-                        <td>{slot.duration}</td>
-                        <td>{getPlanSlotLabel(slot, slot.pieceId ? pieceMap.get(slot.pieceId)?.title : undefined)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
           </section>
         </>
       ) : null}
