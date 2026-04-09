@@ -40,6 +40,7 @@ export function AdminApp() {
   const manualStartTimeRef = useRef<HTMLInputElement>(null);
   const utilityMinutesRef = useRef<HTMLInputElement>(null);
   const manualPieceRef = useRef<HTMLSelectElement>(null);
+
   const practiceMinutes = toMinutes(selectedDay.endTime) - toMinutes(selectedDay.startTime);
   const sortedPlan = sortPlanByTime(selectedDay.plan);
   const plannedMinutes = sortedPlan.reduce((total, slot) => total + slot.duration, 0);
@@ -52,31 +53,6 @@ export function AdminApp() {
 
   function updateSelectedDay(patch: Partial<typeof selectedDay>) {
     updateState({ practiceDays: updatePracticeDay(state, selectedDay.id, patch) });
-  }
-
-  function addPracticeDay(formData: FormData) {
-    const practiceDate = String(formData.get("practiceDate") ?? "").trim();
-    if (!practiceDate) return;
-
-    const startTime = String(formData.get("startTime") ?? selectedDay.startTime);
-    const endTime = String(formData.get("endTime") ?? selectedDay.endTime);
-    const id = makeId("d");
-    updateState({
-      selectedPracticeDayId: id,
-      practiceDays: [
-        ...state.practiceDays,
-        {
-          id,
-          practiceDate,
-          startTime,
-          endTime,
-          availabilities: [],
-          absentMemberIds: state.members.map((member) => member.id),
-          respondedMemberIds: [],
-          plan: []
-        }
-      ]
-    });
   }
 
   function deletePracticeDay(dayId: string) {
@@ -191,7 +167,7 @@ export function AdminApp() {
     const readyPieceCount = state.pieces.filter((piece) => piece.conductorId && piece.memberIds.length > 0).length;
 
     if (readyPieceCount === 0) {
-      setPlanMessage("計画を作れませんでした。先に指揮者と参加メンバーを曲に設定してください。");
+      setPlanMessage("計画を作れませんでした。先に指揮者と参加状況の入力を確認してください。");
       return;
     }
 
@@ -215,7 +191,7 @@ export function AdminApp() {
         <p>練習日を選んで、自動生成と手動調整を組み合わせながら当日の流れを整えます。</p>
         <div className="row">
           <Link className="button" href="/admin/setup">
-            メンバー・曲の追加
+            メンバー・曲・練習日の追加
           </Link>
           <Link className="button secondary" href="/player">
             奏者入力URLへ
@@ -283,32 +259,6 @@ export function AdminApp() {
           </p>
         </div>
 
-        <form
-          className="section-block stack"
-          onSubmit={(event) => {
-            event.preventDefault();
-            addPracticeDay(new FormData(event.currentTarget));
-            event.currentTarget.reset();
-          }}
-        >
-          <h3>新しい練習日を追加</h3>
-          <div className="date-time-grid">
-            <label>
-              日付
-              <input name="practiceDate" type="date" required />
-            </label>
-            <label>
-              開始
-              <input name="startTime" type="time" step="300" defaultValue={selectedDay.startTime} required />
-            </label>
-            <label>
-              終了
-              <input name="endTime" type="time" step="300" defaultValue={selectedDay.endTime} required />
-            </label>
-          </div>
-          <button type="submit">練習日を追加</button>
-        </form>
-
         <div className="section-block row">
           <button className="danger" type="button" onClick={() => deletePracticeDay(selectedDay.id)}>
             選択中の練習日を削除
@@ -374,7 +324,7 @@ export function AdminApp() {
 
         <div className="plan-toolbar">
           <div className="plan-toolbar-head">
-            <strong>補助枠を追加</strong>
+            <strong>補助枠や曲を追加</strong>
             <span className="muted">開始時刻を指定して追加すると、その時間帯は既存の枠を上書きします。</span>
           </div>
           <div className="utility-slot-form">
@@ -462,7 +412,7 @@ export function AdminApp() {
         {sortedPlan.length === 0 ? (
           <div className="plan-empty-state">
             <strong>まだ計画がありません。</strong>
-            <p className="muted">自動生成を使うか、補助枠を追加してここから流れを組み立ててください。</p>
+            <p className="muted">自動生成を使うか、補助枠や曲を追加してここから流れを組み立ててください。</p>
           </div>
         ) : (
           <div className="plan-timeline">

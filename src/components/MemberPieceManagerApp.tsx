@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   getPlannedMinutesByPiece,
   getSortedPracticeDays,
@@ -78,6 +78,31 @@ export function MemberPieceManagerApp() {
     });
   }
 
+  function addPracticeDay(formData: FormData) {
+    const practiceDate = String(formData.get("practiceDate") ?? "").trim();
+    if (!practiceDate) return;
+    const startTime = String(formData.get("startTime") ?? "18:00");
+    const endTime = String(formData.get("endTime") ?? "21:00");
+    const id = makeId("d");
+
+    updateState({
+      selectedPracticeDayId: id,
+      practiceDays: [
+        ...state.practiceDays,
+        {
+          id,
+          practiceDate,
+          startTime,
+          endTime,
+          availabilities: [],
+          absentMemberIds: state.members.map((member) => member.id),
+          respondedMemberIds: [],
+          plan: []
+        }
+      ]
+    });
+  }
+
   function addPiece(formData: FormData) {
     const title = String(formData.get("title") ?? "").trim();
     if (!title) return;
@@ -121,19 +146,23 @@ export function MemberPieceManagerApp() {
     });
   }
 
-  function deleteSelectedPiece() {
-    if (!selectedPiece || !confirm(`${selectedPiece.title} を削除しますか？`)) return;
+  function deletePiece(pieceId: string) {
+    const piece = state.pieces.find((item) => item.id === pieceId);
+    if (!piece || !confirm(`${piece.title} を削除しますか？`)) return;
 
-    const nextPieces = state.pieces.filter((piece) => piece.id !== selectedPiece.id);
+    const nextPieces = state.pieces.filter((item) => item.id !== piece.id);
     updateState({
       pieces: nextPieces,
       practiceDays: state.practiceDays.map((day) => ({
         ...day,
-        plan: day.plan.filter((slot) => slot.pieceId !== selectedPiece.id)
+        plan: day.plan.filter((slot) => slot.pieceId !== piece.id)
       })),
-      recentMinutes: Object.fromEntries(Object.entries(state.recentMinutes).filter(([id]) => id !== selectedPiece.id))
+      recentMinutes: Object.fromEntries(Object.entries(state.recentMinutes).filter(([id]) => id !== piece.id))
     });
-    setSelectedPieceId(nextPieces[0]?.id ?? "");
+
+    if (selectedPieceId === piece.id) {
+      setSelectedPieceId(nextPieces[0]?.id ?? "");
+    }
   }
 
   const defaultStartDayId = sortedPracticeDays[0]?.id ?? "";
@@ -143,8 +172,8 @@ export function MemberPieceManagerApp() {
     <main className="stack">
       <section className="panel stack">
         <p className="muted">管理者用URL</p>
-        <h1>メンバー・曲の追加</h1>
-        <p>まず曲名だけ追加して、そのあと詳細を設定する流れにしています。</p>
+        <h1>メンバー・曲・練習日の追加</h1>
+        <p>メンバー、練習日、曲をここで準備してから、管理画面で練習計画を整えます。</p>
         <div className="row">
           <Link className="button secondary" href="/admin">
             管理画面へ戻る
@@ -204,6 +233,52 @@ export function MemberPieceManagerApp() {
         </section>
 
         <section className="panel stack">
+          <h2>練習日を追加</h2>
+          <form
+            className="stack"
+            onSubmit={(event) => {
+              event.preventDefault();
+              addPracticeDay(new FormData(event.currentTarget));
+              event.currentTarget.reset();
+            }}
+          >
+            <label>
+              日付
+              <input name="practiceDate" type="date" required />
+            </label>
+            <div className="date-time-grid">
+              <label>
+                開始
+                <input name="startTime" type="time" step="300" defaultValue="18:00" required />
+              </label>
+              <label>
+                終了
+                <input name="endTime" type="time" step="300" defaultValue="21:00" required />
+              </label>
+            </div>
+            <button type="submit">練習日を追加</button>
+          </form>
+
+          <details className="fold-panel" open>
+            <summary>
+              入力済みの練習日
+              <span className="muted">{sortedPracticeDays.length}日</span>
+            </summary>
+            <div className="fold-panel-body stack">
+              {sortedPracticeDays.length === 0 ? <p className="muted">まだ練習日がありません。</p> : null}
+              {sortedPracticeDays.map((day) => (
+                <div className="row" key={day.id}>
+                  <strong>{day.practiceDate}</strong>
+                  <span className="muted">
+                    {day.startTime} - {day.endTime}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </details>
+        </section>
+
+        <section className="panel stack">
           <h2>曲を追加</h2>
           <form
             className="stack"
@@ -254,7 +329,7 @@ export function MemberPieceManagerApp() {
                   <p className="muted">選択中の曲</p>
                   <h3>{selectedPiece.title}</h3>
                 </div>
-                <button className="danger" type="button" onClick={deleteSelectedPiece}>
+                <button className="danger" type="button" onClick={() => deletePiece(selectedPiece.id)}>
                   この曲を削除
                 </button>
               </div>
@@ -353,27 +428,7 @@ export function MemberPieceManagerApp() {
                       期間目標 {piece.targetMinutes}分 / 現在 {plannedMinutes}分 / 残り {remainingMinutes}分
                     </div>
                   </div>
-                  <button
-                    className="danger"
-                    type="button"
-                    onClick={() => {
-                      if (!confirm(`${piece.title} を削除しますか？`)) return;
-                      const nextPieces = state.pieces.filter((item) => item.id !== piece.id);
-                      updateState({
-                        pieces: nextPieces,
-                        practiceDays: state.practiceDays.map((day) => ({
-                          ...day,
-                          plan: day.plan.filter((slot) => slot.pieceId !== piece.id)
-                        })),
-                        recentMinutes: Object.fromEntries(
-                          Object.entries(state.recentMinutes).filter(([id]) => id !== piece.id)
-                        )
-                      });
-                      if (selectedPieceId === piece.id) {
-                        setSelectedPieceId(nextPieces[0]?.id ?? "");
-                      }
-                    }}
-                  >
+                  <button className="danger" type="button" onClick={() => deletePiece(piece.id)}>
                     削除
                   </button>
                 </div>
