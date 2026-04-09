@@ -596,6 +596,17 @@ td {
   background: #ffffff;
 }
 
+.player-availability-table td {
+  min-width: 14px;
+  padding: 0;
+}
+
+.player-availability-table thead th {
+  min-width: 14px;
+  padding: 4px 2px;
+  font-size: 10px;
+}
+
 .availability-table .available-cell {
   background: #2f9e44;
   box-shadow: inset 0 0 0 1px #1f7a33;

@@ -13,7 +13,7 @@ import {
   usePieceMap
 } from "@/components/LocalPracticeApp";
 
-const AVAILABILITY_HOURS = Array.from({ length: 15 }, (_, index) => index + 8);
+const AVAILABILITY_SLOTS = Array.from({ length: ((22 - 8) * 60) / 10 + 1 }, (_, index) => 8 * 60 + index * 10);
 
 type DraftByDay = Record<
   string,
@@ -224,32 +224,28 @@ export function PlayerApp() {
     });
   }
 
-  function isPracticeHour(dayId: string, hour: number) {
+  function isPracticeSlot(dayId: string, slotStart: number) {
     const day = sortedPracticeDays.find((item) => item.id === dayId);
     if (!day) return false;
 
-    const slotStart = hour * 60;
-    const slotEnd = hour === 22 ? slotStart : slotStart + 60;
+    const slotEnd = slotStart + 10;
     const practiceStart = toMinutes(day.startTime);
     const practiceEnd = toMinutes(day.endTime);
 
-    return hour === 22 ? practiceStart <= slotStart && slotStart <= practiceEnd : practiceStart < slotEnd && slotStart < practiceEnd;
+    return practiceStart < slotEnd && slotStart < practiceEnd;
   }
 
-  function isMemberAvailableAtHour(dayId: string, hour: number) {
+  function isMemberAvailableAtSlot(dayId: string, slotStart: number) {
     if (!selected) return false;
 
     const draft = draftsByDay[dayId];
     if (!draft || draft.absent) return false;
 
-    const slotStart = hour * 60;
-    const slotEnd = hour === 22 ? slotStart : slotStart + 60;
+    const slotEnd = slotStart + 10;
     const availabilityStart = toMinutes(draft.start);
     const availabilityEnd = toMinutes(draft.end);
 
-    return hour === 22
-      ? availabilityStart <= slotStart && availabilityEnd >= slotStart
-      : availabilityStart < slotEnd && slotStart < availabilityEnd;
+    return availabilityStart < slotEnd && slotStart < availabilityEnd;
   }
 
   const visiblePlans = useMemo(
@@ -324,8 +320,8 @@ export function PlayerApp() {
                 <thead>
                   <tr>
                     <th>練習日</th>
-                    {AVAILABILITY_HOURS.map((hour) => (
-                      <th key={hour}>{hour}:00</th>
+                    {AVAILABILITY_SLOTS.map((minutes) => (
+                      <th key={minutes}>{minutes % 60 === 0 ? toTime(minutes) : ""}</th>
                     ))}
                   </tr>
                 </thead>
@@ -346,15 +342,15 @@ export function PlayerApp() {
                             練習 {day.startTime}-{day.endTime} / 自分 {label}
                           </span>
                         </th>
-                        {AVAILABILITY_HOURS.map((hour) => {
+                        {AVAILABILITY_SLOTS.map((minutes) => {
                           const classNames = [
-                            isPracticeHour(day.id, hour) ? "practice-window-cell" : "",
-                            isMemberAvailableAtHour(day.id, hour) ? "available-cell" : ""
+                            isPracticeSlot(day.id, minutes) ? "practice-window-cell" : "",
+                            isMemberAvailableAtSlot(day.id, minutes) ? "available-cell" : ""
                           ]
                             .filter(Boolean)
                             .join(" ");
 
-                          return <td key={`${day.id}-${hour}`} className={classNames} />;
+                          return <td key={`${day.id}-${minutes}`} className={classNames} />;
                         })}
                       </tr>
                     );
