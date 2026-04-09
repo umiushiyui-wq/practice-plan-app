@@ -597,15 +597,15 @@ td {
 }
 
 .player-availability-table td {
-  min-width: 10px;
+  min-width: 5px;
   padding: 0;
   border: 0;
 }
 
 .player-availability-table thead th {
-  min-width: 10px;
-  padding: 4px 2px;
-  font-size: 10px;
+  min-width: 5px;
+  padding: 3px 1px;
+  font-size: 9px;
 }
 
 .availability-table .available-cell {
