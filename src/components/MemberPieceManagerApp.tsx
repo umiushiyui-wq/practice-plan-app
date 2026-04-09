@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import {
   getPlannedMinutesByPiece,
   getSortedPracticeDays,
@@ -23,6 +24,19 @@ const INSTRUMENT_OPTIONS = [
 export function MemberPieceManagerApp() {
   const { state, updateState } = useLocalPracticeState();
   const sortedPracticeDays = getSortedPracticeDays(state.practiceDays);
+  const [selectedPieceId, setSelectedPieceId] = useState("");
+
+  const selectedPiece =
+    state.pieces.find((piece) => piece.id === selectedPieceId) ?? state.pieces[0] ?? null;
+
+  useEffect(() => {
+    if (selectedPiece && selectedPiece.id !== selectedPieceId) {
+      setSelectedPieceId(selectedPiece.id);
+    }
+    if (!selectedPiece && selectedPieceId) {
+      setSelectedPieceId("");
+    }
+  }, [selectedPiece, selectedPieceId]);
 
   function addMember(formData: FormData) {
     const name = String(formData.get("name") ?? "").trim();
@@ -68,21 +82,58 @@ export function MemberPieceManagerApp() {
     const title = String(formData.get("title") ?? "").trim();
     if (!title) return;
 
+    const pieceId = makeId("p");
     updateState({
       pieces: [
         ...state.pieces,
         {
-          id: makeId("p"),
+          id: pieceId,
           title,
-          conductorId: String(formData.get("conductorId") ?? ""),
-          memberIds: formData.getAll("memberIds").map(String),
-          targetMinutes: Number(formData.get("targetMinutes") ?? 60),
-          dailyMaxMinutes: Number(formData.get("dailyMaxMinutes") ?? 45),
-          targetRangeStartDayId: String(formData.get("targetRangeStartDayId") ?? "") || null,
-          targetRangeEndDayId: String(formData.get("targetRangeEndDayId") ?? "") || null
+          conductorId: "",
+          memberIds: [],
+          targetMinutes: 60,
+          dailyMaxMinutes: 45,
+          targetRangeStartDayId: sortedPracticeDays[0]?.id ?? null,
+          targetRangeEndDayId: sortedPracticeDays[sortedPracticeDays.length - 1]?.id ?? null
         }
       ]
     });
+    setSelectedPieceId(pieceId);
+  }
+
+  function updateSelectedPiece(formData: FormData) {
+    if (!selectedPiece) return;
+
+    updateState({
+      pieces: state.pieces.map((piece) =>
+        piece.id === selectedPiece.id
+          ? {
+              ...piece,
+              conductorId: String(formData.get("conductorId") ?? ""),
+              memberIds: formData.getAll("memberIds").map(String),
+              targetMinutes: Number(formData.get("targetMinutes") ?? 60),
+              dailyMaxMinutes: Number(formData.get("dailyMaxMinutes") ?? 45),
+              targetRangeStartDayId: String(formData.get("targetRangeStartDayId") ?? "") || null,
+              targetRangeEndDayId: String(formData.get("targetRangeEndDayId") ?? "") || null
+            }
+          : piece
+      )
+    });
+  }
+
+  function deleteSelectedPiece() {
+    if (!selectedPiece || !confirm(`${selectedPiece.title} を削除しますか？`)) return;
+
+    const nextPieces = state.pieces.filter((piece) => piece.id !== selectedPiece.id);
+    updateState({
+      pieces: nextPieces,
+      practiceDays: state.practiceDays.map((day) => ({
+        ...day,
+        plan: day.plan.filter((slot) => slot.pieceId !== selectedPiece.id)
+      })),
+      recentMinutes: Object.fromEntries(Object.entries(state.recentMinutes).filter(([id]) => id !== selectedPiece.id))
+    });
+    setSelectedPieceId(nextPieces[0]?.id ?? "");
   }
 
   const defaultStartDayId = sortedPracticeDays[0]?.id ?? "";
@@ -93,7 +144,7 @@ export function MemberPieceManagerApp() {
       <section className="panel stack">
         <p className="muted">管理者用URL</p>
         <h1>メンバー・曲の追加</h1>
-        <p>メンバー登録と曲登録をまとめて行うページです。</p>
+        <p>まず曲名だけ追加して、そのあと詳細を設定する流れにしています。</p>
         <div className="row">
           <Link className="button secondary" href="/admin">
             管理画面へ戻る
@@ -162,69 +213,134 @@ export function MemberPieceManagerApp() {
               event.currentTarget.reset();
             }}
           >
-            <input name="title" placeholder="曲名" required />
-            <select name="conductorId" required>
-              <option value="">指揮者を選択</option>
-              {state.members.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.name}
-                </option>
-              ))}
-            </select>
-
-            <div className="date-time-grid">
-              <label>
-                期間の開始日
-                <select name="targetRangeStartDayId" defaultValue={defaultStartDayId} disabled={sortedPracticeDays.length === 0}>
-                  {sortedPracticeDays.map((day) => (
-                    <option key={day.id} value={day.id}>
-                      {day.practiceDate}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                期間の終了日
-                <select name="targetRangeEndDayId" defaultValue={defaultEndDayId} disabled={sortedPracticeDays.length === 0}>
-                  {sortedPracticeDays.map((day) => (
-                    <option key={day.id} value={day.id}>
-                      {day.practiceDate}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <p className="muted">
-              入力済みの練習日の中から、この曲の目標時間を見たい期間を選びます。期間外の練習日は目標計算に含めません。
-            </p>
-
-            <label>
-              その期間で確保したい練習時間
-              <input name="targetMinutes" type="number" min="0" step="5" defaultValue="60" />
-            </label>
-            <label>
-              1日の最大練習時間
-              <input name="dailyMaxMinutes" type="number" min="15" step="5" defaultValue="45" />
-            </label>
-
-            <details className="fold-panel" open>
-              <summary>
-                参加メンバー
-                <span className="muted">{state.members.length}人から選択</span>
-              </summary>
-              <div className="fold-panel-body stack">
-                {state.members.length === 0 ? <p className="muted">先にメンバーを追加してください。</p> : null}
-                {state.members.map((member) => (
-                  <label className="row" key={member.id}>
-                    <input style={{ width: "auto" }} name="memberIds" type="checkbox" value={member.id} />
-                    {member.name}
-                  </label>
-                ))}
-              </div>
-            </details>
-
+            <input name="title" placeholder="まずは曲名だけ追加" required />
             <button type="submit">曲を追加</button>
           </form>
+
+          <details className="fold-panel" open>
+            <summary>
+              追加済みの曲
+              <span className="muted">{state.pieces.length}曲</span>
+            </summary>
+            <div className="fold-panel-body stack">
+              {state.pieces.length === 0 ? <p className="muted">まだ曲がありません。</p> : null}
+              {state.pieces.map((piece) => (
+                <button
+                  key={piece.id}
+                  type="button"
+                  className={`piece-select-button${selectedPiece?.id === piece.id ? " is-active" : ""}`}
+                  onClick={() => setSelectedPieceId(piece.id)}
+                >
+                  <span>{piece.title}</span>
+                </button>
+              ))}
+            </div>
+          </details>
+
+          {selectedPiece ? (
+            <section className="panel subtle-panel stack">
+              <div className="row">
+                <div>
+                  <p className="muted">選択中の曲</p>
+                  <h3>{selectedPiece.title}</h3>
+                </div>
+                <button className="danger" type="button" onClick={deleteSelectedPiece}>
+                  この曲を削除
+                </button>
+              </div>
+
+              <form
+                className="stack"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  updateSelectedPiece(new FormData(event.currentTarget));
+                }}
+              >
+                <label>
+                  指揮者
+                  <select name="conductorId" defaultValue={selectedPiece.conductorId}>
+                    <option value="">指揮者を選択</option>
+                    {state.members.map((member) => (
+                      <option key={member.id} value={member.id}>
+                        {member.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="date-time-grid">
+                  <label>
+                    期間の開始日
+                    <select
+                      name="targetRangeStartDayId"
+                      defaultValue={selectedPiece.targetRangeStartDayId ?? defaultStartDayId}
+                      disabled={sortedPracticeDays.length === 0}
+                    >
+                      {sortedPracticeDays.map((day) => (
+                        <option key={day.id} value={day.id}>
+                          {day.practiceDate}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    期間の終了日
+                    <select
+                      name="targetRangeEndDayId"
+                      defaultValue={selectedPiece.targetRangeEndDayId ?? defaultEndDayId}
+                      disabled={sortedPracticeDays.length === 0}
+                    >
+                      {sortedPracticeDays.map((day) => (
+                        <option key={day.id} value={day.id}>
+                          {day.practiceDate}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <p className="muted">この曲の目標時間をどの練習日範囲で見るかを選びます。</p>
+
+                <label>
+                  その期間で確保したい練習時間
+                  <input name="targetMinutes" type="number" min="0" step="5" defaultValue={selectedPiece.targetMinutes} />
+                </label>
+                <label>
+                  1日の最大練習時間
+                  <input
+                    name="dailyMaxMinutes"
+                    type="number"
+                    min="15"
+                    step="5"
+                    defaultValue={selectedPiece.dailyMaxMinutes}
+                  />
+                </label>
+
+                <details className="fold-panel" open>
+                  <summary>
+                    参加メンバー
+                    <span className="muted">{state.members.length}人から選択</span>
+                  </summary>
+                  <div className="fold-panel-body stack">
+                    {state.members.length === 0 ? <p className="muted">先にメンバーを追加してください。</p> : null}
+                    {state.members.map((member) => (
+                      <label className="row" key={member.id}>
+                        <input
+                          style={{ width: "auto" }}
+                          name="memberIds"
+                          type="checkbox"
+                          value={member.id}
+                          defaultChecked={selectedPiece.memberIds.includes(member.id)}
+                        />
+                        {member.name}
+                      </label>
+                    ))}
+                  </div>
+                </details>
+
+                <button type="submit">この曲の設定を保存</button>
+              </form>
+            </section>
+          ) : null}
 
           <div className="stack">
             <strong>現在の曲</strong>

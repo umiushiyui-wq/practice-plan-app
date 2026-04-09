@@ -436,6 +436,29 @@ td {
   padding: 14px 16px 16px;
 }
 
+.subtle-panel {
+  background: #f8fbfd;
+}
+
+.piece-select-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: white;
+  color: var(--text);
+  padding: 12px 14px;
+  font-weight: 700;
+}
+
+.piece-select-button.is-active {
+  border-color: var(--accent);
+  background: #eaf6fa;
+  color: var(--accent-dark);
+}
+
 .sheet-wrap {
   width: 100%;
   overflow-x: auto;
