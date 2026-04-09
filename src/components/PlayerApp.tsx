@@ -227,9 +227,8 @@ export function PlayerApp() {
   function isMemberAvailableAtHour(dayId: string, hour: number) {
     if (!selected) return false;
 
-    const day = sortedPracticeDays.find((item) => item.id === dayId);
     const draft = draftsByDay[dayId];
-    if (!day || !draft || draft.absent) return false;
+    if (!draft || draft.absent) return false;
 
     const slotStart = hour * 60;
     const slotEnd = hour === 22 ? slotStart : slotStart + 60;
@@ -286,6 +285,22 @@ export function PlayerApp() {
 
       {selected ? (
         <>
+          <section className="panel stack">
+            <h2>自分が出る曲</h2>
+            {state.pieces.length === 0 ? <p className="muted">まだ曲が登録されていません。</p> : null}
+            {state.pieces.map((piece) => (
+              <label className="row" key={piece.id}>
+                <input
+                  style={{ width: "auto" }}
+                  type="checkbox"
+                  checked={piece.memberIds.includes(selected.id)}
+                  onChange={(event) => togglePiece(piece.id, event.target.checked)}
+                />
+                {piece.title}
+              </label>
+            ))}
+          </section>
+
           <section id="my-availability" className="panel stack">
             <h2>{selected.name} の参加可能時間表</h2>
             <div className="availability-wrap">
@@ -417,22 +432,6 @@ export function PlayerApp() {
                 </section>
               );
             })}
-          </section>
-
-          <section className="panel stack">
-            <h2>自分が出る曲</h2>
-            {state.pieces.length === 0 ? <p className="muted">まだ曲が登録されていません。</p> : null}
-            {state.pieces.map((piece) => (
-              <label className="row" key={piece.id}>
-                <input
-                  style={{ width: "auto" }}
-                  type="checkbox"
-                  checked={piece.memberIds.includes(selected.id)}
-                  onChange={(event) => togglePiece(piece.id, event.target.checked)}
-                />
-                {piece.title}
-              </label>
-            ))}
           </section>
         </>
       ) : null}
