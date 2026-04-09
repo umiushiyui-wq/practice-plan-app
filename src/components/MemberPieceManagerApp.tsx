@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { getPlannedMinutesByPiece, makeId, useLocalPracticeState } from "@/components/LocalPracticeApp";
+import {
+  getPlannedMinutesByPiece,
+  getSortedPracticeDays,
+  makeId,
+  resolvePieceTargetRange,
+  useLocalPracticeState
+} from "@/components/LocalPracticeApp";
 
 const INSTRUMENT_OPTIONS = [
   "フルート",
@@ -16,7 +22,7 @@ const INSTRUMENT_OPTIONS = [
 
 export function MemberPieceManagerApp() {
   const { state, updateState } = useLocalPracticeState();
-  const plannedMinutesByPiece = getPlannedMinutesByPiece(state);
+  const sortedPracticeDays = getSortedPracticeDays(state.practiceDays);
 
   function addMember(formData: FormData) {
     const name = String(formData.get("name") ?? "").trim();
@@ -71,11 +77,16 @@ export function MemberPieceManagerApp() {
           conductorId: String(formData.get("conductorId") ?? ""),
           memberIds: formData.getAll("memberIds").map(String),
           targetMinutes: Number(formData.get("targetMinutes") ?? 60),
-          dailyMaxMinutes: Number(formData.get("dailyMaxMinutes") ?? 45)
+          dailyMaxMinutes: Number(formData.get("dailyMaxMinutes") ?? 45),
+          targetRangeStartDayId: String(formData.get("targetRangeStartDayId") ?? "") || null,
+          targetRangeEndDayId: String(formData.get("targetRangeEndDayId") ?? "") || null
         }
       ]
     });
   }
+
+  const defaultStartDayId = sortedPracticeDays[0]?.id ?? "";
+  const defaultEndDayId = sortedPracticeDays[sortedPracticeDays.length - 1]?.id ?? "";
 
   return (
     <main className="stack">
@@ -160,13 +171,37 @@ export function MemberPieceManagerApp() {
                 </option>
               ))}
             </select>
+
+            <div className="date-time-grid">
+              <label>
+                期間の開始日
+                <select name="targetRangeStartDayId" defaultValue={defaultStartDayId} disabled={sortedPracticeDays.length === 0}>
+                  {sortedPracticeDays.map((day) => (
+                    <option key={day.id} value={day.id}>
+                      {day.practiceDate}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                期間の終了日
+                <select name="targetRangeEndDayId" defaultValue={defaultEndDayId} disabled={sortedPracticeDays.length === 0}>
+                  {sortedPracticeDays.map((day) => (
+                    <option key={day.id} value={day.id}>
+                      {day.practiceDate}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <p className="muted">
+              入力済みの練習日の中から、この曲の目標時間を見たい期間を選びます。期間外の練習日は目標計算に含めません。
+            </p>
+
             <label>
-              期間全体で確保したい練習時間
+              その期間で確保したい練習時間
               <input name="targetMinutes" type="number" min="0" step="5" defaultValue="60" />
             </label>
-            <p className="muted">
-              複数の練習日を入力している場合、その曲を全日程の合計で何分くらい練習したいかを入れます。
-            </p>
             <label>
               1日の最大練習時間
               <input name="dailyMaxMinutes" type="number" min="15" step="5" defaultValue="45" />
@@ -195,7 +230,11 @@ export function MemberPieceManagerApp() {
             <strong>現在の曲</strong>
             {state.pieces.length === 0 ? <p className="muted">まだ曲がありません。</p> : null}
             {state.pieces.map((piece) => {
-              const plannedMinutes = plannedMinutesByPiece.get(piece.id) ?? 0;
+              const targetRange = resolvePieceTargetRange(state, piece);
+              const plannedMinutes =
+                getPlannedMinutesByPiece(state, {
+                  practiceDayIds: targetRange.days.map((day) => day.id)
+                }).get(piece.id) ?? 0;
               const remainingMinutes = Math.max(0, piece.targetMinutes - plannedMinutes);
 
               return (
@@ -206,6 +245,7 @@ export function MemberPieceManagerApp() {
                       指揮者: {state.members.find((member) => member.id === piece.conductorId)?.name ?? "未設定"} / 参加者{" "}
                       {piece.memberIds.length}人
                     </div>
+                    <div className="muted">対象期間: {targetRange.label}</div>
                     <div className="muted">
                       期間目標 {piece.targetMinutes}分 / 現在 {plannedMinutes}分 / 残り {remainingMinutes}分
                     </div>

@@ -16,6 +16,8 @@ export type Piece = {
   memberIds: string[];
   targetMinutes: number;
   dailyMaxMinutes: number;
+  targetRangeStartDayId: string | null;
+  targetRangeEndDayId: string | null;
 };
 
 export type Availability = {
@@ -53,7 +55,17 @@ export type AppState = {
   recentMinutes: Record<string, number>;
 };
 
+type LegacyPiece = Partial<Piece> & {
+  id?: string;
+  title?: string;
+  conductorId?: string;
+  memberIds?: string[];
+  targetMinutes?: number;
+  dailyMaxMinutes?: number;
+};
+
 type LegacyAppState = Partial<AppState> & {
+  pieces?: LegacyPiece[];
   practiceDate?: string;
   startTime?: string;
   endTime?: string;
@@ -105,12 +117,25 @@ export function toTime(minutes: number) {
     .padStart(2, "0")}:${(minutes % 60).toString().padStart(2, "0")}`;
 }
 
+function normalizePiece(piece: LegacyPiece): Piece {
+  return {
+    id: piece.id ?? makeId("p"),
+    title: piece.title ?? "",
+    conductorId: piece.conductorId ?? "",
+    memberIds: Array.isArray(piece.memberIds) ? piece.memberIds : [],
+    targetMinutes: Number(piece.targetMinutes ?? 60),
+    dailyMaxMinutes: Number(piece.dailyMaxMinutes ?? 45),
+    targetRangeStartDayId: piece.targetRangeStartDayId ?? null,
+    targetRangeEndDayId: piece.targetRangeEndDayId ?? null
+  };
+}
+
 function migrateState(value: unknown): AppState {
   if (!value || typeof value !== "object") return defaultState;
 
   const saved = value as LegacyAppState;
   const members = Array.isArray(saved.members) ? saved.members : defaultState.members;
-  const pieces = Array.isArray(saved.pieces) ? saved.pieces : defaultState.pieces;
+  const pieces = Array.isArray(saved.pieces) ? saved.pieces.map(normalizePiece) : defaultState.pieces;
   const recentMinutes = saved.recentMinutes ?? {};
 
   if (Array.isArray(saved.practiceDays) && saved.practiceDays.length > 0) {
@@ -207,6 +232,46 @@ export function updatePracticeDay(
   return state.practiceDays.map((day) => (day.id === dayId ? { ...day, ...patch } : day));
 }
 
+export function getSortedPracticeDays(practiceDays: LocalPracticeDay[]) {
+  return [...practiceDays].sort(
+    (a, b) =>
+      new Date(`${a.practiceDate}T00:00:00`).getTime() - new Date(`${b.practiceDate}T00:00:00`).getTime()
+  );
+}
+
+export function resolvePieceTargetRange(state: AppState, piece: Piece) {
+  const sortedDays = getSortedPracticeDays(state.practiceDays);
+  if (sortedDays.length === 0) {
+    return { days: [], startDay: null, endDay: null, label: "期間なし" };
+  }
+
+  const dayMap = new Map(sortedDays.map((day) => [day.id, day]));
+  const defaultStartDay = sortedDays[0];
+  const defaultEndDay = sortedDays[sortedDays.length - 1];
+  const startDay = (piece.targetRangeStartDayId ? dayMap.get(piece.targetRangeStartDayId) : null) ?? defaultStartDay;
+  const endDay = (piece.targetRangeEndDayId ? dayMap.get(piece.targetRangeEndDayId) : null) ?? defaultEndDay;
+  const startIndex = sortedDays.findIndex((day) => day.id === startDay.id);
+  const endIndex = sortedDays.findIndex((day) => day.id === endDay.id);
+  const safeStartIndex = Math.min(startIndex, endIndex);
+  const safeEndIndex = Math.max(startIndex, endIndex);
+  const days = sortedDays.slice(safeStartIndex, safeEndIndex + 1);
+  const label =
+    days.length === 1
+      ? `${days[0].practiceDate} のみ`
+      : `${days[0].practiceDate} から ${days[days.length - 1].practiceDate} まで`;
+
+  return {
+    days,
+    startDay: days[0] ?? null,
+    endDay: days[days.length - 1] ?? null,
+    label
+  };
+}
+
+export function isPieceActiveOnPracticeDay(state: AppState, piece: Piece, practiceDayId: string) {
+  return resolvePieceTargetRange(state, piece).days.some((day) => day.id === practiceDayId);
+}
+
 export function sortPlanByTime(plan: PlanSlot[]) {
   return [...plan].sort((a, b) => toMinutes(a.start) - toMinutes(b.start) || toMinutes(a.end) - toMinutes(b.end));
 }
@@ -249,11 +314,19 @@ function getEffectiveAvailabilities(day: LocalPracticeDay) {
   );
 }
 
-export function getPlannedMinutesByPiece(state: AppState, options?: { excludePracticeDayId?: string }) {
+export function getPlannedMinutesByPiece(
+  state: AppState,
+  options?: {
+    excludePracticeDayId?: string;
+    practiceDayIds?: string[];
+  }
+) {
   const totals = new Map<string, number>();
+  const allowedDayIds = options?.practiceDayIds ? new Set(options.practiceDayIds) : null;
 
   for (const day of state.practiceDays) {
     if (day.id === options?.excludePracticeDayId) continue;
+    if (allowedDayIds && !allowedDayIds.has(day.id)) continue;
 
     for (const slot of day.plan) {
       if (!slot.pieceId) continue;
@@ -272,14 +345,21 @@ export function generatePracticePlan(state: AppState): PlanSlot[] {
   const selected: PlanSlot[] = [];
   const dailyMinutes = new Map<string, number>();
   const occurrences = new Map<string, number>();
-  const plannedMinutesInOtherDays = getPlannedMinutesByPiece(state, { excludePracticeDayId: day.id });
 
   while (true) {
     const candidates: Array<PlanSlot & { piece: Piece }> = [];
 
     for (const piece of state.pieces) {
       if (!piece.conductorId || piece.memberIds.length === 0) continue;
+      if (!isPieceActiveOnPracticeDay(state, piece, day.id)) continue;
       if ((occurrences.get(piece.id) ?? 0) >= 2) continue;
+
+      const targetRange = resolvePieceTargetRange(state, piece);
+      const rangeDayIds = targetRange.days.map((rangeDay) => rangeDay.id);
+      const plannedMinutesInOtherDays = getPlannedMinutesByPiece(state, {
+        excludePracticeDayId: day.id,
+        practiceDayIds: rangeDayIds
+      });
 
       const alreadyToday = dailyMinutes.get(piece.id) ?? 0;
       const maxDuration = piece.dailyMaxMinutes - alreadyToday;
@@ -314,8 +394,9 @@ export function generatePracticePlan(state: AppState): PlanSlot[] {
             duration,
             score: Math.round(score * 10) / 10,
             reason:
-              `${piece.title}: 期間全体の目標${piece.targetMinutes}分に対して、` +
-              `この日より前後を含む確保済みは${plannedBeforeToday + alreadyToday}分。` +
+              `${piece.title}: 目標期間は ${targetRange.label}。` +
+              `その期間での目標 ${piece.targetMinutes}分に対して、` +
+              `この枠より前に確保済みなのは ${plannedBeforeToday + alreadyToday}分。` +
               `${piece.memberIds.length}人中${availableMembers.length}人がこの時間に参加可能なため選ばれました。`
           });
         }
