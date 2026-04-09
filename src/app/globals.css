@@ -92,6 +92,24 @@ main {
   gap: 14px;
 }
 
+.section-title {
+  display: grid;
+  gap: 4px;
+}
+
+.section-title p,
+.page-section-head p {
+  margin: 0;
+}
+
+.page-section-head {
+  justify-content: space-between;
+}
+
+.compact-field {
+  min-width: min(320px, 100%);
+}
+
 .section-block {
   border-top: 1px solid var(--line);
   padding-top: 16px;
