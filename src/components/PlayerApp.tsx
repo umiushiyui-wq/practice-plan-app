@@ -128,6 +128,7 @@ export function PlayerApp() {
     ? sortedPracticeDays.find((day) => day.id === selectedInputDayId) ?? sortedPracticeDays[0] ?? null
     : null;
   const hasUsablePassword = !!selected && !!selected.password && selected.password !== "__unset__";
+  const canViewAvailabilityTable = !!selected && (!hasUsablePassword || authenticatedMemberId === selected.id);
   const selectedDayHasSavedInput =
     !!selectedInputDay && !!selected && selectedInputDay.respondedMemberIds.includes(selected.id);
   const requiresPassword = selectedDayHasSavedInput && hasUsablePassword && authenticatedMemberId !== selected.id;
@@ -405,65 +406,71 @@ export function PlayerApp() {
 
           <section id="my-availability" className="panel stack">
             <h2>{selected.name} の参加可能時間表</h2>
-            <div className="availability-wrap">
-              <table className="availability-table player-availability-table">
-                <thead>
-                  <tr>
-                    <th>練習日</th>
-                    {AVAILABILITY_SLOTS.map((minutes) => (
-                      <th key={minutes}>{minutes % 60 === 0 ? toTime(minutes) : ""}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedPracticeDays.map((day) => {
-                    const draft = draftsByDay[day.id];
-                    const hasSaved = day.respondedMemberIds.includes(selected.id);
-                    const label = draft
-                      ? hasSaved
-                        ? draft.absent
-                          ? "欠席"
-                          : `${draft.start}-${draft.end}`
-                        : "未入力"
-                      : "未入力";
-
-                    return (
-                      <tr key={day.id}>
-                        <th>
-                          {day.practiceDate}
-                          <span className="muted">
-                            練習 {day.startTime}-{day.endTime} / 自分 {label}
-                          </span>
-                        </th>
-                        {AVAILABILITY_SLOTS.map((minutes, index) => {
-                          const previousMinutes = AVAILABILITY_SLOTS[index - 1];
-                          const nextMinutes = AVAILABILITY_SLOTS[index + 1];
-                          const isPractice = isPracticeSlot(day.id, minutes);
-                          const isAvailable = isMemberAvailableAtSlot(day.id, minutes);
-                          const isPreviousPractice = previousMinutes !== undefined && isPracticeSlot(day.id, previousMinutes);
-                          const isNextPractice = nextMinutes !== undefined && isPracticeSlot(day.id, nextMinutes);
-                          const classNames = [
-                            minutes % 60 === 0 ? "hour-divider-cell" : "",
-                            isPractice ? "practice-window-cell" : "",
-                            isPractice && !isPreviousPractice ? "practice-start-cell" : "",
-                            isPractice && !isNextPractice ? "practice-end-cell" : "",
-                            isAvailable ? "available-cell" : ""
-                          ]
-                            .filter(Boolean)
-                            .join(" ");
-
-                          return <td key={`${day.id}-${minutes}`} className={classNames} />;
-                        })}
+            {canViewAvailabilityTable ? (
+              <>
+                <div className="availability-wrap">
+                  <table className="availability-table player-availability-table">
+                    <thead>
+                      <tr>
+                        <th>練習日</th>
+                        {AVAILABILITY_SLOTS.map((minutes) => (
+                          <th key={minutes}>{minutes % 60 === 0 ? toTime(minutes) : ""}</th>
+                        ))}
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <div className="legend-row">
-              <span className="legend-chip practice">青枠: 出欠を入力する</span>
-              <span className="legend-chip available">緑: 出席する時間</span>
-            </div>
+                    </thead>
+                    <tbody>
+                      {sortedPracticeDays.map((day) => {
+                        const draft = draftsByDay[day.id];
+                        const hasSaved = day.respondedMemberIds.includes(selected.id);
+                        const label = draft
+                          ? hasSaved
+                            ? draft.absent
+                              ? "欠席"
+                              : `${draft.start}-${draft.end}`
+                            : "未入力"
+                          : "未入力";
+
+                        return (
+                          <tr key={day.id}>
+                            <th>
+                              {day.practiceDate}
+                              <span className="muted">
+                                練習 {day.startTime}-{day.endTime} / 自分 {label}
+                              </span>
+                            </th>
+                            {AVAILABILITY_SLOTS.map((minutes, index) => {
+                              const previousMinutes = AVAILABILITY_SLOTS[index - 1];
+                              const nextMinutes = AVAILABILITY_SLOTS[index + 1];
+                              const isPractice = isPracticeSlot(day.id, minutes);
+                              const isAvailable = isMemberAvailableAtSlot(day.id, minutes);
+                              const isPreviousPractice = previousMinutes !== undefined && isPracticeSlot(day.id, previousMinutes);
+                              const isNextPractice = nextMinutes !== undefined && isPracticeSlot(day.id, nextMinutes);
+                              const classNames = [
+                                minutes % 60 === 0 ? "hour-divider-cell" : "",
+                                isPractice ? "practice-window-cell" : "",
+                                isPractice && !isPreviousPractice ? "practice-start-cell" : "",
+                                isPractice && !isNextPractice ? "practice-end-cell" : "",
+                                isAvailable ? "available-cell" : ""
+                              ]
+                                .filter(Boolean)
+                                .join(" ");
+
+                              return <td key={`${day.id}-${minutes}`} className={classNames} />;
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="legend-row">
+                  <span className="legend-chip practice">青枠: 出欠を入力する</span>
+                  <span className="legend-chip available">緑: 出席する時間</span>
+                </div>
+              </>
+            ) : (
+              <p className="muted">参加可能時間表の確認にはパスワードが必要です。</p>
+            )}
           </section>
 
           <section className="panel stack">
