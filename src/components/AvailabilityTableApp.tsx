@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { getSelectedPracticeDay, toMinutes, useLocalPracticeState } from "@/components/LocalPracticeApp";
+import { getSelectedPracticeDay, toMinutes, toTime, useLocalPracticeState } from "@/components/LocalPracticeApp";
 
 const AVAILABILITY_SLOTS = Array.from({ length: ((22 - 8) * 60) / 10 + 1 }, (_, index) => 8 * 60 + index * 10);
 const ALL_PIECES_FILTER = "__all__";
@@ -14,6 +14,7 @@ export function AvailabilityTableApp() {
   const selectedDay = getSelectedPracticeDay(state);
   const [selectedPieceFilter, setSelectedPieceFilter] = useState(ALL_PIECES_FILTER);
   const [selectedPartFilter, setSelectedPartFilter] = useState(ALL_PARTS_FILTER);
+  const [hoveredSlot, setHoveredSlot] = useState<number | null>(null);
 
   const partOptions = useMemo(
     () => Array.from(new Set(state.members.map((member) => member.instrument || "未設定"))),
@@ -55,6 +56,11 @@ export function AvailabilityTableApp() {
 
     return state.pieces.some((piece) => piece.id === selectedPieceFilter && piece.memberIds.includes(memberId));
   }
+
+  const hoveredAvailableCount =
+    hoveredSlot === null
+      ? null
+      : visibleMembers.filter((member) => isMemberHighlighted(member.id) && isMemberAvailableAtSlot(member.id, hoveredSlot)).length;
 
   return (
     <main className="stack">
@@ -115,13 +121,26 @@ export function AvailabilityTableApp() {
 
       <section className="panel stack">
         <h2>{selectedDay.practiceDate} の参加可能時間</h2>
+        {hoveredSlot !== null ? (
+          <div className="notice">
+            {toTime(hoveredSlot)} 時点で参加可能: {hoveredAvailableCount}人
+          </div>
+        ) : null}
         <div className="availability-wrap">
           <table className="availability-table player-availability-table">
             <thead>
               <tr>
                 <th>奏者</th>
                 {AVAILABILITY_SLOTS.map((minutes) => (
-                  <th key={minutes}>{minutes % 60 === 0 ? `${String(Math.floor(minutes / 60)).padStart(2, "0")}:00` : ""}</th>
+                  <th
+                    key={minutes}
+                    onMouseEnter={() => setHoveredSlot(minutes)}
+                    onMouseLeave={() => setHoveredSlot(null)}
+                    onFocus={() => setHoveredSlot(minutes)}
+                    onBlur={() => setHoveredSlot(null)}
+                  >
+                    {minutes % 60 === 0 ? `${String(Math.floor(minutes / 60)).padStart(2, "0")}:00` : ""}
+                  </th>
                 ))}
               </tr>
             </thead>
