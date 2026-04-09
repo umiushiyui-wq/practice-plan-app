@@ -248,7 +248,7 @@ export function MemberPieceManagerApp() {
           </details>
 
           {selectedPiece ? (
-            <section className="panel subtle-panel stack">
+            <section className="panel subtle-panel stack" key={selectedPiece.id}>
               <div className="row">
                 <div>
                   <p className="muted">選択中の曲</p>
