@@ -283,7 +283,7 @@ export function PlayerApp() {
             管理画面へ
           </Link>
           <a className="button secondary" href="#my-availability">
-            参加可能時間表へ
+            出欠を入力する
           </a>
         </div>
       </section>
@@ -310,7 +310,7 @@ export function PlayerApp() {
 
       {selected && !isEditingEnabled ? (
         <section className="panel stack">
-          <h2>{selected.password && selected.password !== "__unset__" ? "編集を開始" : "初回だけパスワードを決めてください"}</h2>
+          <h2>{selected.password && selected.password !== "__unset__" ? "出欠入力を開始" : "初回だけパスワードを決めてください"}</h2>
           <p className="muted">
             {selected.password && selected.password !== "__unset__"
               ? "前回決めたパスワードを入れると編集できます。"
@@ -434,7 +434,7 @@ export function PlayerApp() {
               </table>
             </div>
             <div className="legend-row">
-              <span className="legend-chip practice">青枠: 練習時間</span>
+              <span className="legend-chip practice">青枠: 出欠を入力する</span>
               <span className="legend-chip available">緑: 出席する時間</span>
             </div>
           </section>
