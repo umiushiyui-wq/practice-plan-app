@@ -213,7 +213,7 @@ export function MemberPieceManagerApp() {
   const defaultEndDayId = sortedPracticeDays[sortedPracticeDays.length - 1]?.id ?? "";
 
   return (
-    <main className="stack">
+    <main className="stack setup-page">
       <section className="panel stack">
         <p className="muted">準備ページ</p>
         <h1>メンバー・練習日・曲の追加</h1>
@@ -391,7 +391,7 @@ export function MemberPieceManagerApp() {
               </div>
 
               {selectedPieceSummary ? (
-                <div className="plan-summary-grid">
+                <div className="plan-summary-grid setup-summary-grid">
                   <article className="plan-stat-card">
                     <span className="plan-stat-label">対象期間</span>
                     <strong>{selectedPieceSummary.targetRange.days.length}</strong>
@@ -487,7 +487,7 @@ export function MemberPieceManagerApp() {
             </div>
           )}
 
-          <div className="stack">
+          <div className="stack setup-piece-list">
             <strong>現在の曲</strong>
             {state.pieces.length === 0 ? <p className="muted">まだ曲はありません。</p> : null}
             {state.pieces.map((piece) => {
@@ -499,7 +499,7 @@ export function MemberPieceManagerApp() {
               const remainingMinutes = Math.max(0, piece.targetMinutes - plannedMinutes);
 
               return (
-                <div className="row" key={piece.id}>
+                <div className="row setup-piece-row" key={piece.id}>
                   <div>
                     <strong>{piece.title}</strong>
                     <div className="muted">
@@ -510,7 +510,7 @@ export function MemberPieceManagerApp() {
                       期間目標 {piece.targetMinutes}分 / 現在 {plannedMinutes}分 / 残り {remainingMinutes}分
                     </div>
                   </div>
-                  <button className="secondary" type="button" onClick={() => setSelectedPieceId(piece.id)}>
+                  <button className="secondary setup-piece-edit-button" type="button" onClick={() => setSelectedPieceId(piece.id)}>
                     この曲を編集
                   </button>
                 </div>

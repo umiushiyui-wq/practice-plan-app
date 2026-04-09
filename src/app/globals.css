@@ -92,6 +92,10 @@ main {
   gap: 14px;
 }
 
+.setup-page {
+  width: min(860px, calc(100% - 32px));
+}
+
 .section-title {
   display: grid;
   gap: 4px;
@@ -477,6 +481,27 @@ td {
   color: var(--accent-dark);
 }
 
+.setup-summary-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.setup-piece-list {
+  gap: 12px;
+}
+
+.setup-piece-row {
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fbfdff;
+}
+
+.setup-piece-edit-button {
+  min-width: 128px;
+}
+
 .sheet-wrap {
   width: 100%;
   overflow-x: auto;
@@ -586,6 +611,10 @@ td {
     padding: 18px 0 40px;
   }
 
+  .setup-page {
+    width: min(100% - 20px, 860px);
+  }
+
   h1 {
     font-size: 26px;
     line-height: 1.25;
@@ -649,6 +678,10 @@ td {
 
   .plan-summary-grid {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .setup-summary-grid {
+    grid-template-columns: 1fr;
   }
 
   .plan-slot-card {
