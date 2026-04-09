@@ -37,7 +37,9 @@ export function AdminApp() {
   const [planMessage, setPlanMessage] = useState("");
   const selectedDay = getSelectedPracticeDay(state);
   const pieceMap = usePieceMap(state.pieces);
+  const manualStartTimeRef = useRef<HTMLInputElement>(null);
   const utilityMinutesRef = useRef<HTMLInputElement>(null);
+  const manualPieceRef = useRef<HTMLSelectElement>(null);
   const practiceMinutes = toMinutes(selectedDay.endTime) - toMinutes(selectedDay.startTime);
   const sortedPlan = sortPlanByTime(selectedDay.plan);
   const plannedMinutes = sortedPlan.reduce((total, slot) => total + slot.duration, 0);
@@ -104,21 +106,74 @@ export function AdminApp() {
     });
   }
 
-  function addUtilitySlot(label: string, minutes: number) {
-    const duration = Number.isFinite(minutes) ? Math.max(1, Math.floor(minutes)) : 1;
-    updateSelectedDay({
-      plan: [
-        ...selectedDay.plan,
-        {
+  function insertPlanSlot(nextSlot: (typeof selectedDay.plan)[number]) {
+    const nextStart = toMinutes(nextSlot.start);
+    const nextEnd = toMinutes(nextSlot.end);
+    const trimmedPlan = selectedDay.plan.flatMap((slot) => {
+      const slotStart = toMinutes(slot.start);
+      const slotEnd = toMinutes(slot.end);
+
+      if (slotEnd <= nextStart || nextEnd <= slotStart) {
+        return [slot];
+      }
+
+      const fragments: typeof selectedDay.plan = [];
+
+      if (slotStart < nextStart) {
+        fragments.push({
+          ...slot,
+          end: toTime(nextStart),
+          duration: nextStart - slotStart
+        });
+      }
+
+      if (nextEnd < slotEnd) {
+        fragments.push({
+          ...slot,
           id: makeId("s"),
-          pieceId: null,
-          start: selectedDay.startTime,
-          end: toTime(toMinutes(selectedDay.startTime) + duration),
-          duration,
-          reason: `${label}のために追加した枠です。`
-        }
-      ]
+          start: toTime(nextEnd),
+          duration: slotEnd - nextEnd
+        });
+      }
+
+      return fragments.filter((fragment) => fragment.duration > 0);
     });
+
+    updateSelectedDay({
+      plan: [...trimmedPlan, nextSlot]
+    });
+  }
+
+  function addManualSlot({
+    label,
+    pieceId,
+    reason
+  }: {
+    label: string;
+    pieceId: string | null;
+    reason: string;
+  }) {
+    const startTime = manualStartTimeRef.current?.value || selectedDay.startTime;
+    const requestedMinutes = Number(utilityMinutesRef.current?.value ?? 5);
+    const duration = Number.isFinite(requestedMinutes) ? Math.max(1, Math.floor(requestedMinutes)) : 1;
+    const boundedStart = Math.max(toMinutes(selectedDay.startTime), toMinutes(startTime));
+    const boundedEnd = Math.min(toMinutes(selectedDay.endTime), boundedStart + duration);
+
+    if (boundedEnd <= boundedStart) {
+      setPlanMessage("追加できませんでした。開始時刻と分数を見直してください。");
+      return;
+    }
+
+    insertPlanSlot({
+      id: makeId("s"),
+      pieceId,
+      start: toTime(boundedStart),
+      end: toTime(boundedEnd),
+      duration: boundedEnd - boundedStart,
+      reason
+    });
+
+    setPlanMessage(`${label}を ${toTime(boundedStart)} から ${boundedEnd - boundedStart}分で追加しました。`);
   }
 
   function handleGeneratePlan() {
@@ -318,9 +373,13 @@ export function AdminApp() {
         <div className="plan-toolbar">
           <div className="plan-toolbar-head">
             <strong>補助枠を追加</strong>
-            <span className="muted">短い休憩や準備時間を先に置くと、全体の流れを整えやすいです。</span>
+            <span className="muted">開始時刻を指定して追加すると、その時間帯は既存の枠を上書きします。</span>
           </div>
           <div className="utility-slot-form">
+            <label>
+              何時から
+              <input ref={manualStartTimeRef} name="startTime" type="time" step="60" defaultValue={selectedDay.startTime} />
+            </label>
             <label>
               追加する分数
               <input ref={utilityMinutesRef} name="minutes" type="number" min="1" step="1" defaultValue="5" />
@@ -328,23 +387,72 @@ export function AdminApp() {
             <button
               type="button"
               className="secondary"
-              onClick={() => addUtilitySlot("休憩", Number(utilityMinutesRef.current?.value ?? 5))}
+              onClick={() =>
+                addManualSlot({
+                  label: "休憩",
+                  pieceId: null,
+                  reason: "休憩のために追加した枠です。"
+                })
+              }
             >
               休憩を追加
             </button>
             <button
               type="button"
               className="secondary"
-              onClick={() => addUtilitySlot("合奏準備", Number(utilityMinutesRef.current?.value ?? 5))}
+              onClick={() =>
+                addManualSlot({
+                  label: "合奏準備",
+                  pieceId: null,
+                  reason: "合奏準備のために追加した枠です。"
+                })
+              }
             >
               合奏準備を追加
             </button>
             <button
               type="button"
               className="secondary"
-              onClick={() => addUtilitySlot("片付け", Number(utilityMinutesRef.current?.value ?? 5))}
+              onClick={() =>
+                addManualSlot({
+                  label: "片付け",
+                  pieceId: null,
+                  reason: "片付けのために追加した枠です。"
+                })
+              }
             >
               片付けを追加
+            </button>
+            <label>
+              手動で入れる曲
+              <select ref={manualPieceRef} defaultValue={state.pieces[0]?.id ?? ""}>
+                {state.pieces.length === 0 ? <option value="">曲がありません</option> : null}
+                {state.pieces.map((piece) => (
+                  <option key={piece.id} value={piece.id}>
+                    {piece.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                const pieceId = manualPieceRef.current?.value ?? "";
+                const pieceTitle = pieceId ? pieceMap.get(pieceId)?.title ?? "曲" : "";
+
+                if (!pieceId) {
+                  setPlanMessage("曲を追加するには、先に追加する曲を選んでください。");
+                  return;
+                }
+
+                addManualSlot({
+                  label: pieceTitle,
+                  pieceId,
+                  reason: `${pieceTitle}を手動で追加した枠です。`
+                });
+              }}
+            >
+              曲を追加
             </button>
           </div>
         </div>

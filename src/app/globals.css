@@ -192,7 +192,7 @@ td {
 
 .utility-slot-form {
   display: grid;
-  grid-template-columns: minmax(160px, 220px) repeat(3, max-content);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 10px;
   align-items: end;
 }
