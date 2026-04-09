@@ -47,7 +47,7 @@ export function PieceEditorClient({ piece, users }: PieceEditorProps) {
       body: JSON.stringify({ userIds })
     });
     if (!response.ok) {
-      setMessage("出演者の保存に失敗しました。");
+      setMessage("参加メンバーの保存に失敗しました。");
       return;
     }
     location.reload();
@@ -80,16 +80,18 @@ export function PieceEditorClient({ piece, users }: PieceEditorProps) {
               <select name="conductorUserId" defaultValue={piece.conductorUserId ?? ""}>
                 <option value="">未設定</option>
                 {users.map((user) => (
-                  <option key={user.id} value={user.id}>{user.displayName}</option>
+                  <option key={user.id} value={user.id}>
+                    {user.displayName}
+                  </option>
                 ))}
               </select>
             </label>
             <label>
-              直近期間の目標累積分
+              期間内の目標練習時間
               <input name="targetMinutesInWindow" type="number" min="0" step="5" defaultValue={piece.targetMinutesInWindow} />
             </label>
             <label>
-              1日最大練習分
+              1日あたりの最大練習時間
               <input name="dailyMaxMinutes" type="number" min="15" step="5" defaultValue={piece.dailyMaxMinutes} />
             </label>
             <button type="submit">曲情報を保存</button>
@@ -97,7 +99,7 @@ export function PieceEditorClient({ piece, users }: PieceEditorProps) {
         </section>
 
         <section className="panel stack">
-          <h2>出演者</h2>
+          <h2>参加メンバー</h2>
           <form
             className="stack"
             onSubmit={(event) => {
@@ -117,7 +119,7 @@ export function PieceEditorClient({ piece, users }: PieceEditorProps) {
                 {user.displayName}
               </label>
             ))}
-            <button type="submit">出演者を保存</button>
+            <button type="submit">参加メンバーを保存</button>
           </form>
         </section>
       </div>

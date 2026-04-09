@@ -73,7 +73,9 @@ export function DashboardClient({
       <section className="panel row">
         <div>
           <h1>ダッシュボード</h1>
-          <p className="muted">{currentUser.displayName} / {currentUser.role === "admin" ? "管理者" : "メンバー"}</p>
+          <p className="muted">
+            {currentUser.displayName} / {currentUser.role === "admin" ? "管理者" : "メンバー"}
+          </p>
         </div>
       </section>
 
@@ -99,7 +101,7 @@ export function DashboardClient({
             </label>
             <label>
               パート
-              <input name="part" defaultValue={currentUser.part ?? ""} placeholder="例: 木管" />
+              <input name="part" defaultValue={currentUser.part ?? ""} placeholder="例: 1st" />
             </label>
             <button type="submit">保存</button>
           </form>
@@ -124,16 +126,18 @@ export function DashboardClient({
                 <select name="conductorUserId" defaultValue="">
                   <option value="">未設定</option>
                   {users.map((user) => (
-                    <option key={user.id} value={user.id}>{user.displayName}</option>
+                    <option key={user.id} value={user.id}>
+                      {user.displayName}
+                    </option>
                   ))}
                 </select>
               </label>
               <label>
-                直近期間の目標累積分
+                期間内の目標練習時間
                 <input name="targetMinutesInWindow" type="number" min="0" step="5" defaultValue="60" />
               </label>
               <label>
-                1日最大練習分
+                1日あたりの最大練習時間
                 <input name="dailyMaxMinutes" type="number" min="15" step="5" defaultValue="45" />
               </label>
               <button type="submit">曲を追加</button>
@@ -160,11 +164,11 @@ export function DashboardClient({
               <input name="practiceDates" type="date" />
             </label>
             <label>
-              開始
+              開始時刻
               <input name="startTime" type="time" step="300" required />
             </label>
             <label>
-              終了
+              終了時刻
               <input name="endTime" type="time" step="300" required />
             </label>
             <label>
@@ -203,10 +207,14 @@ export function DashboardClient({
             {practiceDays.map((day) => (
               <tr key={day.id}>
                 <td>{day.practiceDate}</td>
-                <td>{day.startTime}〜{day.endTime}</td>
+                <td>
+                  {day.startTime} - {day.endTime}
+                </td>
                 <td>{day.status}</td>
-                <td>{day.pieces.join("、") || "未設定"}</td>
-                <td><Link href={`/practice-days/${day.id}`}>開く</Link></td>
+                <td>{day.pieces.join(", ") || "未設定"}</td>
+                <td>
+                  <Link href={`/practice-days/${day.id}`}>開く</Link>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -220,7 +228,7 @@ export function DashboardClient({
             <tr>
               <th>曲名</th>
               <th>指揮者</th>
-              <th>目標</th>
+              <th>目標時間</th>
               <th>1日上限</th>
             </tr>
           </thead>

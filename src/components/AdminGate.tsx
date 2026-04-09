@@ -1,12 +1,12 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { ReactNode, FormEvent, useEffect, useState } from "react";
 import { AdminApp } from "@/components/AdminApp";
 
 const ADMIN_PASSWORD = "0084";
 const ADMIN_UNLOCK_KEY = "nagosui-admin-unlocked";
 
-export function AdminGate() {
+export function AdminGate({ children }: { children?: ReactNode }) {
   const [password, setPassword] = useState("");
   const [unlocked, setUnlocked] = useState(false);
   const [error, setError] = useState("");
@@ -29,7 +29,7 @@ export function AdminGate() {
   }
 
   if (unlocked) {
-    return <AdminApp />;
+    return <>{children ?? <AdminApp />}</>;
   }
 
   return (
@@ -38,7 +38,7 @@ export function AdminGate() {
         <div className="stack">
           <p className="muted">管理者用URL</p>
           <h1>パスワードを入力してください</h1>
-          <p className="muted">管理者画面を開くにはパスワードが必要です。</p>
+          <p className="muted">管理画面を開くにはパスワードが必要です。</p>
         </div>
 
         <form className="stack" onSubmit={handleSubmit}>
@@ -54,7 +54,7 @@ export function AdminGate() {
             />
           </label>
           {error ? <p className="error">{error}</p> : null}
-          <button type="submit">管理者画面を開く</button>
+          <button type="submit">管理画面を開く</button>
         </form>
       </section>
     </main>

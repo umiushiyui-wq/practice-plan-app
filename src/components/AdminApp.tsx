@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import {
-  generatePracticePlan,
   findOverlappingPlanSlots,
+  generatePracticePlan,
   getPlanSlotLabel,
   getSelectedPracticeDay,
   makeId,
@@ -15,17 +15,6 @@ import {
   useLocalPracticeState,
   usePieceMap
 } from "@/components/LocalPracticeApp";
-
-const INSTRUMENT_OPTIONS = [
-  "ふるぼえ",
-  "クラリネット",
-  "サックス",
-  "ホルン",
-  "トランペット",
-  "トロンボーン",
-  "低音",
-  "パーカス"
-];
 
 export function AdminApp() {
   const { state, updateState } = useLocalPracticeState();
@@ -76,42 +65,6 @@ export function AdminApp() {
     });
   }
 
-  function addMember(formData: FormData) {
-    const name = String(formData.get("name") ?? "").trim();
-    if (!name) return;
-    const member = {
-      id: makeId("m"),
-      name,
-      instrument: String(formData.get("instrument") ?? ""),
-      part: ""
-    };
-    updateState({
-      members: [...state.members, member],
-      practiceDays: state.practiceDays.map((day) => ({
-        ...day,
-        absentMemberIds: Array.from(new Set([...day.absentMemberIds, member.id]))
-      }))
-    });
-  }
-
-  function addPiece(formData: FormData) {
-    const title = String(formData.get("title") ?? "").trim();
-    if (!title) return;
-    updateState({
-      pieces: [
-        ...state.pieces,
-        {
-          id: makeId("p"),
-          title,
-          conductorId: String(formData.get("conductorId") ?? ""),
-          memberIds: formData.getAll("memberIds").map(String),
-          targetMinutes: Number(formData.get("targetMinutes") ?? 60),
-          dailyMaxMinutes: Number(formData.get("dailyMaxMinutes") ?? 45)
-        }
-      ]
-    });
-  }
-
   function deleteMember(memberId: string) {
     const member = state.members.find((item) => item.id === memberId);
     if (!member || !confirm(`${member.name} を削除しますか？`)) return;
@@ -157,7 +110,7 @@ export function AdminApp() {
                 patch.start || patch.end
                   ? toMinutes(patch.end ?? slot.end) - toMinutes(patch.start ?? slot.start)
                   : slot.duration,
-              reason: patch.pieceId !== undefined ? "管理者が手動修正した枠です。" : slot.reason
+              reason: patch.pieceId !== undefined ? "管理者が手動で調整した枠です。" : slot.reason
             }
           : slot
       )
@@ -175,7 +128,7 @@ export function AdminApp() {
           start: selectedDay.startTime,
           end: toTime(toMinutes(selectedDay.startTime) + duration),
           duration,
-          reason: `${label}です。`
+          reason: `${label}のために追加した枠です。`
         }
       ]
     });
@@ -186,31 +139,29 @@ export function AdminApp() {
     updateSelectedDay({ plan: generatedPlan });
 
     if (generatedPlan.length > 0) {
-      setPlanMessage(`${generatedPlan.length}件の練習枠を生成しました。`);
+      setPlanMessage(`${generatedPlan.length}件の練習枠を自動生成しました。`);
       return;
     }
 
     const presentMemberIds = new Set(
       selectedDay.respondedMemberIds.filter((id) => !selectedDay.absentMemberIds.includes(id))
     );
-    const readyPieceCount = state.pieces.filter(
-      (piece) => piece.conductorId && piece.memberIds.length > 0
-    ).length;
+    const readyPieceCount = state.pieces.filter((piece) => piece.conductorId && piece.memberIds.length > 0).length;
 
     if (readyPieceCount === 0) {
-      setPlanMessage("計画を作れませんでした。曲に指揮者と出演者を設定してください。");
+      setPlanMessage("計画を作れませんでした。先に指揮者と参加メンバーを曲に設定してください。");
       return;
     }
 
     if (presentMemberIds.size === 0) {
-      setPlanMessage("計画を作れませんでした。奏者側で出席として保存された人がまだいません。");
+      setPlanMessage("計画を作れませんでした。奏者側で参加可能時間を保存した人がまだいません。");
       return;
     }
 
-    setPlanMessage("計画を作れませんでした。指揮者・出演者の参加可能時間が重なる時間帯を確認してください。");
+    setPlanMessage("計画を作れませんでした。対象曲や参加可能時間の条件が厳しすぎる可能性があります。");
   }
 
-  function getSlotLabel(slot: typeof selectedDay.plan[number]) {
+  function getSlotLabel(slot: (typeof selectedDay.plan)[number]) {
     return getPlanSlotLabel(slot, slot.pieceId ? pieceMap.get(slot.pieceId)?.title : undefined);
   }
 
@@ -219,13 +170,22 @@ export function AdminApp() {
       <section className="panel stack">
         <p className="muted">管理者用URL</p>
         <h1>管理者用 練習計画</h1>
-        <p>メンバー、曲、練習日、練習計画を管理します。</p>
+        <p>練習日と練習計画を管理する画面です。</p>
         <div className="row">
-          <Link className="button secondary" href="/player">奏者入力URLへ</Link>
-          <Link className="button secondary" href="/availability">参加可能時間表</Link>
-          <Link className="button secondary" href="/sheet">表で見る</Link>
+          <Link className="button" href="/メンバー・曲の追加">
+            メンバー・曲の追加
+          </Link>
+          <Link className="button secondary" href="/player">
+            奏者入力URLへ
+          </Link>
+          <Link className="button secondary" href="/availability">
+            参加可能時間表
+          </Link>
+          <Link className="button secondary" href="/sheet">
+            表で見る
+          </Link>
           <button type="button" onClick={handleGeneratePlan}>
-            選択中の日付で自動計画を生成
+            選択中の練習日で自動生成
           </button>
         </div>
         {planMessage ? <div className="notice">{planMessage}</div> : null}
@@ -235,7 +195,7 @@ export function AdminApp() {
         <h2>練習日</h2>
         <div className="section-block">
           <label>
-            編集する日付
+            編集する練習日
             <select
               value={selectedDay.id}
               onChange={(event) => updateState({ selectedPracticeDayId: event.target.value })}
@@ -250,7 +210,7 @@ export function AdminApp() {
         </div>
 
         <div className="section-block stack">
-          <h3>編集中の日付設定</h3>
+          <h3>選択中の練習日を編集</h3>
           <div className="date-time-grid">
             <label>
               日付
@@ -280,9 +240,10 @@ export function AdminApp() {
             </label>
           </div>
           <p className="muted">
-            練習時間: {practiceMinutes}分 / 計画に追加済み: {plannedMinutes}分
+            練習時間 {practiceMinutes}分 / 計画に割り当て済み {plannedMinutes}分
           </p>
         </div>
+
         <form
           className="section-block stack"
           onSubmit={(event) => {
@@ -294,7 +255,7 @@ export function AdminApp() {
           <h3>新しい練習日を追加</h3>
           <div className="date-time-grid">
             <label>
-              追加する日付
+              日付
               <input name="practiceDate" type="date" required />
             </label>
             <label>
@@ -308,113 +269,126 @@ export function AdminApp() {
           </div>
           <button type="submit">練習日を追加</button>
         </form>
+
         <div className="section-block row">
           <button className="danger" type="button" onClick={() => deletePracticeDay(selectedDay.id)}>
-            選択中の日付を削除
+            選択中の練習日を削除
           </button>
         </div>
       </section>
 
       <div className="grid">
         <section className="panel stack">
-          <h2>メンバー追加</h2>
-          <form className="stack" onSubmit={(e) => { e.preventDefault(); addMember(new FormData(e.currentTarget)); e.currentTarget.reset(); }}>
-            <input name="name" placeholder="名前" required />
-            <select name="instrument" defaultValue="" required>
-              <option value="" disabled>楽器を選択</option>
-              {INSTRUMENT_OPTIONS.map((instrument) => (
-                <option key={instrument} value={instrument}>{instrument}</option>
-              ))}
-            </select>
-            <button type="submit">追加</button>
-          </form>
+          <div className="row">
+            <h2>メンバー一覧</h2>
+            <Link className="button secondary" href="/メンバー・曲の追加">
+              追加ページへ
+            </Link>
+          </div>
+          {state.members.length === 0 ? <p className="muted">まだメンバーがいません。</p> : null}
           {state.members.map((member) => (
             <div className="row" key={member.id}>
-              <strong>{member.name}</strong>
-              <span className="muted">{member.instrument}</span>
-              <button className="danger" type="button" onClick={() => deleteMember(member.id)}>削除</button>
+              <div>
+                <strong>{member.name}</strong>
+                <div className="muted">
+                  {member.instrument || "楽器未設定"}
+                  {member.part ? ` / ${member.part}` : ""}
+                </div>
+              </div>
+              <button className="danger" type="button" onClick={() => deleteMember(member.id)}>
+                削除
+              </button>
             </div>
           ))}
         </section>
 
         <section className="panel stack">
-          <h2>曲追加</h2>
-          <form className="stack" onSubmit={(e) => { e.preventDefault(); addPiece(new FormData(e.currentTarget)); e.currentTarget.reset(); }}>
-            <input name="title" placeholder="曲名" required />
-            <select name="conductorId" required>
-              <option value="">指揮者を選択</option>
-              {state.members.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
-            </select>
-            <label>
-              目標累積練習時間（全練習日で合計したい分）
-              <input name="targetMinutes" type="number" min="0" step="5" defaultValue="60" />
-            </label>
-            <label>
-              1日の最大練習時間（この曲を1日に入れる上限分）
-              <input name="dailyMaxMinutes" type="number" min="15" step="5" defaultValue="45" />
-            </label>
-            <div className="stack">
-              <strong>出演者</strong>
-              {state.members.map((member) => (
-                <label className="row" key={member.id}>
-                  <input style={{ width: "auto" }} name="memberIds" type="checkbox" value={member.id} />
-                  {member.name}
-                </label>
-              ))}
+          <div className="row">
+            <h2>曲一覧</h2>
+            <Link className="button secondary" href="/メンバー・曲の追加">
+              追加ページへ
+            </Link>
+          </div>
+          {state.pieces.length === 0 ? <p className="muted">まだ曲がありません。</p> : null}
+          {state.pieces.map((piece) => (
+            <div className="row" key={piece.id}>
+              <div>
+                <strong>{piece.title}</strong>
+                <div className="muted">
+                  指揮者: {state.members.find((member) => member.id === piece.conductorId)?.name ?? "未設定"} / 参加者{" "}
+                  {piece.memberIds.length}人 / 目標 {piece.targetMinutes}分 / 1日上限 {piece.dailyMaxMinutes}分
+                </div>
+              </div>
+              <button className="danger" type="button" onClick={() => deletePiece(piece.id)}>
+                削除
+              </button>
             </div>
-            <button type="submit">曲を追加</button>
-          </form>
+          ))}
         </section>
       </div>
 
       <section className="panel stack">
-        <h2>曲一覧</h2>
-        <table>
-          <thead><tr><th>曲</th><th>指揮者</th><th>出演者</th><th>目標</th><th>上限</th><th></th></tr></thead>
-          <tbody>
-            {state.pieces.map((piece) => (
-              <tr key={piece.id}>
-                <td>{piece.title}</td>
-                <td>{state.members.find((member) => member.id === piece.conductorId)?.name}</td>
-                <td>{piece.memberIds.length}人</td>
-                <td>{piece.targetMinutes}分</td>
-                <td>{piece.dailyMaxMinutes}分</td>
-                <td><button className="danger" type="button" onClick={() => deletePiece(piece.id)}>削除</button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-
-      <section className="panel stack">
         <div className="row">
-          <h2>{selectedDay.practiceDate} の計画編集</h2>
-          <span className="muted">合計 {plannedMinutes}分 / 練習時間 {practiceMinutes}分</span>
+          <h2>{selectedDay.practiceDate} の練習計画</h2>
+          <span className="muted">
+            割り当て {plannedMinutes}分 / 練習時間 {practiceMinutes}分
+          </span>
         </div>
-        {overlappingSlotIds.size > 0 ? <div className="error">時間がかぶってます。</div> : null}
+        {overlappingSlotIds.size > 0 ? <div className="error">時間が重なっている枠があります。</div> : null}
         <div className="utility-slot-form">
           <label>
-            追加する時間（分）
+            追加する補助枠の分数
             <input ref={utilityMinutesRef} name="minutes" type="number" min="1" step="1" defaultValue="5" />
           </label>
-          <button type="button" className="secondary" onClick={() => addUtilitySlot("休憩", Number(utilityMinutesRef.current?.value ?? 5))}>休憩を追加</button>
-          <button type="button" className="secondary" onClick={() => addUtilitySlot("準備時間", Number(utilityMinutesRef.current?.value ?? 5))}>準備時間を追加</button>
-          <button type="button" className="secondary" onClick={() => addUtilitySlot("片付け時間", Number(utilityMinutesRef.current?.value ?? 5))}>片付け時間を追加</button>
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => addUtilitySlot("休憩", Number(utilityMinutesRef.current?.value ?? 5))}
+          >
+            休憩を追加
+          </button>
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => addUtilitySlot("合奏準備", Number(utilityMinutesRef.current?.value ?? 5))}
+          >
+            合奏準備を追加
+          </button>
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => addUtilitySlot("片付け", Number(utilityMinutesRef.current?.value ?? 5))}
+          >
+            片付けを追加
+          </button>
         </div>
         {sortedPlan.map((slot) => (
           <article className={`panel stack${overlappingSlotIds.has(slot.id) ? " overlap-slot" : ""}`} key={slot.id}>
             <div className="grid">
-              <select value={slot.pieceId ?? ""} onChange={(e) => updateSlot(slot.id, { pieceId: e.target.value || null })}>
+              <select value={slot.pieceId ?? ""} onChange={(event) => updateSlot(slot.id, { pieceId: event.target.value || null })}>
                 <option value="">{getSlotLabel(slot)}</option>
-                {state.pieces.map((piece) => <option key={piece.id} value={piece.id}>{piece.title}</option>)}
+                {state.pieces.map((piece) => (
+                  <option key={piece.id} value={piece.id}>
+                    {piece.title}
+                  </option>
+                ))}
               </select>
-              <input type="time" step="60" value={slot.start} onChange={(e) => updateSlot(slot.id, { start: e.target.value })} />
-              <input type="time" step="60" value={slot.end} onChange={(e) => updateSlot(slot.id, { end: e.target.value })} />
-              <button className="danger" type="button" onClick={() => updateSelectedDay({ plan: selectedDay.plan.filter((item) => item.id !== slot.id) })}>削除</button>
+              <input type="time" step="60" value={slot.start} onChange={(event) => updateSlot(slot.id, { start: event.target.value })} />
+              <input type="time" step="60" value={slot.end} onChange={(event) => updateSlot(slot.id, { end: event.target.value })} />
+              <button
+                className="danger"
+                type="button"
+                onClick={() => updateSelectedDay({ plan: selectedDay.plan.filter((item) => item.id !== slot.id) })}
+              >
+                削除
+              </button>
             </div>
-            {overlappingSlotIds.has(slot.id) ? <div className="error">この枠の時間が他の枠とかぶっています。</div> : null}
-            <p>{getSlotLabel(slot)} / {slot.duration}分{slot.score ? `/ スコア ${slot.score}` : ""}</p>
-            <div className="notice">{slot.reason ?? "管理者が手動修正した枠です。"}</div>
+            {overlappingSlotIds.has(slot.id) ? <div className="error">この枠は別の枠と時間が重なっています。</div> : null}
+            <p>
+              {getSlotLabel(slot)} / {slot.duration}分
+              {slot.score ? ` / スコア ${slot.score}` : ""}
+            </p>
+            <div className="notice">{slot.reason ?? "管理者が手動で調整した枠です。"}</div>
           </article>
         ))}
       </section>

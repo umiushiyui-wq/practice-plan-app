@@ -87,7 +87,9 @@ export function PlanEditorClient({
         {message ? <div className="error">{message}</div> : null}
         {role === "admin" ? (
           <div className="row">
-            <button type="button" onClick={confirmPlan}>この計画を確定</button>
+            <button type="button" onClick={confirmPlan}>
+              この計画を確定
+            </button>
           </div>
         ) : null}
       </section>
@@ -113,16 +115,18 @@ export function PlanEditorClient({
               曲
               <select name="pieceId">
                 {pieces.map((piece) => (
-                  <option key={piece.id} value={piece.id}>{piece.title}</option>
+                  <option key={piece.id} value={piece.id}>
+                    {piece.title}
+                  </option>
                 ))}
               </select>
             </label>
             <label>
-              開始
+              開始時刻
               <input name="startTime" type="time" step="300" required />
             </label>
             <label>
-              終了
+              終了時刻
               <input name="endTime" type="time" step="300" required />
             </label>
             <button type="submit">追加</button>
@@ -136,20 +140,24 @@ export function PlanEditorClient({
           {slots.map((slot) => (
             <article className="panel stack" key={slot.id}>
               <div className="row">
-                <strong>{slot.startTime}〜{slot.endTime}</strong>
+                <strong>
+                  {slot.startTime} - {slot.endTime}
+                </strong>
                 <span>{slot.slotType === "break" ? "休憩" : slot.pieceTitle}</span>
-                <span className="muted">{slot.durationMinutes}分 / {slot.source === "auto" ? "自動提案" : "手動"}</span>
+                <span className="muted">
+                  {slot.durationMinutes}分 / {slot.source === "auto" ? "自動生成" : "手動"}
+                </span>
               </div>
               {slot.reasonText ? (
                 <div className="notice">
-                  <strong>選ばれた理由</strong>
+                  <strong>選定理由</strong>
                   <p>{slot.reasonText}</p>
                   <p className="muted">
-                    総合 {slot.scoreTotal} / 参加 {slot.scoreAttendance} / 進捗 {slot.scoreProgress} / ペナルティ {slot.scorePenalty}
+                    合計 {slot.scoreTotal} / 出席 {slot.scoreAttendance} / 進捗 {slot.scoreProgress} / ペナルティ {slot.scorePenalty}
                   </p>
                 </div>
               ) : (
-                <p className="muted">手修正された枠、または休憩枠です。</p>
+                <p className="muted">説明がない枠です。手動追加した休憩枠などが該当します。</p>
               )}
 
               {role === "admin" ? (
@@ -171,21 +179,25 @@ export function PlanEditorClient({
                     曲
                     <select name="pieceId" defaultValue={slot.pieceId ?? pieces[0]?.id}>
                       {pieces.map((piece) => (
-                        <option key={piece.id} value={piece.id}>{piece.title}</option>
+                        <option key={piece.id} value={piece.id}>
+                          {piece.title}
+                        </option>
                       ))}
                     </select>
                   </label>
                   <label>
-                    開始
+                    開始時刻
                     <input name="startTime" type="time" step="300" defaultValue={slot.startTime} required />
                   </label>
                   <label>
-                    終了
+                    終了時刻
                     <input name="endTime" type="time" step="300" defaultValue={slot.endTime} required />
                   </label>
                   <div className="row">
                     <button type="submit">更新</button>
-                    <button className="danger" type="button" onClick={() => deleteSlot(slot.id)}>削除</button>
+                    <button className="danger" type="button" onClick={() => deleteSlot(slot.id)}>
+                      削除
+                    </button>
                   </div>
                 </form>
               ) : null}

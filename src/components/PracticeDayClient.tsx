@@ -65,7 +65,7 @@ export function PracticeDayClient({
       body: JSON.stringify({ pieceIds })
     });
     if (!response.ok) {
-      setMessage("出演曲の保存に失敗しました。");
+      setMessage("参加曲の保存に失敗しました。");
       return;
     }
     location.reload();
@@ -75,8 +75,8 @@ export function PracticeDayClient({
     setMessage("");
     const response = await fetch(path, { method: "POST" });
     if (!response.ok) {
-      const payload = await response.json().catch(() => ({ error: "処理に失敗しました。" }));
-      setMessage(payload.error ?? "処理に失敗しました。");
+      const payload = await response.json().catch(() => ({ error: "操作に失敗しました。" }));
+      setMessage(payload.error ?? "操作に失敗しました。");
       return;
     }
     setMessage(success);
@@ -91,22 +91,26 @@ export function PracticeDayClient({
         <p className="muted">{timeLabel}</p>
         {message ? <div className={message.includes("失敗") ? "error" : "notice"}>{message}</div> : null}
         <div className="row">
-          {latestPlanId ? <Link className="button secondary" href={`/plans/${latestPlanId}`}>最新の計画を見る</Link> : null}
+          {latestPlanId ? (
+            <Link className="button secondary" href={`/plans/${latestPlanId}`}>
+              最新の練習計画を見る
+            </Link>
+          ) : null}
           {role === "admin" ? (
             <>
               <button
                 type="button"
                 onClick={() =>
-                  adminAction(`/api/practice-days/${practiceDayId}/plans/generate`, "計画候補を生成しました。")
+                  adminAction(`/api/practice-days/${practiceDayId}/plans/generate`, "練習計画を生成しました。")
                 }
               >
-                自動提案を生成
+                自動生成する
               </button>
               <button
                 className="secondary"
                 type="button"
                 onClick={() =>
-                  adminAction(`/api/practice-days/${practiceDayId}/reminders/slack`, "Slackへリマインドを投稿しました。")
+                  adminAction(`/api/practice-days/${practiceDayId}/reminders/slack`, "Slack にリマインドを送信しました。")
                 }
               >
                 未回答者にSlackリマインド
@@ -129,11 +133,11 @@ export function PracticeDayClient({
             {ranges.map((range, index) => (
               <div className="row" key={index}>
                 <label>
-                  開始
+                  開始時刻
                   <input name="startTime" type="time" step="300" defaultValue={range.startTime} required />
                 </label>
                 <label>
-                  終了
+                  終了時刻
                   <input name="endTime" type="time" step="300" defaultValue={range.endTime} required />
                 </label>
                 {ranges.length > 1 ? (
@@ -159,7 +163,7 @@ export function PracticeDayClient({
         </section>
 
         <section className="panel stack">
-          <h2>自分の出演曲</h2>
+          <h2>自分の参加曲</h2>
           <form
             className="stack"
             onSubmit={(event) => {
@@ -173,7 +177,7 @@ export function PracticeDayClient({
                 {piece.title}
               </label>
             ))}
-            <button type="submit">出演曲を保存</button>
+            <button type="submit">参加曲を保存</button>
           </form>
         </section>
       </div>
@@ -185,7 +189,7 @@ export function PracticeDayClient({
             <tr>
               <th>曲名</th>
               <th>指揮者</th>
-              <th>出演者数</th>
+              <th>参加人数</th>
             </tr>
           </thead>
           <tbody>
