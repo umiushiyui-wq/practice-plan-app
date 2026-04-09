@@ -599,24 +599,13 @@ td {
 .player-availability-table td {
   min-width: 14px;
   padding: 0;
-  border-left: 0;
-  border-right: 0;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
+  border: 0;
 }
 
 .player-availability-table thead th {
   min-width: 14px;
   padding: 4px 2px;
   font-size: 10px;
-}
-
-.player-availability-table tbody tr td:first-of-type {
-  border-left: 1px solid var(--line);
-}
-
-.player-availability-table tbody tr td:last-child {
-  border-right: 1px solid var(--line);
 }
 
 .availability-table .available-cell {
@@ -626,14 +615,31 @@ td {
 
 .player-availability-table .practice-window-cell {
   background: #eef6ff;
-  box-shadow: inset 0 0 0 2px #4f8fdd;
+  border-top: 2px solid #4f8fdd;
+  border-bottom: 2px solid #4f8fdd;
 }
 
 .player-availability-table .practice-window-cell.available-cell {
   background: #2f9e44;
-  box-shadow:
-    inset 0 0 0 2px #4f8fdd,
-    inset 0 0 0 999px rgb(47 158 68 / 0.92);
+  border-top: 2px solid #4f8fdd;
+  border-bottom: 2px solid #4f8fdd;
+  box-shadow: inset 0 0 0 999px rgb(47 158 68 / 0.92);
+}
+
+.player-availability-table .practice-start-cell {
+  border-left: 2px solid #4f8fdd;
+}
+
+.player-availability-table .practice-end-cell {
+  border-right: 2px solid #4f8fdd;
+}
+
+.player-availability-table .hour-divider-cell {
+  border-left: 1px solid #c5d0da;
+}
+
+.player-availability-table tbody tr td:last-child {
+  border-right: 1px solid #c5d0da;
 }
 
 .legend-row {

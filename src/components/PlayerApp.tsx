@@ -342,10 +342,19 @@ export function PlayerApp() {
                             練習 {day.startTime}-{day.endTime} / 自分 {label}
                           </span>
                         </th>
-                        {AVAILABILITY_SLOTS.map((minutes) => {
+                        {AVAILABILITY_SLOTS.map((minutes, index) => {
+                          const previousMinutes = AVAILABILITY_SLOTS[index - 1];
+                          const nextMinutes = AVAILABILITY_SLOTS[index + 1];
+                          const isPractice = isPracticeSlot(day.id, minutes);
+                          const isAvailable = isMemberAvailableAtSlot(day.id, minutes);
+                          const isPreviousPractice = previousMinutes !== undefined && isPracticeSlot(day.id, previousMinutes);
+                          const isNextPractice = nextMinutes !== undefined && isPracticeSlot(day.id, nextMinutes);
                           const classNames = [
-                            isPracticeSlot(day.id, minutes) ? "practice-window-cell" : "",
-                            isMemberAvailableAtSlot(day.id, minutes) ? "available-cell" : ""
+                            minutes % 60 === 0 ? "hour-divider-cell" : "",
+                            isPractice ? "practice-window-cell" : "",
+                            isPractice && !isPreviousPractice ? "practice-start-cell" : "",
+                            isPractice && !isNextPractice ? "practice-end-cell" : "",
+                            isAvailable ? "available-cell" : ""
                           ]
                             .filter(Boolean)
                             .join(" ");
