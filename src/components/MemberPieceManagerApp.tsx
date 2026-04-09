@@ -110,7 +110,6 @@ export function MemberPieceManagerApp() {
           ? {
               ...piece,
               conductorId: String(formData.get("conductorId") ?? ""),
-              memberIds: formData.getAll("memberIds").map(String),
               targetMinutes: Number(formData.get("targetMinutes") ?? 60),
               dailyMaxMinutes: Number(formData.get("dailyMaxMinutes") ?? 45),
               targetRangeStartDayId: String(formData.get("targetRangeStartDayId") ?? "") || null,
@@ -314,28 +313,9 @@ export function MemberPieceManagerApp() {
                     defaultValue={selectedPiece.dailyMaxMinutes}
                   />
                 </label>
-
-                <details className="fold-panel" open>
-                  <summary>
-                    参加メンバー
-                    <span className="muted">{state.members.length}人から選択</span>
-                  </summary>
-                  <div className="fold-panel-body stack">
-                    {state.members.length === 0 ? <p className="muted">先にメンバーを追加してください。</p> : null}
-                    {state.members.map((member) => (
-                      <label className="row" key={member.id}>
-                        <input
-                          style={{ width: "auto" }}
-                          name="memberIds"
-                          type="checkbox"
-                          value={member.id}
-                          defaultChecked={selectedPiece.memberIds.includes(member.id)}
-                        />
-                        {member.name}
-                      </label>
-                    ))}
-                  </div>
-                </details>
+                <div className="notice">
+                  参加メンバーはここでは指定しません。奏者側で入力された参加曲をそのまま使います。
+                </div>
 
                 <button type="submit">この曲の設定を保存</button>
               </form>
