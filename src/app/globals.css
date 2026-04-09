@@ -597,13 +597,14 @@ td {
 }
 
 .player-availability-table td {
-  min-width: 14px;
+  min-width: 10px;
   padding: 0;
   border: 0;
+  position: relative;
 }
 
 .player-availability-table thead th {
-  min-width: 14px;
+  min-width: 10px;
   padding: 4px 2px;
   font-size: 10px;
 }
@@ -628,10 +629,12 @@ td {
 
 .player-availability-table .practice-start-cell {
   border-left: 2px solid #4f8fdd;
+  z-index: 2;
 }
 
 .player-availability-table .practice-end-cell {
   border-right: 2px solid #4f8fdd;
+  z-index: 2;
 }
 
 .player-availability-table .hour-divider-cell {
