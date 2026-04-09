@@ -225,7 +225,7 @@ export function MemberPieceManagerApp() {
         </div>
       </section>
 
-      <div className="grid">
+      <div className="stack">
         <section className="panel stack">
           <div className="section-title">
             <p className="muted">Step 1</p>
