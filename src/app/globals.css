@@ -825,6 +825,16 @@ td {
   .availability-table td {
     min-width: 32px;
   }
+
+  .player-availability-table td {
+    min-width: 3px;
+  }
+
+  .player-availability-table thead th {
+    min-width: 3px;
+    padding: 2px 0;
+    font-size: 8px;
+  }
 }
 
 @media (max-width: 520px) {
