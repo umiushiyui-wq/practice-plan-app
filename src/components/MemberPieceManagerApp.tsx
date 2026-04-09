@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -56,8 +56,7 @@ export function MemberPieceManagerApp() {
   function addMember(formData: FormData) {
     const name = String(formData.get("name") ?? "").trim();
     if (!name) return;
-    const password = String(formData.get("password") ?? "").trim() || window.prompt(`${name} のパスワードを設定`)?.trim() || "";
-    if (!password) return;
+    const password = String(formData.get("password") ?? "").trim();
 
     const member = {
       id: makeId("m"),
@@ -254,6 +253,7 @@ export function MemberPieceManagerApp() {
               ))}
             </select>
             <input name="part" placeholder="パート名" />
+            <input type="hidden" name="password" value="__unset__" />
             <button type="submit">メンバーを追加</button>
           </form>
           <details className="fold-panel" open>
@@ -271,6 +271,7 @@ export function MemberPieceManagerApp() {
                       {member.instrument || "楽器未設定"}
                       {member.part ? ` / ${member.part}` : ""}
                     </div>
+                    <div className="muted">{member.password && member.password !== "__unset__" ? "パスワード設定済み" : "初回ログイン時に設定"}</div>
                   </div>
                   <button className="danger" type="button" onClick={() => deleteMember(member.id)}>
                     削除
@@ -525,3 +526,4 @@ export function MemberPieceManagerApp() {
     </main>
   );
 }
+

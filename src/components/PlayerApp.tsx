@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -310,7 +310,12 @@ export function PlayerApp() {
 
       {selected && !isEditingEnabled ? (
         <section className="panel stack">
-          <h2>編集を開始</h2>
+          <h2>{selected.password && selected.password !== "__unset__" ? "編集を開始" : "初回だけパスワードを決めてください"}</h2>
+          <p className="muted">
+            {selected.password && selected.password !== "__unset__"
+              ? "前回決めたパスワードを入れると編集できます。"
+              : "ここで決めたパスワードが次回以降のログイン用になります。"}
+          </p>
           <input
             type="password"
             value={memberPassword}
@@ -321,7 +326,28 @@ export function PlayerApp() {
           <button
             type="button"
             onClick={() => {
-              if ((selected.password ?? "") === memberPassword) {
+              if (!memberPassword.trim()) {
+                setAuthError("パスワードを入力してください。");
+                return;
+              }
+
+              if (!selected.password || selected.password === "__unset__") {
+                updateState({
+                  members: state.members.map((member) =>
+                    member.id === selected.id
+                      ? {
+                          ...member,
+                          password: memberPassword
+                        }
+                      : member
+                  )
+                });
+                setAuthenticatedMemberId(selected.id);
+                setAuthError("");
+                return;
+              }
+
+              if (selected.password === memberPassword) {
                 setAuthenticatedMemberId(selected.id);
                 setAuthError("");
                 return;
@@ -330,7 +356,7 @@ export function PlayerApp() {
               setAuthError("パスワードが違います。");
             }}
           >
-            編集する
+            {selected.password && selected.password !== "__unset__" ? "編集する" : "このパスワードで始める"}
           </button>
         </section>
       ) : null}
@@ -516,3 +542,4 @@ export function PlayerApp() {
     </main>
   );
 }
+
