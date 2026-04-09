@@ -124,15 +124,15 @@ export function PlayerApp() {
   const activePart = partOptions.includes(selectedPart) ? selectedPart : partOptions[0] ?? "";
   const filteredMembers = state.members.filter((member) => (member.instrument || "未設定") === activePart);
   const selected = filteredMembers.find((member) => member.id === memberId) ?? null;
-  const hasAnySavedInput =
-    !!selected && state.practiceDays.some((day) => day.respondedMemberIds.includes(selected.id));
-  const hasUsablePassword = !!selected && !!selected.password && selected.password !== "__unset__";
-  const requiresPassword = hasAnySavedInput && hasUsablePassword;
-  const needsPasswordSetup = hasAnySavedInput && !hasUsablePassword;
-  const isEditingEnabled = !!selected && (!hasAnySavedInput || authenticatedMemberId === selected.id);
   const selectedInputDay = selected
     ? sortedPracticeDays.find((day) => day.id === selectedInputDayId) ?? sortedPracticeDays[0] ?? null
     : null;
+  const hasUsablePassword = !!selected && !!selected.password && selected.password !== "__unset__";
+  const selectedDayHasSavedInput =
+    !!selectedInputDay && !!selected && selectedInputDay.respondedMemberIds.includes(selected.id);
+  const requiresPassword = selectedDayHasSavedInput && hasUsablePassword && authenticatedMemberId !== selected.id;
+  const needsPasswordSetup = selectedDayHasSavedInput && !hasUsablePassword;
+  const canEditSelectedDay = !!selected && (!selectedDayHasSavedInput || authenticatedMemberId === selected.id);
 
   useEffect(() => {
     if (activePart && selectedPart !== activePart) {
@@ -313,7 +313,7 @@ export function PlayerApp() {
         <p className="muted">名前がなければ、管理者側でメンバーを追加してもらってください。</p>
       </section>
 
-      {selected && needsPasswordSetup && !isEditingEnabled ? (
+      {selected && selectedInputDay && needsPasswordSetup ? (
         <section className="panel stack">
           <h2>確認用パスワードを設定</h2>
           <p className="muted">すでに入力済みの内容を次回以降も確認・編集できるように、ここでパスワードを決めてください。</p>
@@ -352,7 +352,7 @@ export function PlayerApp() {
         </section>
       ) : null}
 
-      {selected && requiresPassword && !isEditingEnabled ? (
+      {selected && selectedInputDay && requiresPassword ? (
         <section className="panel stack">
           <h2>出欠入力を開始</h2>
           <p className="muted">前回決めたパスワードを入れると、入力内容の確認と編集ができます。</p>
@@ -385,7 +385,7 @@ export function PlayerApp() {
         </section>
       ) : null}
 
-      {isEditingEnabled && selected ? (
+      {selected ? (
         <>
           <section className="panel stack">
             <h2>自分が出る曲</h2>
@@ -497,37 +497,45 @@ export function PlayerApp() {
                       練習時間 {selectedInputDay.startTime}-{selectedInputDay.endTime}
                     </p>
                   </div>
-                  <button type="button" onClick={() => saveAvailability(selectedInputDay.id)}>
-                    この日の入力を保存
-                  </button>
+                  {canEditSelectedDay ? (
+                    <button type="button" onClick={() => saveAvailability(selectedInputDay.id)}>
+                      この日の入力を保存
+                    </button>
+                  ) : null}
                 </div>
 
-                <label className="row">
-                  <input
-                    style={{ width: "auto" }}
-                    type="checkbox"
-                    checked={currentDraft.absent}
-                    onChange={(event) => updateDayDraft(selectedInputDay.id, { absent: event.target.checked })}
-                  />
-                  欠席
-                </label>
+                {canEditSelectedDay ? (
+                  <>
+                    <label className="row">
+                      <input
+                        style={{ width: "auto" }}
+                        type="checkbox"
+                        checked={currentDraft.absent}
+                        onChange={(event) => updateDayDraft(selectedInputDay.id, { absent: event.target.checked })}
+                      />
+                      欠席
+                    </label>
 
-                <div className="grid">
-                  <TimePartSelect
-                    label="開始"
-                    value={currentDraft.start}
-                    options={currentTimeOptions}
-                    disabled={currentDraft.absent}
-                    onChange={(value) => updateDayDraft(selectedInputDay.id, { start: value })}
-                  />
-                  <TimePartSelect
-                    label="終了"
-                    value={currentDraft.end}
-                    options={currentTimeOptions}
-                    disabled={currentDraft.absent}
-                    onChange={(value) => updateDayDraft(selectedInputDay.id, { end: value })}
-                  />
-                </div>
+                    <div className="grid">
+                      <TimePartSelect
+                        label="開始"
+                        value={currentDraft.start}
+                        options={currentTimeOptions}
+                        disabled={currentDraft.absent}
+                        onChange={(value) => updateDayDraft(selectedInputDay.id, { start: value })}
+                      />
+                      <TimePartSelect
+                        label="終了"
+                        value={currentDraft.end}
+                        options={currentTimeOptions}
+                        disabled={currentDraft.absent}
+                        onChange={(value) => updateDayDraft(selectedInputDay.id, { end: value })}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <p className="muted">この日はすでに入力済みです。内容を確認・編集するにはパスワードが必要です。</p>
+                )}
 
                 {currentPlan.length > 0 ? (
                   <div className="sheet-wrap">
