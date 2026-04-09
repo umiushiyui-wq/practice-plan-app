@@ -609,7 +609,7 @@ td {
 }
 
 .availability-table .available-cell {
-  background: #2f9e44;
+  background: #58b86b;
   box-shadow: inset 0 0 0 1px #1f7a33;
 }
 
@@ -620,10 +620,13 @@ td {
 }
 
 .player-availability-table .practice-window-cell.available-cell {
-  background: #2f9e44;
+  background: #58b86b;
   border-top: 2px solid #4f8fdd;
   border-bottom: 2px solid #4f8fdd;
-  box-shadow: inset 0 0 0 999px rgb(47 158 68 / 0.92);
+  box-shadow:
+    inset 0 0 0 999px rgb(88 184 107 / 0.82),
+    inset 0 2px 0 #4f8fdd,
+    inset 0 -2px 0 #4f8fdd;
 }
 
 .player-availability-table .practice-start-cell {
