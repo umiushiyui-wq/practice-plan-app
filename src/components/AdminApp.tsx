@@ -172,7 +172,7 @@ export function AdminApp() {
         <h1>管理者用 練習計画</h1>
         <p>練習日と練習計画を管理する画面です。</p>
         <div className="row">
-          <Link className="button" href="/メンバー・曲の追加">
+          <Link className="button" href="/admin/setup">
             メンバー・曲の追加
           </Link>
           <Link className="button secondary" href="/player">
@@ -281,7 +281,7 @@ export function AdminApp() {
         <section className="panel stack">
           <div className="row">
             <h2>メンバー一覧</h2>
-            <Link className="button secondary" href="/メンバー・曲の追加">
+            <Link className="button secondary" href="/admin/setup">
               追加ページへ
             </Link>
           </div>
@@ -305,7 +305,7 @@ export function AdminApp() {
         <section className="panel stack">
           <div className="row">
             <h2>曲一覧</h2>
-            <Link className="button secondary" href="/メンバー・曲の追加">
+            <Link className="button secondary" href="/admin/setup">
               追加ページへ
             </Link>
           </div>
