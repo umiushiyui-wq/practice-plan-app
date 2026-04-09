@@ -124,7 +124,9 @@ export function PlayerApp() {
   const activePart = partOptions.includes(selectedPart) ? selectedPart : partOptions[0] ?? "";
   const filteredMembers = state.members.filter((member) => (member.instrument || "未設定") === activePart);
   const selected = filteredMembers.find((member) => member.id === memberId) ?? null;
-  const isEditingEnabled = !!selected && authenticatedMemberId === selected.id;
+  const requiresPassword = !!selected && !!selected.password && selected.password !== "__unset__";
+  const needsInitialPasswordSetup = !!selected && (!selected.password || selected.password === "__unset__");
+  const isEditingEnabled = !!selected && (!requiresPassword || authenticatedMemberId === selected.id);
   const selectedInputDay = selected
     ? sortedPracticeDays.find((day) => day.id === selectedInputDayId) ?? sortedPracticeDays[0] ?? null
     : null;
@@ -308,14 +310,10 @@ export function PlayerApp() {
         <p className="muted">名前がなければ、管理者側でメンバーを追加してもらってください。</p>
       </section>
 
-      {selected && !isEditingEnabled ? (
+      {selected && requiresPassword && !isEditingEnabled ? (
         <section className="panel stack">
-          <h2>{selected.password && selected.password !== "__unset__" ? "出欠入力を開始" : "初回だけパスワードを決めてください"}</h2>
-          <p className="muted">
-            {selected.password && selected.password !== "__unset__"
-              ? "前回決めたパスワードを入れると編集できます。"
-              : "ここで決めたパスワードが次回以降のログイン用になります。"}
-          </p>
+          <h2>出欠入力を開始</h2>
+          <p className="muted">前回決めたパスワードを入れると、入力内容の確認と編集ができます。</p>
           <input
             type="password"
             value={memberPassword}
@@ -331,22 +329,6 @@ export function PlayerApp() {
                 return;
               }
 
-              if (!selected.password || selected.password === "__unset__") {
-                updateState({
-                  members: state.members.map((member) =>
-                    member.id === selected.id
-                      ? {
-                          ...member,
-                          password: memberPassword
-                        }
-                      : member
-                  )
-                });
-                setAuthenticatedMemberId(selected.id);
-                setAuthError("");
-                return;
-              }
-
               if (selected.password === memberPassword) {
                 setAuthenticatedMemberId(selected.id);
                 setAuthError("");
@@ -356,13 +338,52 @@ export function PlayerApp() {
               setAuthError("パスワードが違います。");
             }}
           >
-            {selected.password && selected.password !== "__unset__" ? "編集する" : "このパスワードで始める"}
+            編集する
           </button>
         </section>
       ) : null}
 
       {isEditingEnabled && selected ? (
         <>
+          {needsInitialPasswordSetup ? (
+            <section className="panel stack">
+              <h2>次回以降の確認用パスワード</h2>
+              <p className="muted">初回入力はこのまま進められます。次回から確認や編集をするときのために、先にパスワードを決めておけます。</p>
+              <input
+                type="password"
+                value={memberPassword}
+                onChange={(event) => setMemberPassword(event.target.value)}
+                placeholder="新しいパスワード"
+              />
+              {authError ? <p className="error">{authError}</p> : null}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!memberPassword.trim()) {
+                    setAuthError("パスワードを入力してください。");
+                    return;
+                  }
+
+                  updateState({
+                    members: state.members.map((member) =>
+                      member.id === selected.id
+                        ? {
+                            ...member,
+                            password: memberPassword
+                          }
+                        : member
+                    )
+                  });
+                  setMemberPassword("");
+                  setAuthError("");
+                  setSaveMessage("次回以降の確認用パスワードを設定しました。");
+                }}
+              >
+                このパスワードを設定
+              </button>
+            </section>
+          ) : null}
+
           <section className="panel stack">
             <h2>自分が出る曲</h2>
             {state.pieces.length === 0 ? <p className="muted">まだ曲が登録されていません。</p> : null}
