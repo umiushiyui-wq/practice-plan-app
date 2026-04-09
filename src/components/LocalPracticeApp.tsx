@@ -81,7 +81,7 @@ const defaultDay = defaultPracticeDay();
 
 const defaultState: AppState = {
   members: [
-    { id: "m1", name: "奏者", instrument: "", part: "" },
+    { id: "m1", name: "奏者1", instrument: "", part: "" },
     { id: "m2", name: "指揮者", instrument: "", part: "指揮" }
   ],
   pieces: [],
@@ -100,9 +100,9 @@ export function toMinutes(time: string) {
 }
 
 export function toTime(minutes: number) {
-  return `${Math.floor(minutes / 60).toString().padStart(2, "0")}:${(minutes % 60)
+  return `${Math.floor(minutes / 60)
     .toString()
-    .padStart(2, "0")}`;
+    .padStart(2, "0")}:${(minutes % 60).toString().padStart(2, "0")}`;
 }
 
 function migrateState(value: unknown): AppState {
@@ -229,8 +229,8 @@ export function findOverlappingPlanSlots(plan: PlanSlot[]) {
 
 export function getPlanSlotLabel(slot: PlanSlot, pieceTitle?: string) {
   if (slot.pieceId) return pieceTitle ?? "曲";
-  if (slot.reason?.includes("準備")) return "準備時間";
-  if (slot.reason?.includes("片付け")) return "片付け時間";
+  if (slot.reason?.includes("準備")) return "合奏準備";
+  if (slot.reason?.includes("片付け")) return "片付け";
   return "休憩";
 }
 
@@ -249,6 +249,21 @@ function getEffectiveAvailabilities(day: LocalPracticeDay) {
   );
 }
 
+export function getPlannedMinutesByPiece(state: AppState, options?: { excludePracticeDayId?: string }) {
+  const totals = new Map<string, number>();
+
+  for (const day of state.practiceDays) {
+    if (day.id === options?.excludePracticeDayId) continue;
+
+    for (const slot of day.plan) {
+      if (!slot.pieceId) continue;
+      totals.set(slot.pieceId, (totals.get(slot.pieceId) ?? 0) + slot.duration);
+    }
+  }
+
+  return totals;
+}
+
 export function generatePracticePlan(state: AppState): PlanSlot[] {
   const day = getSelectedPracticeDay(state);
   const effectiveAvailabilities = getEffectiveAvailabilities(day);
@@ -257,6 +272,7 @@ export function generatePracticePlan(state: AppState): PlanSlot[] {
   const selected: PlanSlot[] = [];
   const dailyMinutes = new Map<string, number>();
   const occurrences = new Map<string, number>();
+  const plannedMinutesInOtherDays = getPlannedMinutesByPiece(state, { excludePracticeDayId: day.id });
 
   while (true) {
     const candidates: Array<PlanSlot & { piece: Piece }> = [];
@@ -265,8 +281,8 @@ export function generatePracticePlan(state: AppState): PlanSlot[] {
       if (!piece.conductorId || piece.memberIds.length === 0) continue;
       if ((occurrences.get(piece.id) ?? 0) >= 2) continue;
 
-      const already = dailyMinutes.get(piece.id) ?? 0;
-      const maxDuration = piece.dailyMaxMinutes - already;
+      const alreadyToday = dailyMinutes.get(piece.id) ?? 0;
+      const maxDuration = piece.dailyMaxMinutes - alreadyToday;
       if (maxDuration < 15) continue;
 
       for (let duration = 15; duration <= maxDuration; duration += 5) {
@@ -279,12 +295,15 @@ export function generatePracticePlan(state: AppState): PlanSlot[] {
             isAvailable(effectiveAvailabilities, memberId, start, end)
           );
           const attendanceRate = availableMembers.length / piece.memberIds.length;
-          const recent = state.recentMinutes[piece.id] ?? 0;
+          const plannedBeforeToday = plannedMinutesInOtherDays.get(piece.id) ?? 0;
+          const projectedTotal = plannedBeforeToday + alreadyToday + duration;
           const target = Math.max(piece.targetMinutes, 1);
-          const progressDelay = Math.max(0, target - recent) / target;
+          const remainingBeforeThisSlot = Math.max(0, target - (plannedBeforeToday + alreadyToday));
+          const progressDelay = remainingBeforeThisSlot / target;
+          const overTargetPenalty = Math.max(0, projectedTotal - target) / target;
           const splitPenalty = (occurrences.get(piece.id) ?? 0) > 0 ? 5 : 0;
           const durationScore = (Math.min(duration, 30) / 30) * 10;
-          const score = attendanceRate * 50 + progressDelay * 35 + durationScore - splitPenalty;
+          const score = attendanceRate * 50 + progressDelay * 35 + durationScore - splitPenalty - overTargetPenalty * 20;
 
           candidates.push({
             id: makeId("s"),
@@ -294,7 +313,10 @@ export function generatePracticePlan(state: AppState): PlanSlot[] {
             end: toTime(end),
             duration,
             score: Math.round(score * 10) / 10,
-            reason: `${piece.title}: ${piece.memberIds.length}人中${availableMembers.length}人が参加可能。目標${piece.targetMinutes}分に対して直近実績${recent}分のため選ばれました。`
+            reason:
+              `${piece.title}: 期間全体の目標${piece.targetMinutes}分に対して、` +
+              `この日より前後を含む確保済みは${plannedBeforeToday + alreadyToday}分。` +
+              `${piece.memberIds.length}人中${availableMembers.length}人がこの時間に参加可能なため選ばれました。`
           });
         }
       }

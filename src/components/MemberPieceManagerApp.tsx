@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { makeId, useLocalPracticeState } from "@/components/LocalPracticeApp";
+import { getPlannedMinutesByPiece, makeId, useLocalPracticeState } from "@/components/LocalPracticeApp";
 
 const INSTRUMENT_OPTIONS = [
   "フルート",
@@ -16,6 +16,7 @@ const INSTRUMENT_OPTIONS = [
 
 export function MemberPieceManagerApp() {
   const { state, updateState } = useLocalPracticeState();
+  const plannedMinutesByPiece = getPlannedMinutesByPiece(state);
 
   function addMember(formData: FormData) {
     const name = String(formData.get("name") ?? "").trim();
@@ -160,9 +161,12 @@ export function MemberPieceManagerApp() {
               ))}
             </select>
             <label>
-              期間内の目標練習時間
+              期間全体で確保したい練習時間
               <input name="targetMinutes" type="number" min="0" step="5" defaultValue="60" />
             </label>
+            <p className="muted">
+              複数の練習日を入力している場合、その曲を全日程の合計で何分くらい練習したいかを入れます。
+            </p>
             <label>
               1日の最大練習時間
               <input name="dailyMaxMinutes" type="number" min="15" step="5" defaultValue="45" />
@@ -190,15 +194,25 @@ export function MemberPieceManagerApp() {
           <div className="stack">
             <strong>現在の曲</strong>
             {state.pieces.length === 0 ? <p className="muted">まだ曲がありません。</p> : null}
-            {state.pieces.map((piece) => (
-              <div className="row" key={piece.id}>
-                <span>{piece.title}</span>
-                <span className="muted">
-                  指揮者: {state.members.find((member) => member.id === piece.conductorId)?.name ?? "未設定"} / 参加者{" "}
-                  {piece.memberIds.length}人
-                </span>
-              </div>
-            ))}
+            {state.pieces.map((piece) => {
+              const plannedMinutes = plannedMinutesByPiece.get(piece.id) ?? 0;
+              const remainingMinutes = Math.max(0, piece.targetMinutes - plannedMinutes);
+
+              return (
+                <div className="row" key={piece.id}>
+                  <div>
+                    <strong>{piece.title}</strong>
+                    <div className="muted">
+                      指揮者: {state.members.find((member) => member.id === piece.conductorId)?.name ?? "未設定"} / 参加者{" "}
+                      {piece.memberIds.length}人
+                    </div>
+                    <div className="muted">
+                      期間目標 {piece.targetMinutes}分 / 現在 {plannedMinutes}分 / 残り {remainingMinutes}分
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </section>
       </div>
