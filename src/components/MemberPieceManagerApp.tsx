@@ -69,8 +69,7 @@ export function MemberPieceManagerApp() {
     updateState({
       members: [...state.members, member],
       practiceDays: state.practiceDays.map((day) => ({
-        ...day,
-        absentMemberIds: Array.from(new Set([...day.absentMemberIds, member.id]))
+        ...day
       }))
     });
   }
@@ -129,7 +128,7 @@ export function MemberPieceManagerApp() {
           startTime,
           endTime,
           availabilities: [],
-          absentMemberIds: state.members.map((member) => member.id),
+          absentMemberIds: [],
           respondedMemberIds: [],
           plan: []
         }

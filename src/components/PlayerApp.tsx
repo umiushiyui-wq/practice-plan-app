@@ -124,9 +124,12 @@ export function PlayerApp() {
   const activePart = partOptions.includes(selectedPart) ? selectedPart : partOptions[0] ?? "";
   const filteredMembers = state.members.filter((member) => (member.instrument || "未設定") === activePart);
   const selected = filteredMembers.find((member) => member.id === memberId) ?? null;
-  const requiresPassword = !!selected && !!selected.password && selected.password !== "__unset__";
-  const needsInitialPasswordSetup = !!selected && (!selected.password || selected.password === "__unset__");
-  const isEditingEnabled = !!selected && (!requiresPassword || authenticatedMemberId === selected.id);
+  const hasAnySavedInput =
+    !!selected && state.practiceDays.some((day) => day.respondedMemberIds.includes(selected.id));
+  const hasUsablePassword = !!selected && !!selected.password && selected.password !== "__unset__";
+  const requiresPassword = hasAnySavedInput && hasUsablePassword;
+  const needsPasswordSetup = hasAnySavedInput && !hasUsablePassword;
+  const isEditingEnabled = !!selected && (!hasAnySavedInput || authenticatedMemberId === selected.id);
   const selectedInputDay = selected
     ? sortedPracticeDays.find((day) => day.id === selectedInputDayId) ?? sortedPracticeDays[0] ?? null
     : null;
@@ -157,7 +160,7 @@ export function PlayerApp() {
           {
             start: savedAvailability?.start ?? day.startTime,
             end: savedAvailability?.end ?? day.endTime,
-            absent: isAbsent
+            absent: hasSaved ? isAbsent : false
           }
         ];
       })
@@ -310,6 +313,45 @@ export function PlayerApp() {
         <p className="muted">名前がなければ、管理者側でメンバーを追加してもらってください。</p>
       </section>
 
+      {selected && needsPasswordSetup && !isEditingEnabled ? (
+        <section className="panel stack">
+          <h2>確認用パスワードを設定</h2>
+          <p className="muted">すでに入力済みの内容を次回以降も確認・編集できるように、ここでパスワードを決めてください。</p>
+          <input
+            type="password"
+            value={memberPassword}
+            onChange={(event) => setMemberPassword(event.target.value)}
+            placeholder="新しいパスワード"
+          />
+          {authError ? <p className="error">{authError}</p> : null}
+          <button
+            type="button"
+            onClick={() => {
+              if (!memberPassword.trim()) {
+                setAuthError("パスワードを入力してください。");
+                return;
+              }
+
+              updateState({
+                members: state.members.map((member) =>
+                  member.id === selected.id
+                    ? {
+                        ...member,
+                        password: memberPassword
+                      }
+                    : member
+                )
+              });
+              setAuthenticatedMemberId(selected.id);
+              setAuthError("");
+              setSaveMessage("確認用パスワードを設定しました。");
+            }}
+          >
+            このパスワードを設定
+          </button>
+        </section>
+      ) : null}
+
       {selected && requiresPassword && !isEditingEnabled ? (
         <section className="panel stack">
           <h2>出欠入力を開始</h2>
@@ -345,45 +387,6 @@ export function PlayerApp() {
 
       {isEditingEnabled && selected ? (
         <>
-          {needsInitialPasswordSetup ? (
-            <section className="panel stack">
-              <h2>次回以降の確認用パスワード</h2>
-              <p className="muted">初回入力はこのまま進められます。次回から確認や編集をするときのために、先にパスワードを決めておけます。</p>
-              <input
-                type="password"
-                value={memberPassword}
-                onChange={(event) => setMemberPassword(event.target.value)}
-                placeholder="新しいパスワード"
-              />
-              {authError ? <p className="error">{authError}</p> : null}
-              <button
-                type="button"
-                onClick={() => {
-                  if (!memberPassword.trim()) {
-                    setAuthError("パスワードを入力してください。");
-                    return;
-                  }
-
-                  updateState({
-                    members: state.members.map((member) =>
-                      member.id === selected.id
-                        ? {
-                            ...member,
-                            password: memberPassword
-                          }
-                        : member
-                    )
-                  });
-                  setMemberPassword("");
-                  setAuthError("");
-                  setSaveMessage("次回以降の確認用パスワードを設定しました。");
-                }}
-              >
-                このパスワードを設定
-              </button>
-            </section>
-          ) : null}
-
           <section className="panel stack">
             <h2>自分が出る曲</h2>
             {state.pieces.length === 0 ? <p className="muted">まだ曲が登録されていません。</p> : null}
@@ -415,10 +418,13 @@ export function PlayerApp() {
                 <tbody>
                   {sortedPracticeDays.map((day) => {
                     const draft = draftsByDay[day.id];
+                    const hasSaved = day.respondedMemberIds.includes(selected.id);
                     const label = draft
-                      ? draft.absent
-                        ? "欠席"
-                        : `${draft.start}-${draft.end}`
+                      ? hasSaved
+                        ? draft.absent
+                          ? "欠席"
+                          : `${draft.start}-${draft.end}`
+                        : "未入力"
                       : "未入力";
 
                     return (
