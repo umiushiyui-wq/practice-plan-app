@@ -95,6 +95,22 @@ export function MemberPieceManagerApp() {
     });
   }
 
+  function resetMemberPassword(memberId: string) {
+    const member = state.members.find((item) => item.id === memberId);
+    if (!member || !confirm(`${member.name} のパスワードをリセットしますか？`)) return;
+
+    updateState({
+      members: state.members.map((item) =>
+        item.id === memberId
+          ? {
+              ...item,
+              password: "__unset__"
+            }
+          : item
+      )
+    });
+  }
+
   function addPracticeDay(formData: FormData) {
     const practiceDate = String(formData.get("practiceDate") ?? "").trim();
     if (!practiceDate) return;
@@ -273,9 +289,14 @@ export function MemberPieceManagerApp() {
                     </div>
                     <div className="muted">{member.password && member.password !== "__unset__" ? "パスワード設定済み" : "初回ログイン時に設定"}</div>
                   </div>
-                  <button className="danger" type="button" onClick={() => deleteMember(member.id)}>
-                    削除
-                  </button>
+                  <div className="row">
+                    <button className="secondary" type="button" onClick={() => resetMemberPassword(member.id)}>
+                      パスワードリセット
+                    </button>
+                    <button className="danger" type="button" onClick={() => deleteMember(member.id)}>
+                      削除
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
