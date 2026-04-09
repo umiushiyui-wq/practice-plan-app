@@ -7,6 +7,7 @@ export type Member = {
   name: string;
   instrument: string;
   part: string;
+  password?: string;
 };
 
 export type Piece = {
@@ -134,7 +135,12 @@ function migrateState(value: unknown): AppState {
   if (!value || typeof value !== "object") return defaultState;
 
   const saved = value as LegacyAppState;
-  const members = Array.isArray(saved.members) ? saved.members : defaultState.members;
+  const members = Array.isArray(saved.members)
+    ? saved.members.map((member) => ({
+        ...member,
+        password: typeof member.password === "string" ? member.password : ""
+      }))
+    : defaultState.members;
   const pieces = Array.isArray(saved.pieces) ? saved.pieces.map(normalizePiece) : defaultState.pieces;
   const recentMinutes = saved.recentMinutes ?? {};
 

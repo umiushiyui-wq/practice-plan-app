@@ -56,12 +56,15 @@ export function MemberPieceManagerApp() {
   function addMember(formData: FormData) {
     const name = String(formData.get("name") ?? "").trim();
     if (!name) return;
+    const password = String(formData.get("password") ?? "").trim() || window.prompt(`${name} のパスワードを設定`)?.trim() || "";
+    if (!password) return;
 
     const member = {
       id: makeId("m"),
       name,
       instrument: String(formData.get("instrument") ?? ""),
-      part: String(formData.get("part") ?? "").trim()
+      part: String(formData.get("part") ?? "").trim(),
+      password
     };
 
     updateState({

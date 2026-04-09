@@ -113,14 +113,18 @@ export function PlayerApp() {
   const sortedPracticeDays = useMemo(() => getSortedPracticeDays(state.practiceDays), [state.practiceDays]);
   const [selectedPart, setSelectedPart] = useState("");
   const [memberId, setMemberId] = useState("");
+  const [memberPassword, setMemberPassword] = useState("");
+  const [authenticatedMemberId, setAuthenticatedMemberId] = useState("");
   const [selectedInputDayId, setSelectedInputDayId] = useState("");
   const [draftsByDay, setDraftsByDay] = useState<DraftByDay>({});
   const [saveMessage, setSaveMessage] = useState("");
+  const [authError, setAuthError] = useState("");
 
   const partOptions = Array.from(new Set(state.members.map((member) => member.instrument || "未設定")));
   const activePart = partOptions.includes(selectedPart) ? selectedPart : partOptions[0] ?? "";
   const filteredMembers = state.members.filter((member) => (member.instrument || "未設定") === activePart);
   const selected = filteredMembers.find((member) => member.id === memberId) ?? null;
+  const isEditingEnabled = !!selected && authenticatedMemberId === selected.id;
   const selectedInputDay = selected
     ? sortedPracticeDays.find((day) => day.id === selectedInputDayId) ?? sortedPracticeDays[0] ?? null
     : null;
@@ -130,6 +134,12 @@ export function PlayerApp() {
       setSelectedPart(activePart);
     }
   }, [activePart, selectedPart]);
+
+  useEffect(() => {
+    setMemberPassword("");
+    setAuthenticatedMemberId("");
+    setAuthError("");
+  }, [memberId]);
 
   useEffect(() => {
     if (!selected) return;
@@ -298,7 +308,34 @@ export function PlayerApp() {
         <p className="muted">名前がなければ、管理者側でメンバーを追加してもらってください。</p>
       </section>
 
-      {selected ? (
+      {selected && !isEditingEnabled ? (
+        <section className="panel stack">
+          <h2>編集を開始</h2>
+          <input
+            type="password"
+            value={memberPassword}
+            onChange={(event) => setMemberPassword(event.target.value)}
+            placeholder="パスワード"
+          />
+          {authError ? <p className="error">{authError}</p> : null}
+          <button
+            type="button"
+            onClick={() => {
+              if ((selected.password ?? "") === memberPassword) {
+                setAuthenticatedMemberId(selected.id);
+                setAuthError("");
+                return;
+              }
+
+              setAuthError("パスワードが違います。");
+            }}
+          >
+            編集する
+          </button>
+        </section>
+      ) : null}
+
+      {isEditingEnabled && selected ? (
         <>
           <section className="panel stack">
             <h2>自分が出る曲</h2>
