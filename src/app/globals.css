@@ -599,12 +599,24 @@ td {
 .player-availability-table td {
   min-width: 14px;
   padding: 0;
+  border-left: 0;
+  border-right: 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
 }
 
 .player-availability-table thead th {
   min-width: 14px;
   padding: 4px 2px;
   font-size: 10px;
+}
+
+.player-availability-table tbody tr td:first-of-type {
+  border-left: 1px solid var(--line);
+}
+
+.player-availability-table tbody tr td:last-child {
+  border-right: 1px solid var(--line);
 }
 
 .availability-table .available-cell {
