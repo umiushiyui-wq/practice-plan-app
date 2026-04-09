@@ -409,6 +409,33 @@ td {
   gap: 10px;
 }
 
+.fold-panel {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fbfdff;
+  overflow: hidden;
+}
+
+.fold-panel summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+  padding: 14px 16px;
+  font-weight: 700;
+}
+
+.fold-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.fold-panel-body {
+  border-top: 1px solid var(--line);
+  padding: 14px 16px 16px;
+}
+
 .sheet-wrap {
   width: 100%;
   overflow-x: auto;
