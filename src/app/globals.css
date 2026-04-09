@@ -600,7 +600,6 @@ td {
   min-width: 10px;
   padding: 0;
   border: 0;
-  position: relative;
 }
 
 .player-availability-table thead th {
@@ -628,21 +627,31 @@ td {
 }
 
 .player-availability-table .practice-start-cell {
-  border-left: 2px solid #4f8fdd;
-  z-index: 2;
+  box-shadow: inset 3px 0 0 #4f8fdd;
 }
 
 .player-availability-table .practice-end-cell {
-  border-right: 2px solid #4f8fdd;
-  z-index: 2;
+  box-shadow: inset -3px 0 0 #4f8fdd;
 }
 
 .player-availability-table .hour-divider-cell {
-  border-left: 1px solid #c5d0da;
+  box-shadow: inset 1px 0 0 #c5d0da;
 }
 
 .player-availability-table tbody tr td:last-child {
-  border-right: 1px solid #c5d0da;
+  box-shadow: inset -1px 0 0 #c5d0da;
+}
+
+.player-availability-table .practice-start-cell.hour-divider-cell {
+  box-shadow: inset 3px 0 0 #4f8fdd;
+}
+
+.player-availability-table .practice-end-cell.hour-divider-cell {
+  box-shadow: inset -3px 0 0 #4f8fdd;
+}
+
+.player-availability-table tbody th {
+  z-index: 3;
 }
 
 .legend-row {
