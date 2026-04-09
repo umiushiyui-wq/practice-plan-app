@@ -81,6 +81,7 @@ export function MemberPieceManagerApp() {
   function addPiece(formData: FormData) {
     const title = String(formData.get("title") ?? "").trim();
     if (!title) return;
+    const conductorId = String(formData.get("conductorId") ?? "").trim();
 
     const pieceId = makeId("p");
     updateState({
@@ -89,7 +90,7 @@ export function MemberPieceManagerApp() {
         {
           id: pieceId,
           title,
-          conductorId: "",
+          conductorId,
           memberIds: [],
           targetMinutes: 60,
           dailyMaxMinutes: 45,
@@ -212,7 +213,17 @@ export function MemberPieceManagerApp() {
               event.currentTarget.reset();
             }}
           >
-            <input name="title" placeholder="まずは曲名だけ追加" required />
+            <input name="title" placeholder="曲名" required />
+            <select name="conductorId" required defaultValue="">
+              <option value="" disabled>
+                指揮者を選択
+              </option>
+              {state.members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.name}
+                </option>
+              ))}
+            </select>
             <button type="submit">曲を追加</button>
           </form>
 
@@ -313,10 +324,6 @@ export function MemberPieceManagerApp() {
                     defaultValue={selectedPiece.dailyMaxMinutes}
                   />
                 </label>
-                <div className="notice">
-                  参加メンバーはここでは指定しません。奏者側で入力された参加曲をそのまま使います。
-                </div>
-
                 <button type="submit">この曲の設定を保存</button>
               </form>
             </section>
@@ -346,6 +353,29 @@ export function MemberPieceManagerApp() {
                       期間目標 {piece.targetMinutes}分 / 現在 {plannedMinutes}分 / 残り {remainingMinutes}分
                     </div>
                   </div>
+                  <button
+                    className="danger"
+                    type="button"
+                    onClick={() => {
+                      if (!confirm(`${piece.title} を削除しますか？`)) return;
+                      const nextPieces = state.pieces.filter((item) => item.id !== piece.id);
+                      updateState({
+                        pieces: nextPieces,
+                        practiceDays: state.practiceDays.map((day) => ({
+                          ...day,
+                          plan: day.plan.filter((slot) => slot.pieceId !== piece.id)
+                        })),
+                        recentMinutes: Object.fromEntries(
+                          Object.entries(state.recentMinutes).filter(([id]) => id !== piece.id)
+                        )
+                      });
+                      if (selectedPieceId === piece.id) {
+                        setSelectedPieceId(nextPieces[0]?.id ?? "");
+                      }
+                    }}
+                  >
+                    削除
+                  </button>
                 </div>
               );
             })}

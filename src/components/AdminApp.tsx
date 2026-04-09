@@ -226,9 +226,6 @@ export function AdminApp() {
           <Link className="button secondary" href="/sheet">
             表で見る
           </Link>
-          <button type="button" onClick={handleGeneratePlan}>
-            選択中の練習日で自動生成
-          </button>
         </div>
         {planMessage ? <div className="notice">{planMessage}</div> : null}
       </section>
@@ -325,9 +322,14 @@ export function AdminApp() {
             <p className="muted">Practice Flow</p>
             <h2>{selectedDay.practiceDate} の練習計画</h2>
           </div>
-          <span className="muted">
-            {selectedDay.startTime} - {selectedDay.endTime}
-          </span>
+          <div className="row">
+            <span className="muted">
+              {selectedDay.startTime} - {selectedDay.endTime}
+            </span>
+            <button type="button" onClick={handleGeneratePlan}>
+              選択中の練習日で自動生成
+            </button>
+          </div>
         </div>
 
         <div className="plan-summary-grid">
