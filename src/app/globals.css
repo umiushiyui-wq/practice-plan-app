@@ -657,6 +657,15 @@ td {
   z-index: 3;
 }
 
+.player-availability-table .hovered-slot-cell {
+  background-image: linear-gradient(rgba(31, 122, 51, 0.08), rgba(31, 122, 51, 0.08));
+}
+
+.player-availability-table thead .hovered-slot-cell {
+  color: #0f5132;
+  font-weight: 700;
+}
+
 .legend-row {
   display: flex;
   flex-wrap: wrap;

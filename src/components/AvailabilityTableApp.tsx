@@ -126,7 +126,7 @@ export function AvailabilityTableApp() {
             {toTime(hoveredSlot)} 時点で参加可能: {hoveredAvailableCount}人
           </div>
         ) : null}
-        <div className="availability-wrap">
+        <div className="availability-wrap" onMouseLeave={() => setHoveredSlot(null)}>
           <table className="availability-table player-availability-table">
             <thead>
               <tr>
@@ -134,6 +134,7 @@ export function AvailabilityTableApp() {
                 {AVAILABILITY_SLOTS.map((minutes) => (
                   <th
                     key={minutes}
+                    className={hoveredSlot === minutes ? "hovered-slot-cell" : ""}
                     onMouseEnter={() => setHoveredSlot(minutes)}
                     onMouseLeave={() => setHoveredSlot(null)}
                     onFocus={() => setHoveredSlot(minutes)}
@@ -183,7 +184,13 @@ export function AvailabilityTableApp() {
                         .filter(Boolean)
                         .join(" ");
 
-                      return <td key={`${member.id}-${minutes}`} className={classNames} />;
+                      return (
+                        <td
+                          key={`${member.id}-${minutes}`}
+                          className={[classNames, hoveredSlot === minutes ? "hovered-slot-cell" : ""].filter(Boolean).join(" ")}
+                          onMouseEnter={() => setHoveredSlot(minutes)}
+                        />
+                      );
                     })}
                   </tr>
                 );
