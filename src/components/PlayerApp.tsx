@@ -112,7 +112,7 @@ export function PlayerApp() {
   const pieceMap = usePieceMap(state.pieces);
   const sortedPracticeDays = useMemo(() => getSortedPracticeDays(state.practiceDays), [state.practiceDays]);
   const [selectedPart, setSelectedPart] = useState("");
-  const [memberId, setMemberId] = useState("m1");
+  const [memberId, setMemberId] = useState("");
   const [selectedInputDayId, setSelectedInputDayId] = useState("");
   const [draftsByDay, setDraftsByDay] = useState<DraftByDay>({});
   const [saveMessage, setSaveMessage] = useState("");
@@ -120,21 +120,16 @@ export function PlayerApp() {
   const partOptions = Array.from(new Set(state.members.map((member) => member.instrument || "未設定")));
   const activePart = partOptions.includes(selectedPart) ? selectedPart : partOptions[0] ?? "";
   const filteredMembers = state.members.filter((member) => (member.instrument || "未設定") === activePart);
-  const selected = filteredMembers.find((member) => member.id === memberId) ?? filteredMembers[0] ?? state.members[0] ?? null;
-  const selectedInputDay =
-    sortedPracticeDays.find((day) => day.id === selectedInputDayId) ?? sortedPracticeDays[0] ?? null;
+  const selected = filteredMembers.find((member) => member.id === memberId) ?? null;
+  const selectedInputDay = selected
+    ? sortedPracticeDays.find((day) => day.id === selectedInputDayId) ?? sortedPracticeDays[0] ?? null
+    : null;
 
   useEffect(() => {
     if (activePart && selectedPart !== activePart) {
       setSelectedPart(activePart);
     }
   }, [activePart, selectedPart]);
-
-  useEffect(() => {
-    if (selected && selected.id !== memberId) {
-      setMemberId(selected.id);
-    }
-  }, [memberId, selected]);
 
   useEffect(() => {
     if (!selected) return;
@@ -161,13 +156,20 @@ export function PlayerApp() {
   }, [selected, sortedPracticeDays]);
 
   useEffect(() => {
+    if (!selected) {
+      if (selectedInputDayId) {
+        setSelectedInputDayId("");
+      }
+      return;
+    }
+
     if (selectedInputDay && selectedInputDay.id !== selectedInputDayId) {
       setSelectedInputDayId(selectedInputDay.id);
     }
     if (!selectedInputDay && selectedInputDayId) {
       setSelectedInputDayId("");
     }
-  }, [selectedInputDay, selectedInputDayId]);
+  }, [selected, selectedInputDay, selectedInputDayId]);
 
   function updateDayDraft(dayId: string, patch: Partial<DraftByDay[string]>) {
     setDraftsByDay((current) => ({
@@ -286,6 +288,7 @@ export function PlayerApp() {
           ))}
         </select>
         <select value={selected?.id ?? ""} onChange={(event) => setMemberId(event.target.value)}>
+          <option value="">自分を選んでください</option>
           {filteredMembers.map((member) => (
             <option key={member.id} value={member.id}>
               {member.name}
@@ -468,7 +471,11 @@ export function PlayerApp() {
             )}
           </section>
         </>
-      ) : null}
+      ) : (
+        <section className="panel stack">
+          <p className="muted">上で自分を選ぶと、その下に参加曲と出欠入力が表示されます。</p>
+        </section>
+      )}
     </main>
   );
 }
