@@ -81,6 +81,7 @@ export function MemberPieceManagerApp() {
   function addPracticeDay(formData: FormData) {
     const practiceDate = String(formData.get("practiceDate") ?? "").trim();
     if (!practiceDate) return;
+
     const startTime = String(formData.get("startTime") ?? "18:00");
     const endTime = String(formData.get("endTime") ?? "21:00");
     const id = makeId("d");
@@ -106,9 +107,10 @@ export function MemberPieceManagerApp() {
   function addPiece(formData: FormData) {
     const title = String(formData.get("title") ?? "").trim();
     if (!title) return;
-    const conductorId = String(formData.get("conductorId") ?? "").trim();
 
+    const conductorId = String(formData.get("conductorId") ?? "").trim();
     const pieceId = makeId("p");
+
     updateState({
       pieces: [
         ...state.pieces,
@@ -124,6 +126,7 @@ export function MemberPieceManagerApp() {
         }
       ]
     });
+
     setSelectedPieceId(pieceId);
   }
 
@@ -148,7 +151,7 @@ export function MemberPieceManagerApp() {
 
   function clearPieceSettings(pieceId: string) {
     const piece = state.pieces.find((item) => item.id === pieceId);
-    if (!piece || !confirm(`${piece.title} の設定を消去しますか？`)) return;
+    if (!piece || !confirm(`${piece.title} の練習時間などの項目を消去しますか？`)) return;
 
     updateState({
       pieces: state.pieces.map((item) =>
@@ -174,9 +177,10 @@ export function MemberPieceManagerApp() {
 
   function deletePiece(pieceId: string) {
     const piece = state.pieces.find((item) => item.id === pieceId);
-    if (!piece || !confirm(`${piece.title} を曲一覧から完全に削除しますか？`)) return;
+    if (!piece || !confirm(`${piece.title} を曲一覧から消去しますか？`)) return;
 
     const nextPieces = state.pieces.filter((item) => item.id !== piece.id);
+
     updateState({
       pieces: nextPieces,
       practiceDays: state.practiceDays.map((day) => ({
@@ -197,9 +201,9 @@ export function MemberPieceManagerApp() {
   return (
     <main className="stack">
       <section className="panel stack">
-        <p className="muted">管理者用URL</p>
+        <p className="muted">管理者用の準備URL</p>
         <h1>メンバー・曲・練習日の追加</h1>
-        <p>メンバー、練習日、曲をここで準備してから、管理画面で練習計画を整えます。</p>
+        <p>メンバー、練習日、曲の登録をここでまとめて進めてから、管理画面で練習計画を調整します。</p>
         <div className="row">
           <Link className="button secondary" href="/admin">
             管理画面へ戻る
@@ -229,7 +233,7 @@ export function MemberPieceManagerApp() {
                 </option>
               ))}
             </select>
-            <input name="part" placeholder="パート名（任意）" />
+            <input name="part" placeholder="パート名" />
             <button type="submit">メンバーを追加</button>
           </form>
 
@@ -239,7 +243,7 @@ export function MemberPieceManagerApp() {
               <span className="muted">{state.members.length}人</span>
             </summary>
             <div className="fold-panel-body stack">
-              {state.members.length === 0 ? <p className="muted">まだメンバーがいません。</p> : null}
+              {state.members.length === 0 ? <p className="muted">まだメンバーがありません。</p> : null}
               {state.members.map((member) => (
                 <div className="row" key={member.id}>
                   <div>
@@ -357,10 +361,10 @@ export function MemberPieceManagerApp() {
                 </div>
                 <div className="row">
                   <button className="secondary" type="button" onClick={() => clearPieceSettings(selectedPiece.id)}>
-                    この曲の設定を消去
+                    練習時間などの項目を消去
                   </button>
                   <button className="danger" type="button" onClick={() => deletePiece(selectedPiece.id)}>
-                    曲自体を削除
+                    曲の消去
                   </button>
                 </div>
               </div>
@@ -414,7 +418,7 @@ export function MemberPieceManagerApp() {
                     </select>
                   </label>
                 </div>
-                <p className="muted">この曲の目標時間をどの練習日範囲で見るかを選びます。</p>
+                <p className="muted">この曲の目標時間を、どの練習日の範囲で見るかを選べます。</p>
 
                 <label>
                   その期間で確保したい練習時間
@@ -451,8 +455,7 @@ export function MemberPieceManagerApp() {
                   <div>
                     <strong>{piece.title}</strong>
                     <div className="muted">
-                      指揮者: {state.members.find((member) => member.id === piece.conductorId)?.name ?? "未設定"} / 参加者{" "}
-                      {piece.memberIds.length}人
+                      指揮者 {state.members.find((member) => member.id === piece.conductorId)?.name ?? "未設定"}
                     </div>
                     <div className="muted">対象期間: {targetRange.label}</div>
                     <div className="muted">
@@ -461,10 +464,7 @@ export function MemberPieceManagerApp() {
                   </div>
                   <div className="row">
                     <button className="secondary" type="button" onClick={() => clearPieceSettings(piece.id)}>
-                      設定を消去
-                    </button>
-                    <button className="danger" type="button" onClick={() => deletePiece(piece.id)}>
-                      曲を削除
+                      練習時間などの項目を消去
                     </button>
                   </div>
                 </div>
