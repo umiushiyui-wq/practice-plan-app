@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { getSelectedPracticeDay, toMinutes, toTime, useLocalPracticeState } from "@/components/LocalPracticeApp";
 
-const HEATMAP_SLOTS = Array.from({ length: ((22 - 8) * 60) / 10 + 1 }, (_, index) => 8 * 60 + index * 10);
+const HEATMAP_SLOTS = Array.from({ length: 15 }, (_, index) => 8 * 60 + index * 60);
 
 type HoveredCell = {
   pieceId: string;
   pieceTitle: string;
-  minutes: number;
+  startMinutes: number;
+  endMinutes: number;
   count: number;
 };
 
@@ -42,7 +43,7 @@ export function ColorMapApp() {
   const practiceStart = toMinutes(selectedDay.startTime);
   const practiceEnd = toMinutes(selectedDay.endTime);
   const visibleSlots = useMemo(
-    () => HEATMAP_SLOTS.filter((minutes) => practiceStart <= minutes && minutes < practiceEnd),
+    () => HEATMAP_SLOTS.filter((minutes) => minutes < practiceEnd && minutes + 60 > practiceStart),
     [practiceEnd, practiceStart]
   );
 
@@ -65,25 +66,29 @@ export function ColorMapApp() {
   const heatmapRows = useMemo(() => {
     return state.pieces
       .map((piece) => {
-      const participantIds = Array.from(new Set([piece.conductorId, ...piece.memberIds].filter(Boolean)));
-      const counts = visibleSlots.map((minutes) => {
-        const slotEnd = minutes + 10;
-        return participantIds.filter((memberId) =>
-          (memberAvailabilityMap.get(memberId) ?? []).some((window) => window.start < slotEnd && minutes < window.end)
-        ).length;
-      });
-      const peakCount = counts.length > 0 ? Math.max(...counts) : 0;
-      const averageCount = counts.length > 0 ? Math.round((counts.reduce((total, count) => total + count, 0) / counts.length) * 10) / 10 : 0;
+        const participantIds = Array.from(new Set([piece.conductorId, ...piece.memberIds].filter(Boolean)));
+        const counts = visibleSlots.map((minutes) => {
+          const slotEnd = minutes + 60;
+          return participantIds.filter((memberId) =>
+            (memberAvailabilityMap.get(memberId) ?? []).some((window) => window.start < slotEnd && minutes < window.end)
+          ).length;
+        });
+        const peakCount = counts.length > 0 ? Math.max(...counts) : 0;
+        const averageCount =
+          counts.length > 0 ? Math.round((counts.reduce((total, count) => total + count, 0) / counts.length) * 10) / 10 : 0;
 
-      return {
-        piece,
-        participantTotal: participantIds.length,
-        counts,
-        peakCount,
-        averageCount
-      };
+        return {
+          piece,
+          participantTotal: participantIds.length,
+          counts,
+          peakCount,
+          averageCount
+        };
       })
-      .sort((a, b) => b.peakCount - a.peakCount || b.averageCount - a.averageCount || a.piece.title.localeCompare(b.piece.title, "ja"));
+      .sort(
+        (a, b) =>
+          b.peakCount - a.peakCount || b.averageCount - a.averageCount || a.piece.title.localeCompare(b.piece.title, "ja")
+      );
   }, [memberAvailabilityMap, state.pieces, visibleSlots]);
 
   return (
@@ -138,7 +143,7 @@ export function ColorMapApp() {
           <article className="plan-stat-card">
             <span className="plan-stat-label">表示幅</span>
             <strong>{visibleSlots.length}マス</strong>
-            <span className="muted">練習時間だけ表示</span>
+            <span className="muted">1時間ごとの表示</span>
           </article>
           <article className="plan-stat-card">
             <span className="plan-stat-label">色の目安</span>
@@ -149,10 +154,11 @@ export function ColorMapApp() {
 
         {hoveredCell ? (
           <div className="notice">
-            {hoveredCell.pieceTitle} / {toTime(hoveredCell.minutes)} 時点で参加可能 {hoveredCell.count}人
+            {hoveredCell.pieceTitle} / {toTime(hoveredCell.startMinutes)} - {toTime(hoveredCell.endMinutes)} で参加可能{" "}
+            {hoveredCell.count}人
           </div>
         ) : (
-          <p className="muted">マスにカーソルを置くと、その時間の参加可能人数が見られます。</p>
+          <p className="muted">各マスは1時間単位です。その1時間に少しでも参加可能時間が重なれば参加として数えます。</p>
         )}
 
         <div className="color-scale-legend" aria-hidden="true">
@@ -176,10 +182,8 @@ export function ColorMapApp() {
                 <tr>
                   <th>曲</th>
                   {visibleSlots.map((minutes) => (
-                    <th key={minutes} className={minutes % 60 === 0 ? "hour-divider-cell" : ""}>
-                      {minutes % 60 === 0 || minutes === practiceStart
-                        ? `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`
-                        : ""}
+                    <th key={minutes} className="hour-divider-cell">
+                      {`${String(Math.floor(minutes / 60)).padStart(2, "0")}:00`}
                     </th>
                   ))}
                 </tr>
@@ -194,9 +198,9 @@ export function ColorMapApp() {
                     {visibleSlots.map((minutes, index) => {
                       const count = counts[index];
                       const classNames = [
-                        minutes % 60 === 0 ? "hour-divider-cell" : "",
+                        "hour-divider-cell",
                         "practice-window-cell",
-                        hoveredCell?.pieceId === piece.id && hoveredCell.minutes === minutes ? "hovered-slot-cell" : ""
+                        hoveredCell?.pieceId === piece.id && hoveredCell.startMinutes === minutes ? "hovered-slot-cell" : ""
                       ]
                         .filter(Boolean)
                         .join(" ");
@@ -206,12 +210,13 @@ export function ColorMapApp() {
                           key={`${piece.id}-${minutes}`}
                           className={classNames}
                           style={{ backgroundColor: getHeatmapColor(count) }}
-                          title={`${piece.title} / ${toTime(minutes)} / ${count}人`}
+                          title={`${piece.title} / ${toTime(minutes)}-${toTime(minutes + 60)} / ${count}人`}
                           onMouseEnter={() =>
                             setHoveredCell({
                               pieceId: piece.id,
                               pieceTitle: piece.title,
-                              minutes,
+                              startMinutes: minutes,
+                              endMinutes: minutes + 60,
                               count
                             })
                           }
