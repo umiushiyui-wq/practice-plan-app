@@ -113,6 +113,7 @@ export function PlayerApp() {
   const sortedPracticeDays = getSortedPracticeDays(state.practiceDays);
   const [selectedPart, setSelectedPart] = useState("");
   const [memberId, setMemberId] = useState("m1");
+  const [selectedInputDayId, setSelectedInputDayId] = useState("");
   const [draftsByDay, setDraftsByDay] = useState<DraftByDay>({});
   const [saveMessage, setSaveMessage] = useState("");
 
@@ -120,6 +121,8 @@ export function PlayerApp() {
   const activePart = partOptions.includes(selectedPart) ? selectedPart : partOptions[0] ?? "";
   const filteredMembers = state.members.filter((member) => (member.instrument || "未設定") === activePart);
   const selected = filteredMembers.find((member) => member.id === memberId) ?? filteredMembers[0] ?? state.members[0] ?? null;
+  const selectedInputDay =
+    sortedPracticeDays.find((day) => day.id === selectedInputDayId) ?? sortedPracticeDays[0] ?? null;
 
   useEffect(() => {
     if (activePart && selectedPart !== activePart) {
@@ -156,6 +159,15 @@ export function PlayerApp() {
     setDraftsByDay(nextDrafts);
     setSaveMessage("");
   }, [selected, sortedPracticeDays]);
+
+  useEffect(() => {
+    if (selectedInputDay && selectedInputDay.id !== selectedInputDayId) {
+      setSelectedInputDayId(selectedInputDay.id);
+    }
+    if (!selectedInputDay && selectedInputDayId) {
+      setSelectedInputDayId("");
+    }
+  }, [selectedInputDay, selectedInputDayId]);
 
   function updateDayDraft(dayId: string, patch: Partial<DraftByDay[string]>) {
     setDraftsByDay((current) => ({
@@ -247,6 +259,10 @@ export function PlayerApp() {
       ) as Record<string, ReturnType<typeof sortPlanByTime>>,
     [sortedPracticeDays]
   );
+
+  const currentDraft = selectedInputDay ? draftsByDay[selectedInputDay.id] : null;
+  const currentTimeOptions = selectedInputDay ? buildTimeOptions(selectedInputDay.startTime, selectedInputDay.endTime) : [];
+  const currentPlan = selectedInputDay ? visiblePlans[selectedInputDay.id] ?? [] : [];
 
   return (
     <main className="stack">
@@ -353,85 +369,98 @@ export function PlayerApp() {
           </section>
 
           <section className="panel stack">
-            <h2>練習日ごとの入力</h2>
+            <div className="row page-section-head">
+              <div>
+                <h2>練習日ごとの入力</h2>
+                <p className="muted">編集したい練習日だけ選んで入力できます。</p>
+              </div>
+              {selectedInputDay ? (
+                <label className="compact-field">
+                  練習日
+                  <select value={selectedInputDay.id} onChange={(event) => setSelectedInputDayId(event.target.value)}>
+                    {sortedPracticeDays.map((day) => (
+                      <option key={day.id} value={day.id}>
+                        {day.practiceDate} {day.startTime}-{day.endTime}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+            </div>
+
             {saveMessage ? <div className="notice">{saveMessage}</div> : null}
-            {sortedPracticeDays.map((day) => {
-              const draft = draftsByDay[day.id];
-              const timeOptions = buildTimeOptions(day.startTime, day.endTime);
-              const dayPlan = visiblePlans[day.id] ?? [];
 
-              if (!draft) return null;
-
-              return (
-                <section className="panel subtle-panel stack" key={day.id}>
-                  <div className="row page-section-head">
-                    <div>
-                      <h3>{day.practiceDate}</h3>
-                      <p className="muted">
-                        練習時間 {day.startTime}-{day.endTime}
-                      </p>
-                    </div>
-                    <button type="button" onClick={() => saveAvailability(day.id)}>
-                      この日の入力を保存
-                    </button>
+            {selectedInputDay && currentDraft ? (
+              <section className="panel subtle-panel stack">
+                <div className="row page-section-head">
+                  <div>
+                    <h3>{selectedInputDay.practiceDate}</h3>
+                    <p className="muted">
+                      練習時間 {selectedInputDay.startTime}-{selectedInputDay.endTime}
+                    </p>
                   </div>
+                  <button type="button" onClick={() => saveAvailability(selectedInputDay.id)}>
+                    この日の入力を保存
+                  </button>
+                </div>
 
-                  <label className="row">
-                    <input
-                      style={{ width: "auto" }}
-                      type="checkbox"
-                      checked={draft.absent}
-                      onChange={(event) => updateDayDraft(day.id, { absent: event.target.checked })}
-                    />
-                    欠席
-                  </label>
+                <label className="row">
+                  <input
+                    style={{ width: "auto" }}
+                    type="checkbox"
+                    checked={currentDraft.absent}
+                    onChange={(event) => updateDayDraft(selectedInputDay.id, { absent: event.target.checked })}
+                  />
+                  欠席
+                </label>
 
-                  <div className="grid">
-                    <TimePartSelect
-                      label="開始"
-                      value={draft.start}
-                      options={timeOptions}
-                      disabled={draft.absent}
-                      onChange={(value) => updateDayDraft(day.id, { start: value })}
-                    />
-                    <TimePartSelect
-                      label="終了"
-                      value={draft.end}
-                      options={timeOptions}
-                      disabled={draft.absent}
-                      onChange={(value) => updateDayDraft(day.id, { end: value })}
-                    />
-                  </div>
+                <div className="grid">
+                  <TimePartSelect
+                    label="開始"
+                    value={currentDraft.start}
+                    options={currentTimeOptions}
+                    disabled={currentDraft.absent}
+                    onChange={(value) => updateDayDraft(selectedInputDay.id, { start: value })}
+                  />
+                  <TimePartSelect
+                    label="終了"
+                    value={currentDraft.end}
+                    options={currentTimeOptions}
+                    disabled={currentDraft.absent}
+                    onChange={(value) => updateDayDraft(selectedInputDay.id, { end: value })}
+                  />
+                </div>
 
-                  {dayPlan.length > 0 ? (
-                    <div className="sheet-wrap">
-                      <table className="player-plan-table">
-                        <thead>
-                          <tr>
-                            <th>開始</th>
-                            <th>終了</th>
-                            <th>分</th>
-                            <th>内容</th>
+                {currentPlan.length > 0 ? (
+                  <div className="sheet-wrap">
+                    <table className="player-plan-table">
+                      <thead>
+                        <tr>
+                          <th>開始</th>
+                          <th>終了</th>
+                          <th>分</th>
+                          <th>内容</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {currentPlan.map((slot) => (
+                          <tr key={slot.id}>
+                            <td>{slot.start}</td>
+                            <td>{slot.end}</td>
+                            <td>{slot.duration}</td>
+                            <td>{getPlanSlotLabel(slot, slot.pieceId ? pieceMap.get(slot.pieceId)?.title : undefined)}</td>
                           </tr>
-                        </thead>
-                        <tbody>
-                          {dayPlan.map((slot) => (
-                            <tr key={slot.id}>
-                              <td>{slot.start}</td>
-                              <td>{slot.end}</td>
-                              <td>{slot.duration}</td>
-                              <td>{getPlanSlotLabel(slot, slot.pieceId ? pieceMap.get(slot.pieceId)?.title : undefined)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <p className="muted">まだこの日の練習計画はありません。</p>
-                  )}
-                </section>
-              );
-            })}
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="muted">まだこの日の練習計画はありません。</p>
+                )}
+              </section>
+            ) : (
+              <p className="muted">まだ練習日がありません。</p>
+            )}
           </section>
         </>
       ) : null}
