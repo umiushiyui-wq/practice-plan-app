@@ -113,6 +113,9 @@ export function AvailabilityTableApp() {
           <Link className="button secondary" href="/player">
             奏者ページへ
           </Link>
+          <Link className="button secondary" href="/color-map">
+            カラーマップへ
+          </Link>
           <Link className="button secondary" href="/sheet">
             表で見る
           </Link>

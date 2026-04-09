@@ -190,6 +190,9 @@ export function AdminApp() {
           <Link className="button secondary" href="/availability">
             可否一覧へ
           </Link>
+          <Link className="button secondary" href="/color-map">
+            カラーマップへ
+          </Link>
           <Link className="button secondary" href="/sheet">
             表で見る
           </Link>

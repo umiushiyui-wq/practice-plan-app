@@ -666,6 +666,65 @@ td {
   font-weight: 700;
 }
 
+.color-map-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.color-scale-legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.color-scale-bar {
+  flex: 1;
+  min-width: 180px;
+  height: 14px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgb(53, 117, 214) 0%, rgb(58, 168, 93) 50%, rgb(153, 74, 54) 100%);
+  border: 1px solid rgba(22, 32, 42, 0.12);
+}
+
+.color-map-table {
+  table-layout: fixed;
+}
+
+.color-map-table thead th {
+  min-width: 14px;
+  padding: 4px 1px;
+  font-size: 9px;
+}
+
+.color-map-table tbody th {
+  min-width: 150px;
+  max-width: 150px;
+  z-index: 2;
+}
+
+.color-map-table td {
+  min-width: 14px;
+  width: 14px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+}
+
+.color-map-table .practice-window-cell {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+.color-map-table .hour-divider-cell {
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.5);
+}
+
+.color-map-table .hovered-slot-cell {
+  box-shadow: inset 0 0 0 2px #16202a;
+}
+
 .legend-row {
   display: flex;
   flex-wrap: wrap;
@@ -786,6 +845,10 @@ td {
   }
 
   .setup-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .color-map-summary-grid {
     grid-template-columns: 1fr;
   }
 
