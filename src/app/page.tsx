@@ -9,13 +9,6 @@ const actions = [
     primary: true
   },
   {
-    href: "/admin",
-    label: "管理者ページ",
-    title: "練習計画を作成",
-    description: "メンバー、練習日、曲を登録して、練習計画を自動生成・調整します。",
-    primary: false
-  },
-  {
     href: "/sheet",
     label: "表ビュー",
     title: "計画表を確認",
