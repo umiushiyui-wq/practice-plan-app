@@ -429,5 +429,5 @@ export function generatePracticePlan(state: AppState): PlanSlot[] {
 }
 
 export function usePieceMap(pieces: Piece[]) {
-  return useMemo(() => new Map(pieces.map((piece) => [piece])), [pieces]);
+  return useMemo(() => new Map(pieces.map((piece) => [piece.id, piece])), [pieces]);
 }
