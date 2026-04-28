@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
+import "./admin-plan.css";
 
 export const metadata: Metadata = {
   title: "2027OB演奏会出欠",
