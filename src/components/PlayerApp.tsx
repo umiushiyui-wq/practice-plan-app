@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -256,6 +256,9 @@ export function PlayerApp() {
   function isMemberAvailableAtSlot(dayId: string, slotStart: number) {
     if (!selected) return false;
 
+    const day = sortedPracticeDays.find((item) => item.id === dayId);
+    if (!day || !day.respondedMemberIds.includes(selected.id)) return false;
+
     const draft = draftsByDay[dayId];
     if (!draft || draft.absent) return false;
 
@@ -435,7 +438,7 @@ export function PlayerApp() {
                             <th>
                               {day.practiceDate}
                               <span className="muted">
-                                練習 {day.startTime}-{day.endTime} / 自分 {label}
+                                練習 {day.startTime}-{day.endTime} / 入力状況 {label}
                               </span>
                             </th>
                             {AVAILABILITY_SLOTS.map((minutes, index) => {
@@ -464,7 +467,7 @@ export function PlayerApp() {
                   </table>
                 </div>
                 <div className="legend-row">
-                  <span className="legend-chip practice">青枠: 出欠を入力する</span>
+                  <span className="legend-chip practice">青枠: 練習時間</span>
                   <span className="legend-chip available">緑: 出席する時間</span>
                 </div>
               </>
@@ -584,4 +587,3 @@ export function PlayerApp() {
     </main>
   );
 }
-
