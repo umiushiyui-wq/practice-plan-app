@@ -134,6 +134,8 @@ export function PlayerApp() {
   const requiresPassword = selectedDayHasSavedInput && hasUsablePassword && authenticatedMemberId !== selected.id;
   const needsPasswordSetup = selectedDayHasSavedInput && !hasUsablePassword;
   const canEditSelectedDay = !!selected && (!selectedDayHasSavedInput || authenticatedMemberId === selected.id);
+  const hasUnsubmittedPracticeDays =
+    !!selected && sortedPracticeDays.some((day) => !day.respondedMemberIds.includes(selected.id));
 
   useEffect(() => {
     if (activePart && selectedPart !== activePart) {
@@ -315,6 +317,7 @@ export function PlayerApp() {
           ))}
         </select>
         <p className="muted">名前がなければ、管理者側でメンバーを追加してもらってください。</p>
+        {hasUnsubmittedPracticeDays ? <p style={{ color: "var(--danger)", fontWeight: 800 }}>未入力の練習日があります</p> : null}
       </section>
 
       {selected && selectedInputDay && needsPasswordSetup ? (
