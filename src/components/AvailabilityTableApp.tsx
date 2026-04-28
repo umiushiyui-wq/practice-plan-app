@@ -107,8 +107,8 @@ export function AvailabilityTableApp() {
         </div>
         <p className="muted">曲を選ぶとその曲に乗っている人を濃く表示し、パートでは一覧自体を絞り込めます。</p>
         <div className="row">
-          <Link className="button secondary" href="/admin">
-            管理画面へ
+          <Link className="button secondary" href="/admin/plan">
+            練習計画へ
           </Link>
           <Link className="button secondary" href="/player">
             奏者ページへ
