@@ -13,7 +13,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <header className="topbar">
           <div className="topbar-inner">
-            <Link href="/">2027OB演奏会出欠</Link>
+            <Link className="brand-link" href="/">
+              2027 OB演奏会
+            </Link>
+            <nav className="topnav" aria-label="主要ページ">
+              <Link href="/player">奏者</Link>
+              <Link href="/admin">管理</Link>
+              <Link href="/availability">可否一覧</Link>
+              <Link href="/sheet">表</Link>
+            </nav>
           </div>
         </header>
         {children}

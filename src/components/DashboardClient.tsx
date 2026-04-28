@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 type UserOption = {
   id: string;
@@ -32,6 +32,16 @@ type CurrentUser = UserOption & {
   role: "member" | "admin";
 };
 
+function statusLabel(status: string) {
+  const labels: Record<string, string> = {
+    draft: "下書き",
+    collecting: "回答受付中",
+    planned: "計画作成済み",
+    confirmed: "確定済み"
+  };
+  return labels[status] ?? status;
+}
+
 export function DashboardClient({
   currentUser,
   users,
@@ -45,12 +55,16 @@ export function DashboardClient({
 }) {
   const [message, setMessage] = useState("");
 
+  const nextPracticeDay = useMemo(() => practiceDays[0] ?? null, [practiceDays]);
+
   async function submitJson(path: string, formData: FormData) {
     setMessage("");
+
     const body: Record<string, unknown> = Object.fromEntries(formData.entries());
     const pieceIds = formData.getAll("pieceIds").map(String);
-    if (pieceIds.length > 0) body.pieceIds = pieceIds;
     const practiceDates = formData.getAll("practiceDates").map(String).filter(Boolean);
+
+    if (pieceIds.length > 0) body.pieceIds = pieceIds;
     if (practiceDates.length > 0) body.practiceDates = practiceDates;
 
     const response = await fetch(path, {
@@ -60,8 +74,8 @@ export function DashboardClient({
     });
 
     if (!response.ok) {
-      const payload = await response.json().catch(() => ({ error: "エラーが発生しました。" }));
-      setMessage(payload.error ?? "エラーが発生しました。");
+      const payload = await response.json().catch(() => ({ error: "保存に失敗しました。" }));
+      setMessage(payload.error ?? "保存に失敗しました。");
       return;
     }
 
@@ -70,20 +84,52 @@ export function DashboardClient({
 
   return (
     <main className="stack">
-      <section className="panel row">
-        <div>
-          <h1>ダッシュボード</h1>
-          <p className="muted">
+      <section className="hero-panel dashboard-hero">
+        <div className="hero-copy">
+          <p className="eyebrow">ダッシュボード</p>
+          <h1>練習準備の状況</h1>
+          <p>
             {currentUser.displayName} / {currentUser.role === "admin" ? "管理者" : "メンバー"}
           </p>
+        </div>
+        <div className="hero-actions">
+          <Link className="button secondary" href="/player">
+            奏者ページ
+          </Link>
+          {currentUser.role === "admin" ? (
+            <Link className="button" href="/admin">
+              管理画面
+            </Link>
+          ) : null}
         </div>
       </section>
 
       {message ? <div className="error">{message}</div> : null}
 
+      <section className="summary-strip">
+        <article className="metric-card">
+          <span className="metric-label">練習日</span>
+          <strong>{practiceDays.length}</strong>
+          <span className="muted">{nextPracticeDay ? `${nextPracticeDay.practiceDate} が最新` : "未登録"}</span>
+        </article>
+        <article className="metric-card">
+          <span className="metric-label">曲</span>
+          <strong>{pieces.length}</strong>
+          <span className="muted">登録済み</span>
+        </article>
+        <article className="metric-card">
+          <span className="metric-label">メンバー</span>
+          <strong>{users.length}</strong>
+          <span className="muted">有効ユーザー</span>
+        </article>
+      </section>
+
       <div className="grid">
         <section className="panel stack">
-          <h2>自分の情報</h2>
+          <div className="section-title">
+            <p className="muted">プロフィール</p>
+            <h2>自分の情報</h2>
+          </div>
           <form
             className="stack"
             onSubmit={(event) => {
@@ -109,7 +155,10 @@ export function DashboardClient({
 
         {currentUser.role === "admin" ? (
           <section className="panel stack">
-            <h2>曲を追加</h2>
+            <div className="section-title">
+              <p className="muted">曲登録</p>
+              <h2>曲を追加</h2>
+            </div>
             <form
               className="stack"
               onSubmit={(event) => {
@@ -132,14 +181,16 @@ export function DashboardClient({
                   ))}
                 </select>
               </label>
-              <label>
-                期間内の目標練習時間
-                <input name="targetMinutesInWindow" type="number" min="0" step="5" defaultValue="60" />
-              </label>
-              <label>
-                1日あたりの最大練習時間
-                <input name="dailyMaxMinutes" type="number" min="15" step="5" defaultValue="45" />
-              </label>
+              <div className="date-time-grid two-col">
+                <label>
+                  期間内の目標練習時間
+                  <input name="targetMinutesInWindow" type="number" min="0" step="5" defaultValue="60" />
+                </label>
+                <label>
+                  1日あたりの最大練習時間
+                  <input name="dailyMaxMinutes" type="number" min="15" step="5" defaultValue="45" />
+                </label>
+              </div>
               <button type="submit">曲を追加</button>
             </form>
           </section>
@@ -148,103 +199,139 @@ export function DashboardClient({
 
       {currentUser.role === "admin" ? (
         <section className="panel stack">
-          <h2>練習日を作成</h2>
+          <div className="section-title">
+            <p className="muted">練習日</p>
+            <h2>練習日を作成</h2>
+          </div>
           <form
-            className="grid"
+            className="stack"
             onSubmit={(event) => {
               event.preventDefault();
               submitJson("/api/practice-days", new FormData(event.currentTarget));
             }}
           >
-            <label>
-              練習日
-              <input name="practiceDates" type="date" required />
-              <input name="practiceDates" type="date" />
-              <input name="practiceDates" type="date" />
-              <input name="practiceDates" type="date" />
-            </label>
-            <label>
-              開始時刻
-              <input name="startTime" type="time" step="300" required />
-            </label>
-            <label>
-              終了時刻
-              <input name="endTime" type="time" step="300" required />
-            </label>
-            <label>
-              回答締切
-              <input name="responseDeadline" type="datetime-local" />
-            </label>
-            <div className="stack">
-              <strong>対象曲</strong>
-              {pieces.map((piece) => (
-                <label key={piece.id} className="row">
-                  <input style={{ width: "auto" }} name="pieceIds" type="checkbox" value={piece.id} />
-                  {piece.title}
+            <div className="date-time-grid">
+              <label>
+                練習日
+                <input name="practiceDates" type="date" required />
+              </label>
+              <label>
+                開始時刻
+                <input name="startTime" type="time" step="300" required />
+              </label>
+              <label>
+                終了時刻
+                <input name="endTime" type="time" step="300" required />
+              </label>
+            </div>
+            <details className="fold-panel">
+              <summary>
+                追加の日付と対象曲
+                <span className="muted">任意</span>
+              </summary>
+              <div className="fold-panel-body stack">
+                <div className="date-time-grid">
+                  <input name="practiceDates" type="date" aria-label="追加の練習日 1" />
+                  <input name="practiceDates" type="date" aria-label="追加の練習日 2" />
+                  <input name="practiceDates" type="date" aria-label="追加の練習日 3" />
+                </div>
+                <label>
+                  回答締切
+                  <input name="responseDeadline" type="datetime-local" />
                 </label>
-              ))}
-            </div>
-            <div className="row">
-              <button type="submit">練習日を作成</button>
-            </div>
+                <div className="checkbox-list">
+                  {pieces.map((piece) => (
+                    <label key={piece.id} className="checkbox-row">
+                      <input name="pieceIds" type="checkbox" value={piece.id} />
+                      <span>{piece.title}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </details>
+            <button type="submit">練習日を作成</button>
           </form>
         </section>
       ) : null}
 
       <section className="panel stack">
-        <h2>練習日</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>日付</th>
-              <th>時間</th>
-              <th>状態</th>
-              <th>対象曲</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {practiceDays.map((day) => (
-              <tr key={day.id}>
-                <td>{day.practiceDate}</td>
-                <td>
-                  {day.startTime} - {day.endTime}
-                </td>
-                <td>{day.status}</td>
-                <td>{day.pieces.join(", ") || "未設定"}</td>
-                <td>
-                  <Link href={`/practice-days/${day.id}`}>開く</Link>
-                </td>
+        <div className="row page-section-head">
+          <div>
+            <p className="muted">一覧</p>
+            <h2>練習日</h2>
+          </div>
+        </div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>日付</th>
+                <th>時間</th>
+                <th>状態</th>
+                <th>対象曲</th>
+                <th>操作</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {practiceDays.map((day) => (
+                <tr key={day.id}>
+                  <td>{day.practiceDate}</td>
+                  <td>
+                    {day.startTime} - {day.endTime}
+                  </td>
+                  <td>
+                    <span className="status-pill">{statusLabel(day.status)}</span>
+                  </td>
+                  <td>{day.pieces.join(", ") || "未設定"}</td>
+                  <td>
+                    <Link className="text-link" href={`/practice-days/${day.id}`}>
+                      開く
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="panel stack">
-        <h2>曲</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>曲名</th>
-              <th>指揮者</th>
-              <th>目標時間</th>
-              <th>1日上限</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pieces.map((piece) => (
-              <tr key={piece.id}>
-                <td>
-                  {currentUser.role === "admin" ? <Link href={`/pieces/${piece.id}`}>{piece.title}</Link> : piece.title}
-                </td>
-                <td>{piece.conductorName ?? "未設定"}</td>
-                <td>{piece.targetMinutesInWindow}分</td>
-                <td>{piece.dailyMaxMinutes}分</td>
+        <div className="row page-section-head">
+          <div>
+            <p className="muted">一覧</p>
+            <h2>曲</h2>
+          </div>
+        </div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>曲名</th>
+                <th>指揮者</th>
+                <th>目標</th>
+                <th>1日上限</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {pieces.map((piece) => (
+                <tr key={piece.id}>
+                  <td>
+                    {currentUser.role === "admin" ? (
+                      <Link className="text-link" href={`/pieces/${piece.id}`}>
+                        {piece.title}
+                      </Link>
+                    ) : (
+                      piece.title
+                    )}
+                  </td>
+                  <td>{piece.conductorName ?? "未設定"}</td>
+                  <td>{piece.targetMinutesInWindow}分</td>
+                  <td>{piece.dailyMaxMinutes}分</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
     </main>
   );
