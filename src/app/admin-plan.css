@@ -1,0 +1,173 @@
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+  box-shadow: none;
+}
+
+.plan-builder {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.plan-palette,
+.plan-canvas {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdff;
+  padding: 16px;
+}
+
+.plan-palette {
+  position: sticky;
+  top: 76px;
+}
+
+.plan-palette-section,
+.plan-palette-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.plan-palette-card {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  min-height: 70px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-left: 8px solid var(--plan-color, var(--accent));
+  border-radius: 8px;
+  background: var(--plan-bg, #fff);
+  color: var(--text);
+  padding: 12px;
+  text-align: left;
+  cursor: grab;
+}
+
+.plan-palette-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.plan-palette-card:hover {
+  border-color: var(--plan-color, var(--accent));
+}
+
+.plan-palette-card:active,
+.plan-slot-card:active {
+  cursor: grabbing;
+}
+
+.plan-canvas-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.plan-drop-zone {
+  min-height: 12px;
+  border: 1px dashed transparent;
+  border-radius: 8px;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    min-height 120ms ease;
+}
+
+.plan-drop-zone.is-active {
+  min-height: 42px;
+  border-color: #517caa;
+  background: #edf5ff;
+}
+
+.plan-slot-card {
+  border-left: 10px solid var(--plan-color, var(--accent));
+  border-radius: 8px;
+  background: var(--plan-bg, #fff);
+  cursor: grab;
+  transition:
+    box-shadow 120ms ease,
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+
+.plan-slot-card.is-dragging {
+  opacity: 0.46;
+  transform: scale(0.995);
+}
+
+.plan-slot-piece,
+.plan-tone-0 {
+  --plan-color: #2563eb;
+  --plan-bg: #eff6ff;
+}
+
+.plan-tone-1 {
+  --plan-color: #7c3aed;
+  --plan-bg: #f5f3ff;
+}
+
+.plan-tone-2 {
+  --plan-color: #c2410c;
+  --plan-bg: #fff7ed;
+}
+
+.plan-tone-3 {
+  --plan-color: #0f766e;
+  --plan-bg: #ecfdf5;
+}
+
+.plan-tone-4 {
+  --plan-color: #be123c;
+  --plan-bg: #fff1f2;
+}
+
+.plan-tone-5 {
+  --plan-color: #a16207;
+  --plan-bg: #fefce8;
+}
+
+.plan-slot-break {
+  --plan-color: #16a34a;
+  --plan-bg: #f0fdf4;
+}
+
+.plan-slot-setup {
+  --plan-color: #d97706;
+  --plan-bg: #fffbeb;
+}
+
+.plan-slot-cleanup {
+  --plan-color: #475569;
+  --plan-bg: #f8fafc;
+}
+
+.plan-slot-editor {
+  grid-template-columns: minmax(220px, 2fr) minmax(100px, 130px) minmax(150px, auto) 100px;
+}
+
+.plan-slot-move-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+@media (max-width: 720px) {
+  .plan-builder {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-palette {
+    position: static;
+  }
+
+  .plan-slot-move-buttons {
+    grid-template-columns: 1fr;
+  }
+}
