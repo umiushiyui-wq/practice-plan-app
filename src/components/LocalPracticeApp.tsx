@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export type Member = {
   id: string;
@@ -181,6 +181,7 @@ function migrateState(value: unknown): AppState {
 export function useLocalPracticeState() {
   const [state, setState] = useState<AppState>(defaultState);
   const [ready, setReady] = useState(false);
+  const shouldPersistRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -197,6 +198,7 @@ export function useLocalPracticeState() {
         const saved = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
         if (saved) {
           setState(migrateState(JSON.parse(saved)));
+          shouldPersistRef.current = response?.ok === true;
         }
       }
       setReady(true);
@@ -209,21 +211,27 @@ export function useLocalPracticeState() {
   }, []);
 
   useEffect(() => {
-    if (ready) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      fetch("/api/local-state", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ state })
-      }).catch(() => {});
-    }
+    if (!ready || !shouldPersistRef.current) return;
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    fetch("/api/local-state", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state })
+    }).catch(() => {});
   }, [ready, state]);
 
+  function updateFullState(value: AppState | ((current: AppState) => AppState)) {
+    shouldPersistRef.current = true;
+    setState(value);
+  }
+
   function updateState(patch: Partial<AppState>) {
+    shouldPersistRef.current = true;
     setState((current) => ({ ...current, ...patch }));
   }
 
-  return { state, setState, updateState, ready };
+  return { state, setState: updateFullState, updateState, ready };
 }
 
 export function getSelectedPracticeDay(state: AppState) {
@@ -421,5 +429,5 @@ export function generatePracticePlan(state: AppState): PlanSlot[] {
 }
 
 export function usePieceMap(pieces: Piece[]) {
-  return useMemo(() => new Map(pieces.map((piece) => [piece.id, piece])), [pieces]);
+  return useMemo(() => new Map(pieces.map((piece) => [piece])), [pieces]);
 }
