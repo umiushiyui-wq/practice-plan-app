@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useState, type DragEvent } from "react";
 import {
   findOverlappingPlanSlots,
   generatePracticePlan,
@@ -15,6 +15,38 @@ import {
   useLocalPracticeState,
   usePieceMap
 } from "@/components/LocalPracticeApp";
+
+type UtilitySlotKind = "break" | "setup" | "cleanup";
+
+type PaletteDragPayload =
+  | {
+      type: "palette";
+      slotType: "piece";
+      pieceId: string;
+    }
+  | {
+      type: "palette";
+      slotType: "utility";
+      utilityKind: UtilitySlotKind;
+    };
+
+type SlotDragPayload = {
+  type: "slot";
+  slotId: string;
+};
+
+const DRAG_DATA_TYPE = "application/x-practice-plan-slot";
+
+const UTILITY_SLOT_TEMPLATES: Array<{
+  kind: UtilitySlotKind;
+  label: string;
+  defaultMinutes: number;
+  reason: string;
+}> = [
+  { kind: "setup", label: "合奏準備", defaultMinutes: 5, reason: "合奏準備として手動追加した枠です。" },
+  { kind: "break", label: "休憩", defaultMinutes: 5, reason: "休憩として手動追加した枠です。" },
+  { kind: "cleanup", label: "片付け", defaultMinutes: 5, reason: "片付けとして手動追加した枠です。" }
+];
 
 function formatMinutesLabel(minutes: number) {
   const safeMinutes = Math.max(0, minutes);
@@ -33,14 +65,21 @@ function getSlotVariant(slotLabel: string) {
   return "piece";
 }
 
+function getUtilityTemplate(kind: UtilitySlotKind) {
+  return UTILITY_SLOT_TEMPLATES.find((template) => template.kind === kind) ?? UTILITY_SLOT_TEMPLATES[0];
+}
+
+function normalizeDuration(value: number, fallback = 1) {
+  return Number.isFinite(value) ? Math.max(1, Math.floor(value)) : fallback;
+}
+
 export function AdminApp() {
   const { state, updateState } = useLocalPracticeState();
   const [planMessage, setPlanMessage] = useState("");
+  const [draggedSlotId, setDraggedSlotId] = useState<string | null>(null);
+  const [activeDropIndex, setActiveDropIndex] = useState<number | null>(null);
   const selectedDay = getSelectedPracticeDay(state);
   const pieceMap = usePieceMap(state.pieces);
-  const manualStartTimeRef = useRef<HTMLInputElement>(null);
-  const utilityMinutesRef = useRef<HTMLInputElement>(null);
-  const manualPieceRef = useRef<HTMLSelectElement>(null);
 
   const practiceMinutes = toMinutes(selectedDay.endTime) - toMinutes(selectedDay.startTime);
   const sortedPlan = sortPlanByTime(selectedDay.plan);
@@ -69,93 +108,134 @@ export function AdminApp() {
     });
   }
 
-  function updateSlot(slotId: string, patch: { pieceId?: string | null; start?: string; end?: string }) {
-    updateSelectedDay({
-      plan: selectedDay.plan.map((slot) =>
-        slot.id === slotId
-          ? {
-              ...slot,
-              ...patch,
-              duration:
-                patch.start || patch.end
-                  ? toMinutes(patch.end ?? slot.end) - toMinutes(patch.start ?? slot.start)
-                  : slot.duration,
-              reason: patch.pieceId !== undefined ? "管理者が手動で調整した枠です。" : slot.reason
-            }
-          : slot
-      )
+  function rebuildPlanTimes(plan: typeof selectedDay.plan) {
+    const practiceStart = toMinutes(selectedDay.startTime);
+    const practiceEnd = toMinutes(selectedDay.endTime);
+    let cursor = practiceStart;
+
+    return plan.flatMap((slot) => {
+      const requestedDuration = normalizeDuration(slot.duration);
+      const nextEnd = Math.min(practiceEnd, cursor + requestedDuration);
+
+      if (nextEnd <= cursor) return [];
+
+      const nextSlot = {
+        ...slot,
+        start: toTime(cursor),
+        end: toTime(nextEnd),
+        duration: nextEnd - cursor
+      };
+      cursor = nextEnd;
+      return [nextSlot];
     });
   }
 
-  function insertPlanSlot(nextSlot: (typeof selectedDay.plan)[number]) {
-    const nextStart = toMinutes(nextSlot.start);
-    const nextEnd = toMinutes(nextSlot.end);
-
-    const trimmedPlan = selectedDay.plan.flatMap((slot) => {
-      const slotStart = toMinutes(slot.start);
-      const slotEnd = toMinutes(slot.end);
-
-      if (slotEnd <= nextStart || nextEnd <= slotStart) {
-        return [slot];
-      }
-
-      const fragments: typeof selectedDay.plan = [];
-
-      if (slotStart < nextStart) {
-        fragments.push({
-          ...slot,
-          end: toTime(nextStart),
-          duration: nextStart - slotStart
-        });
-      }
-
-      if (nextEnd < slotEnd) {
-        fragments.push({
-          ...slot,
-          id: makeId("s"),
-          start: toTime(nextEnd),
-          duration: slotEnd - nextEnd
-        });
-      }
-
-      return fragments.filter((fragment) => fragment.duration > 0);
-    });
-
-    updateSelectedDay({
-      plan: [...trimmedPlan, nextSlot]
-    });
+  function updatePlanFromOrderedSlots(plan: typeof selectedDay.plan) {
+    updateSelectedDay({ plan: rebuildPlanTimes(plan) });
   }
 
-  function addManualSlot({
-    label,
-    pieceId,
-    reason
-  }: {
-    label: string;
-    pieceId: string | null;
-    reason: string;
-  }) {
-    const startTime = manualStartTimeRef.current?.value || selectedDay.startTime;
-    const requestedMinutes = Number(utilityMinutesRef.current?.value ?? 5);
-    const duration = Number.isFinite(requestedMinutes) ? Math.max(1, Math.floor(requestedMinutes)) : 1;
-    const boundedStart = Math.max(toMinutes(selectedDay.startTime), toMinutes(startTime));
-    const boundedEnd = Math.min(toMinutes(selectedDay.endTime), boundedStart + duration);
+  function updateSlot(slotId: string, patch: { pieceId?: string | null; duration?: number }) {
+    const nextPlan = sortedPlan.map((slot) =>
+      slot.id === slotId
+        ? {
+            ...slot,
+            ...patch,
+            duration: patch.duration === undefined ? slot.duration : normalizeDuration(patch.duration, slot.duration),
+            reason: patch.pieceId !== undefined ? "管理者が手動で調整した枠です。" : slot.reason
+          }
+        : slot
+    );
+    updatePlanFromOrderedSlots(nextPlan);
+  }
 
-    if (boundedEnd <= boundedStart) {
-      setPlanMessage("追加できませんでした。開始時刻と分数を確認してください。");
+  function makeSlotFromPalette(payload: PaletteDragPayload): (typeof selectedDay.plan)[number] | null {
+    if (payload.slotType === "piece") {
+      const piece = pieceMap.get(payload.pieceId);
+      if (!piece) return null;
+
+      const defaultDuration = Math.max(5, Math.min(piece.dailyMaxMinutes || 30, 60, Math.max(practiceMinutes, 1)));
+
+      return {
+        id: makeId("s"),
+        pieceId: piece.id,
+        start: selectedDay.startTime,
+        end: toTime(toMinutes(selectedDay.startTime) + defaultDuration),
+        duration: defaultDuration,
+        reason: `${piece.title} を手動追加した枠です。`
+      };
+    }
+
+    const template = getUtilityTemplate(payload.utilityKind);
+
+    return {
+      id: makeId("s"),
+      pieceId: null,
+      start: selectedDay.startTime,
+      end: toTime(toMinutes(selectedDay.startTime) + template.defaultMinutes),
+      duration: template.defaultMinutes,
+      reason: template.reason
+    };
+  }
+
+  function addSlotFromPalette(payload: PaletteDragPayload, targetIndex = sortedPlan.length) {
+    const nextSlot = makeSlotFromPalette(payload);
+    if (!nextSlot) {
+      setPlanMessage("追加できませんでした。曲の設定を確認してください。");
       return;
     }
 
-    insertPlanSlot({
-      id: makeId("s"),
-      pieceId,
-      start: toTime(boundedStart),
-      end: toTime(boundedEnd),
-      duration: boundedEnd - boundedStart,
-      reason
-    });
+    const nextPlan = [...sortedPlan];
+    nextPlan.splice(targetIndex, 0, nextSlot);
+    updatePlanFromOrderedSlots(nextPlan);
+    setPlanMessage(`${getSlotLabel(nextSlot)} を追加しました。ドラッグして順番を調整できます。`);
+  }
 
-    setPlanMessage(`${label} を ${toTime(boundedStart)} から ${boundedEnd - boundedStart}分追加しました。`);
+  function moveSlot(slotId: string, targetIndex: number) {
+    const currentIndex = sortedPlan.findIndex((slot) => slot.id === slotId);
+    if (currentIndex < 0) return;
+
+    const nextPlan = [...sortedPlan];
+    const [movedSlot] = nextPlan.splice(currentIndex, 1);
+    const adjustedIndex = currentIndex < targetIndex ? targetIndex - 1 : targetIndex;
+    nextPlan.splice(Math.max(0, Math.min(adjustedIndex, nextPlan.length)), 0, movedSlot);
+    updatePlanFromOrderedSlots(nextPlan);
+  }
+
+  function writeDragPayload(event: DragEvent, payload: PaletteDragPayload | SlotDragPayload) {
+    event.dataTransfer.effectAllowed = payload.type === "slot" ? "move" : "copy";
+    event.dataTransfer.setData(DRAG_DATA_TYPE, JSON.stringify(payload));
+  }
+
+  function readDragPayload(event: DragEvent): PaletteDragPayload | SlotDragPayload | null {
+    const rawPayload = event.dataTransfer.getData(DRAG_DATA_TYPE);
+    if (!rawPayload) return null;
+
+    try {
+      return JSON.parse(rawPayload) as PaletteDragPayload | SlotDragPayload;
+    } catch {
+      return null;
+    }
+  }
+
+  function handleDrop(event: DragEvent, targetIndex: number) {
+    event.preventDefault();
+    const payload = readDragPayload(event);
+    setDraggedSlotId(null);
+    setActiveDropIndex(null);
+
+    if (!payload) return;
+    if (payload.type === "slot") {
+      moveSlot(payload.slotId, targetIndex);
+      return;
+    }
+
+    addSlotFromPalette(payload, targetIndex);
+  }
+
+  function getPieceToneClass(pieceId: string | null) {
+    if (!pieceId) return "";
+    const pieceIndex = state.pieces.findIndex((piece) => piece.id === pieceId);
+    return `plan-tone-${Math.max(0, pieceIndex) % 6}`;
   }
 
   function handleGeneratePlan() {
@@ -316,163 +396,183 @@ export function AdminApp() {
           <div className="error">時間が重なっている枠があります。開始時刻と終了時刻を調整してください。</div>
         ) : null}
 
-        <div className="plan-toolbar">
-          <div className="plan-toolbar-head">
-            <strong>手動で枠を追加</strong>
-            <span className="muted">あとから追加した枠は、その時間帯だけ既存の枠を上書きします。</span>
-          </div>
-          <div className="utility-slot-form">
-            <label>
-              何時から
-              <input ref={manualStartTimeRef} name="startTime" type="time" step="60" defaultValue={selectedDay.startTime} />
-            </label>
-            <label>
-              追加する分数
-              <input ref={utilityMinutesRef} name="minutes" type="number" min="1" step="1" defaultValue="5" />
-            </label>
-            <button
-              type="button"
-              className="secondary"
-              onClick={() =>
-                addManualSlot({
-                  label: "休憩",
-                  pieceId: null,
-                  reason: "休憩として手動追加した枠です。"
-                })
-              }
-            >
-              休憩を追加
-            </button>
-            <button
-              type="button"
-              className="secondary"
-              onClick={() =>
-                addManualSlot({
-                  label: "合奏準備",
-                  pieceId: null,
-                  reason: "合奏準備として手動追加した枠です。"
-                })
-              }
-            >
-              合奏準備を追加
-            </button>
-            <button
-              type="button"
-              className="secondary"
-              onClick={() =>
-                addManualSlot({
-                  label: "片付け",
-                  pieceId: null,
-                  reason: "片付けとして手動追加した枠です。"
-                })
-              }
-            >
-              片付けを追加
-            </button>
-            <label>
-              曲を追加
-              <select ref={manualPieceRef} defaultValue={state.pieces[0]?.id ?? ""}>
-                {state.pieces.length === 0 ? <option value="">曲がありません</option> : null}
-                {state.pieces.map((piece) => (
-                  <option key={piece.id} value={piece.id}>
-                    {piece.title}
-                  </option>
+        <div className="plan-builder">
+          <aside className="plan-palette">
+            <div className="plan-toolbar-head">
+              <strong>追加するボックス</strong>
+              <span className="muted">左のボックスを下の計画エリアへドラッグ、またはクリックで末尾へ追加できます。</span>
+            </div>
+
+            <div className="plan-palette-section">
+              <span className="plan-stat-label">曲</span>
+              {state.pieces.length === 0 ? (
+                <div className="notice">曲がありません。準備ページで曲を追加してください。</div>
+              ) : (
+                <div className="plan-palette-grid">
+                  {state.pieces.map((piece) => (
+                    <button
+                      className={`plan-palette-card plan-slot-piece ${getPieceToneClass(piece.id)}`}
+                      draggable
+                      key={piece.id}
+                      type="button"
+                      onClick={() => addSlotFromPalette({ type: "palette", slotType: "piece", pieceId: piece.id })}
+                      onDragStart={(event) => writeDragPayload(event, { type: "palette", slotType: "piece", pieceId: piece.id })}
+                    >
+                      <strong>{piece.title}</strong>
+                      <span>{piece.dailyMaxMinutes}分まで</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="plan-palette-section">
+              <span className="plan-stat-label">休憩・準備</span>
+              <div className="plan-palette-grid">
+                {UTILITY_SLOT_TEMPLATES.map((template) => (
+                  <button
+                    className={`plan-palette-card plan-slot-${template.kind}`}
+                    draggable
+                    key={template.kind}
+                    type="button"
+                    onClick={() => addSlotFromPalette({ type: "palette", slotType: "utility", utilityKind: template.kind })}
+                    onDragStart={(event) =>
+                      writeDragPayload(event, { type: "palette", slotType: "utility", utilityKind: template.kind })
+                    }
+                  >
+                    <strong>{template.label}</strong>
+                    <span>{template.defaultMinutes}分</span>
+                  </button>
                 ))}
-              </select>
-            </label>
-            <button
-              type="button"
-              onClick={() => {
-                const pieceId = manualPieceRef.current?.value ?? "";
-                const pieceTitle = pieceId ? pieceMap.get(pieceId)?.title ?? "曲" : "";
+              </div>
+            </div>
+          </aside>
 
-                if (!pieceId) {
-                  setPlanMessage("曲を追加するには、先に曲を登録してください。");
-                  return;
-                }
+          <div className="plan-canvas">
+            <div className="plan-canvas-head">
+              <strong>練習計画</strong>
+              <span className="muted">ボックスをドラッグして順番を変更できます。時間は上から順に自動で詰めます。</span>
+            </div>
 
-                addManualSlot({
-                  label: pieceTitle,
-                  pieceId,
-                  reason: `${pieceTitle} を手動追加した枠です。`
-                });
-              }}
-            >
-              曲を追加
-            </button>
+            <div
+              className={`plan-drop-zone ${activeDropIndex === 0 ? "is-active" : ""}`}
+              onDragEnter={() => setActiveDropIndex(0)}
+              onDragOver={(event) => event.preventDefault()}
+              onDragLeave={() => setActiveDropIndex(null)}
+              onDrop={(event) => handleDrop(event, 0)}
+            />
+
+            {sortedPlan.length === 0 ? (
+              <div className="plan-empty-state">
+                <strong>まだ計画がありません。</strong>
+                <p className="muted">左のボックスをここに入れるか、自動生成してください。</p>
+              </div>
+            ) : (
+              <div className="plan-timeline">
+                {sortedPlan.map((slot, index) => {
+                  const slotLabel = getSlotLabel(slot);
+                  const slotVariant = getSlotVariant(slotLabel);
+
+                  return (
+                    <div key={slot.id}>
+                      <article
+                        className={`plan-slot-card plan-slot-${slotVariant} ${getPieceToneClass(slot.pieceId)}${
+                          overlappingSlotIds.has(slot.id) ? " overlap-slot" : ""
+                        }${draggedSlotId === slot.id ? " is-dragging" : ""}`}
+                        draggable
+                        onDragEnd={() => {
+                          setDraggedSlotId(null);
+                          setActiveDropIndex(null);
+                        }}
+                        onDragStart={(event) => {
+                          setDraggedSlotId(slot.id);
+                          writeDragPayload(event, { type: "slot", slotId: slot.id });
+                        }}
+                      >
+                        <div className="plan-slot-rail">
+                          <span className="plan-slot-index">{String(index + 1).padStart(2, "0")}</span>
+                        </div>
+                        <div className="plan-slot-main">
+                          <div className="plan-slot-top">
+                            <div className="plan-slot-heading">
+                              <span className="plan-slot-time">
+                                {slot.start} - {slot.end}
+                              </span>
+                              <h3>{slotLabel}</h3>
+                            </div>
+                            <div className="plan-slot-badges">
+                              <span className="plan-badge">{formatMinutesLabel(slot.duration)}</span>
+                              {slot.score ? <span className="plan-badge accent">スコア {slot.score}</span> : null}
+                              {overlappingSlotIds.has(slot.id) ? <span className="plan-badge danger">重なり</span> : null}
+                            </div>
+                          </div>
+                          <div className="plan-slot-editor">
+                            <label>
+                              内容
+                              <select value={slot.pieceId ?? ""} onChange={(event) => updateSlot(slot.id, { pieceId: event.target.value || null })}>
+                                <option value="">{slotLabel}</option>
+                                {state.pieces.map((piece) => (
+                                  <option key={piece.id} value={piece.id}>
+                                    {piece.title}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label>
+                              分数
+                              <input
+                                type="number"
+                                min="1"
+                                step="1"
+                                value={slot.duration}
+                                onChange={(event) => updateSlot(slot.id, { duration: Number(event.target.value) })}
+                              />
+                            </label>
+                            <div className="plan-slot-move-buttons">
+                              <button
+                                className="secondary"
+                                disabled={index === 0}
+                                type="button"
+                                onClick={() => moveSlot(slot.id, index - 1)}
+                              >
+                                上へ
+                              </button>
+                              <button
+                                className="secondary"
+                                disabled={index === sortedPlan.length - 1}
+                                type="button"
+                                onClick={() => moveSlot(slot.id, index + 2)}
+                              >
+                                下へ
+                              </button>
+                            </div>
+                            <button
+                              className="danger"
+                              type="button"
+                              onClick={() => updatePlanFromOrderedSlots(sortedPlan.filter((item) => item.id !== slot.id))}
+                            >
+                              削除
+                            </button>
+                          </div>
+                          <div className="plan-slot-footer">
+                            <div className="notice">{slot.reason ?? "管理者が手動で調整した枠です。"}</div>
+                          </div>
+                        </div>
+                      </article>
+                      <div
+                        className={`plan-drop-zone ${activeDropIndex === index + 1 ? "is-active" : ""}`}
+                        onDragEnter={() => setActiveDropIndex(index + 1)}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDragLeave={() => setActiveDropIndex(null)}
+                        onDrop={(event) => handleDrop(event, index + 1)}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
-
-        {sortedPlan.length === 0 ? (
-          <div className="plan-empty-state">
-            <strong>まだ計画がありません。</strong>
-            <p className="muted">自動生成するか、上の追加欄から手動で枠を入れてください。</p>
-          </div>
-        ) : (
-          <div className="plan-timeline">
-            {sortedPlan.map((slot, index) => {
-              const slotLabel = getSlotLabel(slot);
-              const slotVariant = getSlotVariant(slotLabel);
-
-              return (
-                <article
-                  className={`plan-slot-card plan-slot-${slotVariant}${overlappingSlotIds.has(slot.id) ? " overlap-slot" : ""}`}
-                  key={slot.id}
-                >
-                  <div className="plan-slot-rail">
-                    <span className="plan-slot-index">{String(index + 1).padStart(2, "0")}</span>
-                  </div>
-                  <div className="plan-slot-main">
-                    <div className="plan-slot-top">
-                      <div className="plan-slot-heading">
-                        <span className="plan-slot-time">
-                          {slot.start} - {slot.end}
-                        </span>
-                        <h3>{slotLabel}</h3>
-                      </div>
-                      <div className="plan-slot-badges">
-                        <span className="plan-badge">{formatMinutesLabel(slot.duration)}</span>
-                        {slot.score ? <span className="plan-badge accent">スコア {slot.score}</span> : null}
-                        {overlappingSlotIds.has(slot.id) ? <span className="plan-badge danger">重なり</span> : null}
-                      </div>
-                    </div>
-                    <div className="plan-slot-editor">
-                      <label>
-                        内容
-                        <select value={slot.pieceId ?? ""} onChange={(event) => updateSlot(slot.id, { pieceId: event.target.value || null })}>
-                          <option value="">{slotLabel}</option>
-                          {state.pieces.map((piece) => (
-                            <option key={piece.id} value={piece.id}>
-                              {piece.title}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label>
-                        開始
-                        <input type="time" step="60" value={slot.start} onChange={(event) => updateSlot(slot.id, { start: event.target.value })} />
-                      </label>
-                      <label>
-                        終了
-                        <input type="time" step="60" value={slot.end} onChange={(event) => updateSlot(slot.id, { end: event.target.value })} />
-                      </label>
-                      <button
-                        className="danger"
-                        type="button"
-                        onClick={() => updateSelectedDay({ plan: selectedDay.plan.filter((item) => item.id !== slot.id) })}
-                      >
-                        削除
-                      </button>
-                    </div>
-                    <div className="plan-slot-footer">
-                      <div className="notice">{slot.reason ?? "管理者が手動で調整した枠です。"}</div>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
       </section>
     </main>
   );
