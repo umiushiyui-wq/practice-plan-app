@@ -658,6 +658,19 @@ export function AdminApp() {
                             </div>
                           </div>
                           <button
+                            className="plan-slot-delete-button"
+                            type="button"
+                            aria-label={`${slotLabel}を削除`}
+                            title="削除"
+                            onPointerDown={(event) => event.stopPropagation()}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              deleteSlot(slot.id);
+                            }}
+                          >
+                            ×
+                          </button>
+                          <button
                             className="plan-resize-handle plan-resize-handle-bottom"
                             type="button"
                             aria-label={`${slotLabel}の終了時刻を変更`}
@@ -688,7 +701,7 @@ export function AdminApp() {
                   </div>
                   <div className="plan-detail-grid">
                     <label>
-                      内容
+                      内容・曲
                       <select
                         value={getSlotContentValue(selectedSlot)}
                         onChange={(event) => updateSlotContent(selectedSlot.id, event.target.value)}
@@ -742,7 +755,7 @@ export function AdminApp() {
               ) : (
                 <div className="plan-detail-empty">
                   <strong>編集するボックスを選択</strong>
-                  <span className="muted">5分の短い枠も、選択後にここで内容・時刻・削除を操作できます。</span>
+                  <span className="muted">5分の短い枠も、選択後にここで曲・内容・時刻を変更できます。削除はボックス内からも操作できます。</span>
                 </div>
               )}
             </div>
