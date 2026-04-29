@@ -75,6 +75,7 @@ button:disabled {
   grid-template-columns: 64px minmax(0, 1fr);
   gap: 12px;
   align-items: stretch;
+  overflow: visible;
 }
 
 .plan-time-axis {
@@ -102,21 +103,41 @@ button:disabled {
 }
 
 .plan-timeline-track {
-  display: grid;
-  align-content: start;
+  position: relative;
   min-width: 0;
 }
 
 .plan-timeline-track .plan-timeline {
+  display: grid;
   gap: 0;
 }
 
-.plan-timeline-track .plan-drop-zone {
-  min-height: 0;
+.plan-slot-row {
+  position: relative;
 }
 
-.plan-timeline-track .plan-drop-zone.is-active {
-  min-height: 36px;
+.plan-timeline-track > .plan-drop-zone,
+.plan-slot-row > .plan-drop-zone {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 4;
+  height: 18px;
+  min-height: 0;
+  border-radius: 8px;
+}
+
+.plan-timeline-track > .plan-drop-zone {
+  top: -9px;
+}
+
+.plan-slot-row > .plan-drop-zone {
+  bottom: -9px;
+}
+
+.plan-timeline-track > .plan-drop-zone.is-active,
+.plan-slot-row > .plan-drop-zone.is-active {
+  min-height: 0;
 }
 
 .plan-drop-zone {
@@ -130,12 +151,17 @@ button:disabled {
 }
 
 .plan-drop-zone.is-active {
-  min-height: 42px;
+  min-height: 12px;
   border-color: #517caa;
   background: #edf5ff;
 }
 
 .plan-slot-card {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 10px;
+  min-height: 0;
+  padding: 10px 12px;
   border-left: 10px solid var(--plan-color, var(--accent));
   border-radius: 8px;
   background: var(--plan-bg, #fff);
@@ -209,7 +235,48 @@ button:disabled {
 }
 
 .plan-slot-main {
+  display: grid;
+  gap: 8px;
+  min-height: 0;
+  min-width: 0;
   position: relative;
+}
+
+.plan-slot-rail {
+  min-height: 0;
+}
+
+.plan-slot-index {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.plan-slot-top {
+  gap: 8px;
+}
+
+.plan-slot-heading {
+  min-width: 0;
+}
+
+.plan-slot-heading h3 {
+  font-size: 16px;
+  line-height: 1.25;
+}
+
+.plan-slot-time {
+  font-size: 12px;
+}
+
+.plan-slot-badges {
+  gap: 6px;
+}
+
+.plan-badge {
+  min-height: 24px;
+  padding: 0 8px;
 }
 
 .plan-resize-handle {
