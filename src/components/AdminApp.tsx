@@ -89,11 +89,13 @@ export function AdminApp() {
   const [planMessage, setPlanMessage] = useState("");
   const [draggedSlotId, setDraggedSlotId] = useState<string | null>(null);
   const [activeDropMinutes, setActiveDropMinutes] = useState<number | null>(null);
+  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const selectedDay = getSelectedPracticeDay(state);
   const pieceMap = usePieceMap(state.pieces);
 
   const practiceMinutes = toMinutes(selectedDay.endTime) - toMinutes(selectedDay.startTime);
   const sortedPlan = sortPlanByTime(selectedDay.plan);
+  const selectedSlot = sortedPlan.find((slot) => slot.id === selectedSlotId) ?? null;
   const plannedMinutes = sortedPlan.reduce((total, slot) => total + slot.duration, 0);
   const freeMinutes = Math.max(0, practiceMinutes - plannedMinutes);
   const overlappingSlotIds = findOverlappingPlanSlots(selectedDay.plan);
@@ -163,6 +165,51 @@ export function AdminApp() {
     updatePlan(nextPlan);
   }
 
+  function deleteSlot(slotId: string) {
+    updatePlan(sortedPlan.filter((item) => item.id !== slotId));
+    setSelectedSlotId((currentSlotId) => (currentSlotId === slotId ? null : currentSlotId));
+  }
+
+  function getSlotContentValue(slot: (typeof selectedDay.plan)[number]) {
+    if (slot.pieceId) return `piece:${slot.pieceId}`;
+    if (slot.reason?.includes("準備")) return "utility:setup";
+    if (slot.reason?.includes("片付け")) return "utility:cleanup";
+    return "utility:break";
+  }
+
+  function updateSlotContent(slotId: string, value: string) {
+    if (value.startsWith("piece:")) {
+      updateSlot(slotId, { pieceId: value.replace("piece:", "") });
+      return;
+    }
+
+    if (!value.startsWith("utility:")) return;
+
+    const utilityKind = value.replace("utility:", "") as UtilitySlotKind;
+    const template = getUtilityTemplate(utilityKind);
+    const nextPlan = sortedPlan.map((slot) =>
+      slot.id === slotId
+        ? {
+            ...slot,
+            pieceId: null,
+            reason: template.reason
+          }
+        : slot
+    );
+    updatePlan(nextPlan);
+  }
+
+  function updateSlotTimeInput(slotId: string, boundary: "start" | "end", value: string) {
+    if (!value) return;
+    updateSlotBoundary(slotId, boundary, toMinutes(value));
+  }
+
+  function adjustSlotEnd(slotId: string, deltaMinutes: number) {
+    const slot = sortedPlan.find((item) => item.id === slotId);
+    if (!slot) return;
+    updateSlotBoundary(slotId, "end", toMinutes(slot.end) + deltaMinutes);
+  }
+
   function moveSlotToStart(slotId: string, nextStart: number) {
     const nextPlan = sortedPlan.map((slot) => {
       if (slot.id !== slotId) return slot;
@@ -170,6 +217,7 @@ export function AdminApp() {
       return normalizeSlotTiming(slot, nextStart, nextStart + duration);
     });
     updatePlan(nextPlan);
+    setSelectedSlotId(slotId);
   }
 
   function updateSlotBoundary(slotId: string, boundary: "start" | "end", minutes: number) {
@@ -185,9 +233,14 @@ export function AdminApp() {
     updatePlan(nextPlan);
   }
 
-  function handleResizeStart(event: ReactPointerEvent<HTMLButtonElement>, slotId: string, boundary: "start" | "end") {
+  function handleResizeStart(
+    event: ReactPointerEvent<HTMLButtonElement>,
+    slotId: string,
+    boundary: "start" | "end"
+  ) {
     event.preventDefault();
     event.stopPropagation();
+    setSelectedSlotId(slotId);
 
     const startY = event.clientY;
     const slot = sortedPlan.find((item) => item.id === slotId);
@@ -250,6 +303,7 @@ export function AdminApp() {
     }
 
     updatePlan([...sortedPlan, nextSlot]);
+    setSelectedSlotId(nextSlot.id);
     setPlanMessage(`${getSlotLabel(nextSlot)} を ${nextSlot.start} から追加しました。`);
   }
 
@@ -353,7 +407,10 @@ export function AdminApp() {
           </div>
           <label className="compact-field">
             練習日
-            <select value={selectedDay.id} onChange={(event) => updateState({ selectedPracticeDayId: event.target.value })}>
+            <select
+              value={selectedDay.id}
+              onChange={(event) => updateState({ selectedPracticeDayId: event.target.value })}
+            >
               {state.practiceDays.map((day) => (
                 <option key={day.id} value={day.id}>
                   {day.practiceDate} {day.startTime}-{day.endTime}
@@ -366,15 +423,29 @@ export function AdminApp() {
         <div className="date-time-grid">
           <label>
             日付
-            <input type="date" value={selectedDay.practiceDate} onChange={(event) => updateSelectedDay({ practiceDate: event.target.value })} />
+            <input
+              type="date"
+              value={selectedDay.practiceDate}
+              onChange={(event) => updateSelectedDay({ practiceDate: event.target.value })}
+            />
           </label>
           <label>
             開始
-            <input type="time" step="300" value={selectedDay.startTime} onChange={(event) => updateSelectedDay({ startTime: event.target.value })} />
+            <input
+              type="time"
+              step="300"
+              value={selectedDay.startTime}
+              onChange={(event) => updateSelectedDay({ startTime: event.target.value })}
+            />
           </label>
           <label>
             終了
-            <input type="time" step="300" value={selectedDay.endTime} onChange={(event) => updateSelectedDay({ endTime: event.target.value })} />
+            <input
+              type="time"
+              step="300"
+              value={selectedDay.endTime}
+              onChange={(event) => updateSelectedDay({ endTime: event.target.value })}
+            />
           </label>
         </div>
 
@@ -448,7 +519,7 @@ export function AdminApp() {
           <aside className="plan-palette">
             <div className="plan-toolbar-head">
               <strong>追加するボックス</strong>
-              <span className="muted">左のボックスを下の計画エリアへドラッグ、またはクリックで末尾へ追加できます。</span>
+              <span className="muted">左のボックスを下の計画エリアへドラッグ、またはクリックで開始時刻へ追加できます。</span>
             </div>
 
             <div className="plan-palette-section">
@@ -521,103 +592,159 @@ export function AdminApp() {
                 onDragOver={handleTimelineDragOver}
                 onDrop={handleTimelineDrop}
               >
-                {activeDropMinutes !== null ? (
-                  <div
-                    className="plan-drop-time-guide"
-                    style={{ top: `${(activeDropMinutes - practiceStartMinutes) / MINUTES_PER_PIXEL}px` }}
-                  >
-                    {toTime(activeDropMinutes)}
-                  </div>
-                ) : null}
-
-                {sortedPlan.length === 0 ? (
-                  <div className="plan-empty-state">
-                    <strong>まだ計画がありません。</strong>
-                    <p className="muted">左のボックスをここに入れるか、自動生成してください。</p>
-                  </div>
-                ) : (
-                  <div className="plan-timeline">
-                    {sortedPlan.map((slot) => {
-                      const slotLabel = getSlotLabel(slot);
-                      const slotVariant = getSlotVariant(slotLabel);
-
-                      return (
-                        <div className="plan-slot-row" key={slot.id}>
-                          <article
-                            className={`plan-slot-card plan-slot-${slotVariant} ${getPieceToneClass(slot.pieceId)}${
-                              overlappingSlotIds.has(slot.id) ? " overlap-slot" : ""
-                            }${draggedSlotId === slot.id ? " is-dragging" : ""}`}
-                            draggable
-                            style={{
-                              height: `${Math.max(1, slot.duration / MINUTES_PER_PIXEL)}px`,
-                              top: `${(toMinutes(slot.start) - practiceStartMinutes) / MINUTES_PER_PIXEL}px`
-                            }}
-                            onDragEnd={() => {
-                              setDraggedSlotId(null);
-                              setActiveDropMinutes(null);
-                            }}
-                            onDragStart={(event) => {
-                              setDraggedSlotId(slot.id);
-                              writeDragPayload(event, { type: "slot", slotId: slot.id });
-                            }}
-                          >
-                            <div className="plan-slot-main">
-                              <button
-                                className="plan-resize-handle plan-resize-handle-top"
-                                type="button"
-                                aria-label={`${slotLabel}の開始時刻を変更`}
-                                onPointerDown={(event) => handleResizeStart(event, slot.id, "start")}
-                              >
-                                ↕
-                              </button>
-                              <div className="plan-slot-top">
-                                <div className="plan-slot-heading">
-                                  <span className="plan-slot-time">
-                                    {slot.start} - {slot.end}
-                                  </span>
-                                  <h3>{slotLabel}</h3>
-                                </div>
-                                <div className="plan-slot-badges">
-                                  <span className="plan-badge">{formatMinutesLabel(slot.duration)}</span>
-                                  {overlappingSlotIds.has(slot.id) ? <span className="plan-badge danger">重なり</span> : null}
-                                </div>
-                              </div>
-                              <div className="plan-slot-editor">
-                                <label>
-                                  内容
-                                  <select value={slot.pieceId ?? ""} onChange={(event) => updateSlot(slot.id, { pieceId: event.target.value || null })}>
-                                    <option value="">{slotLabel}</option>
-                                    {state.pieces.map((piece) => (
-                                      <option key={piece.id} value={piece.id}>
-                                        {piece.title}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </label>
-                                <button
-                                  className="danger"
-                                  type="button"
-                                  onClick={() => updatePlan(sortedPlan.filter((item) => item.id !== slot.id))}
-                                >
-                                  削除
-                                </button>
-                              </div>
-                              <button
-                                className="plan-resize-handle plan-resize-handle-bottom"
-                                type="button"
-                                aria-label={`${slotLabel}の終了時刻を変更`}
-                                onPointerDown={(event) => handleResizeStart(event, slot.id, "end")}
-                              >
-                                ↕
-                              </button>
-                            </div>
-                          </article>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+            {activeDropMinutes !== null ? (
+              <div
+                className="plan-drop-time-guide"
+                style={{ top: `${(activeDropMinutes - practiceStartMinutes) / MINUTES_PER_PIXEL}px` }}
+              >
+                {toTime(activeDropMinutes)}
               </div>
+            ) : null}
+
+            {sortedPlan.length === 0 ? (
+              <div className="plan-empty-state">
+                <strong>まだ計画がありません。</strong>
+                <p className="muted">左のボックスをここに入れるか、自動生成してください。</p>
+              </div>
+            ) : (
+              <div className="plan-timeline">
+                {sortedPlan.map((slot) => {
+                  const slotLabel = getSlotLabel(slot);
+                  const slotVariant = getSlotVariant(slotLabel);
+
+                  return (
+                    <div className="plan-slot-row" key={slot.id}>
+                      <article
+                        className={`plan-slot-card plan-slot-${slotVariant} ${getPieceToneClass(slot.pieceId)}${
+                          overlappingSlotIds.has(slot.id) ? " overlap-slot" : ""
+                        }${draggedSlotId === slot.id ? " is-dragging" : ""}${
+                          selectedSlotId === slot.id ? " is-selected" : ""
+                        }`}
+                        draggable
+                        style={{
+                          height: `${Math.max(1, slot.duration / MINUTES_PER_PIXEL)}px`,
+                          top: `${(toMinutes(slot.start) - practiceStartMinutes) / MINUTES_PER_PIXEL}px`
+                        }}
+                        onClick={() => setSelectedSlotId(slot.id)}
+                        onDragEnd={() => {
+                          setDraggedSlotId(null);
+                          setActiveDropMinutes(null);
+                        }}
+                        onDragStart={(event) => {
+                          setDraggedSlotId(slot.id);
+                          setSelectedSlotId(slot.id);
+                          writeDragPayload(event, { type: "slot", slotId: slot.id });
+                        }}
+                      >
+                        <div className="plan-slot-main">
+                          <button
+                            className="plan-resize-handle plan-resize-handle-top"
+                            type="button"
+                            aria-label={`${slotLabel}の開始時刻を変更`}
+                            onPointerDown={(event) => handleResizeStart(event, slot.id, "start")}
+                          >
+                            ↕
+                          </button>
+                          <div className="plan-slot-top">
+                            <div className="plan-slot-heading">
+                              <span className="plan-slot-time">
+                                {slot.start} - {slot.end}
+                              </span>
+                              <h3>{slotLabel}</h3>
+                            </div>
+                            <div className="plan-slot-badges">
+                              <span className="plan-badge">{formatMinutesLabel(slot.duration)}</span>
+                              {overlappingSlotIds.has(slot.id) ? <span className="plan-badge danger">重なり</span> : null}
+                            </div>
+                          </div>
+                          <button
+                            className="plan-resize-handle plan-resize-handle-bottom"
+                            type="button"
+                            aria-label={`${slotLabel}の終了時刻を変更`}
+                            onPointerDown={(event) => handleResizeStart(event, slot.id, "end")}
+                          >
+                            ↕
+                          </button>
+                        </div>
+                      </article>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+              </div>
+            </div>
+            <div className="plan-detail-panel">
+              {selectedSlot ? (
+                <>
+                  <div className="plan-detail-head">
+                    <div>
+                      <span className="plan-stat-label">選択中のボックス</span>
+                      <strong>{getSlotLabel(selectedSlot)}</strong>
+                    </div>
+                    <span className="plan-detail-chip">
+                      {selectedSlot.start} - {selectedSlot.end} / {formatMinutesLabel(selectedSlot.duration)}
+                    </span>
+                  </div>
+                  <div className="plan-detail-grid">
+                    <label>
+                      内容
+                      <select
+                        value={getSlotContentValue(selectedSlot)}
+                        onChange={(event) => updateSlotContent(selectedSlot.id, event.target.value)}
+                      >
+                        {UTILITY_SLOT_TEMPLATES.map((template) => (
+                          <option key={template.kind} value={`utility:${template.kind}`}>
+                            {template.label}
+                          </option>
+                        ))}
+                        {state.pieces.map((piece) => (
+                          <option key={piece.id} value={`piece:${piece.id}`}>
+                            {piece.title}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      開始
+                      <input
+                        type="time"
+                        step="300"
+                        value={selectedSlot.start}
+                        onChange={(event) => updateSlotTimeInput(selectedSlot.id, "start", event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      終了
+                      <input
+                        type="time"
+                        step="300"
+                        value={selectedSlot.end}
+                        onChange={(event) => updateSlotTimeInput(selectedSlot.id, "end", event.target.value)}
+                      />
+                    </label>
+                  </div>
+                  <div className="plan-detail-actions">
+                    <button type="button" className="secondary" onClick={() => adjustSlotEnd(selectedSlot.id, -5)}>
+                      -5分
+                    </button>
+                    <button type="button" className="secondary" onClick={() => adjustSlotEnd(selectedSlot.id, 5)}>
+                      +5分
+                    </button>
+                    <button type="button" className="secondary" onClick={() => setSelectedSlotId(null)}>
+                      選択解除
+                    </button>
+                    <button type="button" className="danger" onClick={() => deleteSlot(selectedSlot.id)}>
+                      削除
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="plan-detail-empty">
+                  <strong>編集するボックスを選択</strong>
+                  <span className="muted">5分の短い枠も、選択後にここで内容・時刻・削除を操作できます。</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
