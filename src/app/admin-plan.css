@@ -206,6 +206,13 @@ button:disabled {
   transform: scale(0.995);
 }
 
+.plan-slot-card.is-selected {
+  z-index: 7;
+  box-shadow:
+    0 0 0 3px #2563eb,
+    0 12px 28px rgba(37, 99, 235, 0.18);
+}
+
 .plan-slot-piece,
 .plan-tone-0 {
   --plan-color: #2563eb;
@@ -252,10 +259,6 @@ button:disabled {
   --plan-bg: #f8fafc;
 }
 
-.plan-slot-editor {
-  grid-template-columns: minmax(220px, 2fr) minmax(150px, auto) 100px;
-}
-
 .plan-slot-main {
   display: grid;
   gap: 4px;
@@ -293,11 +296,11 @@ button:disabled {
 
 .plan-resize-handle {
   position: absolute;
-  right: -6px;
-  left: -6px;
+  right: 6px;
+  left: auto;
   z-index: 3;
-  width: calc(100% + 12px);
-  min-height: 22px;
+  width: 44px;
+  min-height: 16px;
   border-radius: 0 0 8px 8px;
   background: color-mix(in srgb, var(--plan-color, var(--accent)) 18%, transparent);
   color: var(--plan-color, var(--accent));
@@ -310,17 +313,70 @@ button:disabled {
 }
 
 .plan-resize-handle-top {
-  top: -10px;
+  top: -1px;
   bottom: auto;
   border-radius: 8px 8px 0 0;
 }
 
 .plan-resize-handle-bottom {
-  bottom: -10px;
+  bottom: -1px;
 }
 
 .plan-resize-handle:hover {
   box-shadow: inset 0 2px 0 color-mix(in srgb, var(--plan-color, var(--accent)) 44%, transparent);
+}
+
+.plan-detail-panel {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #c6d3df;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 14px;
+}
+
+.plan-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.plan-detail-head > div {
+  display: grid;
+  gap: 2px;
+}
+
+.plan-detail-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  border-radius: 8px;
+  background: #eef5ff;
+  color: #1d4ed8;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.plan-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 120px 120px;
+  gap: 10px;
+  align-items: end;
+}
+
+.plan-detail-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.plan-detail-empty {
+  display: grid;
+  gap: 4px;
 }
 
 @media (max-width: 720px) {
@@ -335,4 +391,9 @@ button:disabled {
   .plan-timeline-shell {
     grid-template-columns: 54px minmax(0, 1fr);
   }
+
+  .plan-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
 }
