@@ -650,7 +650,32 @@ export function AdminApp() {
                               <span className="plan-slot-time">
                                 {slot.start} - {slot.end}
                               </span>
-                              <h3>{slotLabel}</h3>
+                              <select
+                                className="plan-slot-title-select"
+                                aria-label={`${slotLabel}の内容・曲を変更`}
+                                title="内容・曲を変更"
+                                value={getSlotContentValue(slot)}
+                                onPointerDown={(event) => event.stopPropagation()}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setSelectedSlotId(slot.id);
+                                }}
+                                onChange={(event) => {
+                                  updateSlotContent(slot.id, event.target.value);
+                                  setSelectedSlotId(slot.id);
+                                }}
+                              >
+                                {UTILITY_SLOT_TEMPLATES.map((template) => (
+                                  <option key={template.kind} value={`utility:${template.kind}`}>
+                                    {template.label}
+                                  </option>
+                                ))}
+                                {state.pieces.map((piece) => (
+                                  <option key={piece.id} value={`piece:${piece.id}`}>
+                                    {piece.title}
+                                  </option>
+                                ))}
+                              </select>
                             </div>
                             <div className="plan-slot-badges">
                               <span className="plan-badge">{formatMinutesLabel(slot.duration)}</span>

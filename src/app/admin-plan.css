@@ -276,13 +276,29 @@ button:disabled {
   min-width: 0;
 }
 
-.plan-slot-heading h3 {
-  font-size: 16px;
-  line-height: 1.25;
-}
-
 .plan-slot-time {
   font-size: 12px;
+}
+
+.plan-slot-title-select {
+  width: 100%;
+  min-height: 26px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--plan-bg, #ffffff) 80%, #ffffff);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1.25;
+  padding: 1px 26px 1px 0;
+  box-shadow: none;
+}
+
+.plan-slot-title-select:hover,
+.plan-slot-title-select:focus {
+  border-color: color-mix(in srgb, var(--plan-color, var(--accent)) 55%, #ffffff);
+  background: #ffffff;
 }
 
 .plan-slot-badges {
