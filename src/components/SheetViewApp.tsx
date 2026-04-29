@@ -50,7 +50,9 @@ export function SheetViewApp() {
 
       <section className="panel stack">
         <h2>{formatPracticeDateLabel(selectedDay.practiceDate)}</h2>
-        {selectedDay.plan.length === 0 ? (
+        {!selectedDay.isPlanPublished ? (
+          <p className="muted">この日の練習スケジュールはまだ公開されていません。</p>
+        ) : selectedDay.plan.length === 0 ? (
           <p className="muted">まだこの日の計画がありません。管理者用URLで自動計画を生成してください。</p>
         ) : (
           <div className="sheet-wrap">

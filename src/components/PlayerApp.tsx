@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -45,7 +45,6 @@ function getClosestTime(value: string, options: string[]) {
       : closest
   );
 }
-
 function TimePartSelect({
   label,
   value,
@@ -274,7 +273,7 @@ export function PlayerApp() {
   const visiblePlans = useMemo(
     () =>
       Object.fromEntries(
-        sortedPracticeDays.map((day) => [day.id, sortPlanByTime(day.plan)])
+        sortedPracticeDays.map((day) => [day.id, day.isPlanPublished ? sortPlanByTime(day.plan) : []])
       ) as Record<string, ReturnType<typeof sortPlanByTime>>,
     [sortedPracticeDays]
   );
@@ -550,7 +549,9 @@ export function PlayerApp() {
                   <p className="muted">この日はすでに入力済みです。内容を確認・編集するにはパスワードが必要です。</p>
                 )}
 
-                {currentPlan.length > 0 ? (
+                {!selectedInputDay.isPlanPublished ? (
+                  <p className="muted">練習スケジュールはまだ公開されていません。</p>
+                ) : currentPlan.length > 0 ? (
                   <div className="sheet-wrap">
                     <table className="player-plan-table">
                       <thead>
@@ -590,3 +591,4 @@ export function PlayerApp() {
     </main>
   );
 }
+

@@ -130,6 +130,7 @@ export function MemberPieceManagerApp() {
           availabilities: [],
           absentMemberIds: [],
           respondedMemberIds: [],
+          isPlanPublished: false,
           plan: []
         }
       ]

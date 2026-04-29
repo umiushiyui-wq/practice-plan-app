@@ -418,42 +418,17 @@ export function AdminApp() {
               ))}
             </select>
           </label>
-        </div>
-
-        <div className="date-time-grid">
-          <label>
-            日付
+          <label className="plan-publish-switch">
             <input
-              type="date"
-              value={selectedDay.practiceDate}
-              onChange={(event) => updateSelectedDay({ practiceDate: event.target.value })}
+              type="checkbox"
+              checked={selectedDay.isPlanPublished}
+              onChange={(event) => updateSelectedDay({ isPlanPublished: event.target.checked })}
             />
+            <span className="plan-publish-switch-control" aria-hidden="true" />
+            <span>
+              練習スケジュールを{selectedDay.isPlanPublished ? "公開中" : "非公開"}
+            </span>
           </label>
-          <label>
-            開始
-            <input
-              type="time"
-              step="300"
-              value={selectedDay.startTime}
-              onChange={(event) => updateSelectedDay({ startTime: event.target.value })}
-            />
-          </label>
-          <label>
-            終了
-            <input
-              type="time"
-              step="300"
-              value={selectedDay.endTime}
-              onChange={(event) => updateSelectedDay({ endTime: event.target.value })}
-            />
-          </label>
-        </div>
-
-        <div className="row">
-          <span className="muted">練習時間: {formatMinutesLabel(practiceMinutes)}</span>
-          <button className="danger" type="button" onClick={() => deletePracticeDay(selectedDay.id)}>
-            この練習日を削除
-          </button>
         </div>
       </section>
 

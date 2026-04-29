@@ -45,6 +45,7 @@ export type LocalPracticeDay = {
   availabilities: Availability[];
   absentMemberIds: string[];
   respondedMemberIds: string[];
+  isPlanPublished: boolean;
   plan: PlanSlot[];
 };
 
@@ -86,6 +87,7 @@ function defaultPracticeDay(): LocalPracticeDay {
     availabilities: [],
     absentMemberIds: [],
     respondedMemberIds: [],
+    isPlanPublished: false,
     plan: []
   };
 }
@@ -152,7 +154,8 @@ function migrateState(value: unknown): AppState {
       practiceDays: saved.practiceDays.map((day) => ({
         ...day,
         absentMemberIds: day.absentMemberIds ?? [],
-        respondedMemberIds: day.respondedMemberIds ?? []
+        respondedMemberIds: day.respondedMemberIds ?? [],
+        isPlanPublished: typeof day.isPlanPublished === "boolean" ? day.isPlanPublished : true
       })),
       selectedPracticeDayId: saved.selectedPracticeDayId ?? saved.practiceDays[0].id
     };
@@ -166,6 +169,7 @@ function migrateState(value: unknown): AppState {
     availabilities: saved.availabilities ?? defaultDay.availabilities,
     absentMemberIds: [],
     respondedMemberIds: [],
+    isPlanPublished: true,
     plan: saved.plan ?? []
   };
 

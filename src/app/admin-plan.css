@@ -26,6 +26,56 @@ button:disabled {
   top: 76px;
 }
 
+.plan-publish-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.plan-publish-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.plan-publish-switch-control {
+  position: relative;
+  width: 46px;
+  height: 26px;
+  border-radius: 8px;
+  background: #cbd5e1;
+  transition: background-color 120ms ease;
+}
+
+.plan-publish-switch-control::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25);
+  transition: transform 120ms ease;
+}
+
+.plan-publish-switch input:checked + .plan-publish-switch-control {
+  background: #2563eb;
+}
+
+.plan-publish-switch input:checked + .plan-publish-switch-control::after {
+  transform: translateX(20px);
+}
+
+.plan-publish-switch input:focus-visible + .plan-publish-switch-control {
+  outline: 3px solid color-mix(in srgb, #2563eb 30%, transparent);
+  outline-offset: 2px;
+}
+
 .plan-palette-section,
 .plan-palette-grid {
   display: grid;
