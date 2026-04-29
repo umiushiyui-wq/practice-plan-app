@@ -36,7 +36,7 @@ type SlotDragPayload = {
 };
 
 const DRAG_DATA_TYPE = "application/x-practice-plan-slot";
-const MINUTES_PER_PIXEL = 0.5;
+const MINUTES_PER_PIXEL = 0.25;
 const RESIZE_STEP_MINUTES = 5;
 
 const UTILITY_SLOT_TEMPLATES: Array<{
@@ -99,6 +99,7 @@ export function AdminApp() {
   const usedPieceCount = new Set(sortedPlan.map((slot) => slot.pieceId).filter(Boolean)).size;
   const practiceStartMinutes = toMinutes(selectedDay.startTime);
   const practiceEndMinutes = toMinutes(selectedDay.endTime);
+  const timelineHeight = Math.max(1, practiceMinutes / MINUTES_PER_PIXEL);
   const timeAxisMarks =
     practiceMinutes > 0
       ? Array.from({ length: Math.floor(practiceMinutes / 30) + 1 }, (_, index) => practiceStartMinutes + index * 30)
@@ -475,7 +476,7 @@ export function AdminApp() {
               <span className="muted">箱の高さが時間です。下端をドラッグすると分数を変更できます。</span>
             </div>
 
-            <div className="plan-timeline-shell" style={{ minHeight: `${Math.max(220, practiceMinutes / MINUTES_PER_PIXEL)}px` }}>
+            <div className="plan-timeline-shell" style={{ height: `${timelineHeight}px` }}>
               <div className="plan-time-axis" aria-hidden="true">
                 {timeAxisMarks.map((minutes) => (
                   <span
@@ -509,13 +510,13 @@ export function AdminApp() {
                       const slotVariant = getSlotVariant(slotLabel);
 
                       return (
-                        <div key={slot.id}>
+                        <div className="plan-slot-row" key={slot.id}>
                           <article
                             className={`plan-slot-card plan-slot-${slotVariant} ${getPieceToneClass(slot.pieceId)}${
                               overlappingSlotIds.has(slot.id) ? " overlap-slot" : ""
                             }${draggedSlotId === slot.id ? " is-dragging" : ""}`}
                             draggable
-                            style={{ minHeight: `${Math.max(84, slot.duration / MINUTES_PER_PIXEL)}px` }}
+                            style={{ height: `${Math.max(1, slot.duration / MINUTES_PER_PIXEL)}px` }}
                             onDragEnd={() => {
                               setDraggedSlotId(null);
                               setActiveDropIndex(null);
