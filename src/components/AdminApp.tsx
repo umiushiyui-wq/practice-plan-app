@@ -38,6 +38,7 @@ type SlotDragPayload = {
 const DRAG_DATA_TYPE = "application/x-practice-plan-slot";
 const MINUTES_PER_PIXEL = 0.25;
 const RESIZE_STEP_MINUTES = 5;
+const MIN_SLOT_MINUTES = 5;
 
 const UTILITY_SLOT_TEMPLATES: Array<{
   kind: UtilitySlotKind;
@@ -75,16 +76,19 @@ function normalizeDuration(value: number, fallback = 1) {
   return Number.isFinite(value) ? Math.max(1, Math.floor(value)) : fallback;
 }
 
-function snapDuration(minutes: number, fallback = RESIZE_STEP_MINUTES) {
-  const normalized = normalizeDuration(minutes, fallback);
-  return Math.max(RESIZE_STEP_MINUTES, Math.round(normalized / RESIZE_STEP_MINUTES) * RESIZE_STEP_MINUTES);
+function snapMinutes(minutes: number) {
+  return Math.round(minutes / RESIZE_STEP_MINUTES) * RESIZE_STEP_MINUTES;
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
 }
 
 export function AdminApp() {
   const { state, updateState } = useLocalPracticeState();
   const [planMessage, setPlanMessage] = useState("");
   const [draggedSlotId, setDraggedSlotId] = useState<string | null>(null);
-  const [activeDropIndex, setActiveDropIndex] = useState<number | null>(null);
+  const [activeDropMinutes, setActiveDropMinutes] = useState<number | null>(null);
   const selectedDay = getSelectedPracticeDay(state);
   const pieceMap = usePieceMap(state.pieces);
 
@@ -100,6 +104,7 @@ export function AdminApp() {
   const practiceStartMinutes = toMinutes(selectedDay.startTime);
   const practiceEndMinutes = toMinutes(selectedDay.endTime);
   const timelineHeight = Math.max(1, practiceMinutes / MINUTES_PER_PIXEL);
+  const lastSlotStartMinutes = Math.max(practiceStartMinutes, practiceEndMinutes - MIN_SLOT_MINUTES);
   const timeAxisMarks =
     practiceMinutes > 0
       ? Array.from({ length: Math.floor(practiceMinutes / 30) + 1 }, (_, index) => practiceStartMinutes + index * 30)
@@ -126,56 +131,73 @@ export function AdminApp() {
     });
   }
 
-  function rebuildPlanTimes(plan: typeof selectedDay.plan) {
-    const practiceStart = toMinutes(selectedDay.startTime);
-    const practiceEnd = toMinutes(selectedDay.endTime);
-    let cursor = practiceStart;
+  function normalizeSlotTiming(slot: (typeof selectedDay.plan)[number], nextStart: number, nextEnd: number) {
+    const dayStart = toMinutes(selectedDay.startTime);
+    const dayEnd = toMinutes(selectedDay.endTime);
+    const latestStart = Math.max(dayStart, dayEnd - MIN_SLOT_MINUTES);
+    const clampedStart = clampNumber(snapMinutes(nextStart), dayStart, latestStart);
+    const clampedEnd = clampNumber(snapMinutes(nextEnd), clampedStart + MIN_SLOT_MINUTES, dayEnd);
 
-    return plan.flatMap((slot) => {
-      const requestedDuration = normalizeDuration(slot.duration);
-      const nextEnd = Math.min(practiceEnd, cursor + requestedDuration);
-
-      if (nextEnd <= cursor) return [];
-
-      const nextSlot = {
-        ...slot,
-        start: toTime(cursor),
-        end: toTime(nextEnd),
-        duration: nextEnd - cursor
-      };
-      cursor = nextEnd;
-      return [nextSlot];
-    });
+    return {
+      ...slot,
+      start: toTime(clampedStart),
+      end: toTime(clampedEnd),
+      duration: clampedEnd - clampedStart
+    };
   }
 
-  function updatePlanFromOrderedSlots(plan: typeof selectedDay.plan) {
-    updateSelectedDay({ plan: rebuildPlanTimes(plan) });
+  function updatePlan(plan: typeof selectedDay.plan) {
+    updateSelectedDay({ plan: sortPlanByTime(plan) });
   }
 
-  function updateSlot(slotId: string, patch: { pieceId?: string | null; duration?: number }) {
+  function updateSlot(slotId: string, patch: { pieceId?: string | null }) {
     const nextPlan = sortedPlan.map((slot) =>
       slot.id === slotId
         ? {
             ...slot,
             ...patch,
-            duration: patch.duration === undefined ? slot.duration : normalizeDuration(patch.duration, slot.duration),
             reason: patch.pieceId !== undefined ? "管理者が手動で調整した枠です。" : slot.reason
           }
         : slot
     );
-    updatePlanFromOrderedSlots(nextPlan);
+    updatePlan(nextPlan);
   }
 
-  function handleResizeStart(event: ReactPointerEvent<HTMLButtonElement>, slotId: string, currentDuration: number) {
+  function moveSlotToStart(slotId: string, nextStart: number) {
+    const nextPlan = sortedPlan.map((slot) => {
+      if (slot.id !== slotId) return slot;
+      const duration = normalizeDuration(slot.duration, MIN_SLOT_MINUTES);
+      return normalizeSlotTiming(slot, nextStart, nextStart + duration);
+    });
+    updatePlan(nextPlan);
+  }
+
+  function updateSlotBoundary(slotId: string, boundary: "start" | "end", minutes: number) {
+    const nextPlan = sortedPlan.map((slot) => {
+      if (slot.id !== slotId) return slot;
+
+      const currentStart = toMinutes(slot.start);
+      const currentEnd = toMinutes(slot.end);
+      return boundary === "start"
+        ? normalizeSlotTiming(slot, minutes, currentEnd)
+        : normalizeSlotTiming(slot, currentStart, minutes);
+    });
+    updatePlan(nextPlan);
+  }
+
+  function handleResizeStart(event: ReactPointerEvent<HTMLButtonElement>, slotId: string, boundary: "start" | "end") {
     event.preventDefault();
     event.stopPropagation();
 
     const startY = event.clientY;
-    const startDuration = currentDuration;
+    const slot = sortedPlan.find((item) => item.id === slotId);
+    if (!slot) return;
+
+    const startBoundaryMinutes = boundary === "start" ? toMinutes(slot.start) : toMinutes(slot.end);
 
     function handlePointerMove(moveEvent: PointerEvent) {
       const deltaMinutes = (moveEvent.clientY - startY) * MINUTES_PER_PIXEL;
-      updateSlot(slotId, { duration: snapDuration(startDuration + deltaMinutes, startDuration) });
+      updateSlotBoundary(slotId, boundary, startBoundaryMinutes + deltaMinutes);
     }
 
     function handlePointerUp() {
@@ -187,57 +209,48 @@ export function AdminApp() {
     window.addEventListener("pointerup", handlePointerUp, { once: true });
   }
 
-  function makeSlotFromPalette(payload: PaletteDragPayload): (typeof selectedDay.plan)[number] | null {
+  function makeSlotFromPalette(payload: PaletteDragPayload, startMinutes = toMinutes(selectedDay.startTime)): (typeof selectedDay.plan)[number] | null {
     if (payload.slotType === "piece") {
       const piece = pieceMap.get(payload.pieceId);
       if (!piece) return null;
 
-      const defaultDuration = Math.max(5, Math.min(piece.dailyMaxMinutes || 30, 60, Math.max(practiceMinutes, 1)));
+      const defaultDuration = Math.max(MIN_SLOT_MINUTES, Math.min(piece.dailyMaxMinutes || 30, 60, Math.max(practiceMinutes, 1)));
+      const start = clampNumber(snapMinutes(startMinutes), practiceStartMinutes, lastSlotStartMinutes);
+      const end = Math.min(practiceEndMinutes, start + defaultDuration);
 
       return {
         id: makeId("s"),
         pieceId: piece.id,
-        start: selectedDay.startTime,
-        end: toTime(toMinutes(selectedDay.startTime) + defaultDuration),
-        duration: defaultDuration,
+        start: toTime(start),
+        end: toTime(end),
+        duration: end - start,
         reason: `${piece.title} を手動追加した枠です。`
       };
     }
 
     const template = getUtilityTemplate(payload.utilityKind);
+    const start = clampNumber(snapMinutes(startMinutes), practiceStartMinutes, lastSlotStartMinutes);
+    const end = Math.min(practiceEndMinutes, start + template.defaultMinutes);
 
     return {
       id: makeId("s"),
       pieceId: null,
-      start: selectedDay.startTime,
-      end: toTime(toMinutes(selectedDay.startTime) + template.defaultMinutes),
-      duration: template.defaultMinutes,
+      start: toTime(start),
+      end: toTime(end),
+      duration: end - start,
       reason: template.reason
     };
   }
 
-  function addSlotFromPalette(payload: PaletteDragPayload, targetIndex = sortedPlan.length) {
-    const nextSlot = makeSlotFromPalette(payload);
+  function addSlotFromPalette(payload: PaletteDragPayload, startMinutes = toMinutes(selectedDay.startTime)) {
+    const nextSlot = makeSlotFromPalette(payload, startMinutes);
     if (!nextSlot) {
       setPlanMessage("追加できませんでした。曲の設定を確認してください。");
       return;
     }
 
-    const nextPlan = [...sortedPlan];
-    nextPlan.splice(targetIndex, 0, nextSlot);
-    updatePlanFromOrderedSlots(nextPlan);
-    setPlanMessage(`${getSlotLabel(nextSlot)} を追加しました。ドラッグして順番を調整できます。`);
-  }
-
-  function moveSlot(slotId: string, targetIndex: number) {
-    const currentIndex = sortedPlan.findIndex((slot) => slot.id === slotId);
-    if (currentIndex < 0) return;
-
-    const nextPlan = [...sortedPlan];
-    const [movedSlot] = nextPlan.splice(currentIndex, 1);
-    const adjustedIndex = currentIndex < targetIndex ? targetIndex - 1 : targetIndex;
-    nextPlan.splice(Math.max(0, Math.min(adjustedIndex, nextPlan.length)), 0, movedSlot);
-    updatePlanFromOrderedSlots(nextPlan);
+    updatePlan([...sortedPlan, nextSlot]);
+    setPlanMessage(`${getSlotLabel(nextSlot)} を ${nextSlot.start} から追加しました。`);
   }
 
   function writeDragPayload(event: DragEvent, payload: PaletteDragPayload | SlotDragPayload) {
@@ -256,33 +269,32 @@ export function AdminApp() {
     }
   }
 
-  function handleDrop(event: DragEvent, targetIndex: number) {
+  function getTimelineDropMinutes(event: DragEvent<HTMLElement>) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const rawOffset = (event.clientY - rect.top) * MINUTES_PER_PIXEL;
+    return clampNumber(snapMinutes(practiceStartMinutes + rawOffset), practiceStartMinutes, lastSlotStartMinutes);
+  }
+
+  function handleTimelineDragOver(event: DragEvent<HTMLElement>) {
+    event.preventDefault();
+    setActiveDropMinutes(getTimelineDropMinutes(event));
+  }
+
+  function handleTimelineDrop(event: DragEvent<HTMLElement>) {
     event.preventDefault();
     const payload = readDragPayload(event);
     setDraggedSlotId(null);
-    setActiveDropIndex(null);
+    setActiveDropMinutes(null);
 
     if (!payload) return;
+    const dropMinutes = getTimelineDropMinutes(event);
+
     if (payload.type === "slot") {
-      moveSlot(payload.slotId, targetIndex);
+      moveSlotToStart(payload.slotId, dropMinutes);
       return;
     }
 
-    addSlotFromPalette(payload, targetIndex);
-  }
-
-  function getCardDropIndex(event: DragEvent<HTMLElement>, index: number) {
-    const rect = event.currentTarget.getBoundingClientRect();
-    return event.clientY < rect.top + rect.height / 2 ? index : index + 1;
-  }
-
-  function handleCardDragOver(event: DragEvent<HTMLElement>, index: number) {
-    event.preventDefault();
-    setActiveDropIndex(getCardDropIndex(event, index));
-  }
-
-  function handleCardDrop(event: DragEvent<HTMLElement>, index: number) {
-    handleDrop(event, getCardDropIndex(event, index));
+    addSlotFromPalette(payload, dropMinutes);
   }
 
   function getPieceToneClass(pieceId: string | null) {
@@ -487,7 +499,7 @@ export function AdminApp() {
           <div className="plan-canvas">
             <div className="plan-canvas-head">
               <strong>練習計画</strong>
-              <span className="muted">箱の高さが時間です。下端をドラッグすると分数を変更できます。</span>
+              <span className="muted">箱を上下にドラッグして時刻を移動できます。上下の端をドラッグすると開始・終了を変更できます。</span>
             </div>
 
             <div className="plan-timeline-shell" style={{ height: `${timelineHeight}px` }}>
@@ -503,14 +515,20 @@ export function AdminApp() {
                 ))}
               </div>
 
-              <div className="plan-timeline-track">
-                <div
-                  className={`plan-drop-zone ${activeDropIndex === 0 ? "is-active" : ""}`}
-                  onDragEnter={() => setActiveDropIndex(0)}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDragLeave={() => setActiveDropIndex(null)}
-                  onDrop={(event) => handleDrop(event, 0)}
-                />
+              <div
+                className="plan-timeline-track"
+                onDragLeave={() => setActiveDropMinutes(null)}
+                onDragOver={handleTimelineDragOver}
+                onDrop={handleTimelineDrop}
+              >
+                {activeDropMinutes !== null ? (
+                  <div
+                    className="plan-drop-time-guide"
+                    style={{ top: `${(activeDropMinutes - practiceStartMinutes) / MINUTES_PER_PIXEL}px` }}
+                  >
+                    {toTime(activeDropMinutes)}
+                  </div>
+                ) : null}
 
                 {sortedPlan.length === 0 ? (
                   <div className="plan-empty-state">
@@ -519,7 +537,7 @@ export function AdminApp() {
                   </div>
                 ) : (
                   <div className="plan-timeline">
-                    {sortedPlan.map((slot, index) => {
+                    {sortedPlan.map((slot) => {
                       const slotLabel = getSlotLabel(slot);
                       const slotVariant = getSlotVariant(slotLabel);
 
@@ -530,20 +548,28 @@ export function AdminApp() {
                               overlappingSlotIds.has(slot.id) ? " overlap-slot" : ""
                             }${draggedSlotId === slot.id ? " is-dragging" : ""}`}
                             draggable
-                            style={{ height: `${Math.max(1, slot.duration / MINUTES_PER_PIXEL)}px` }}
-                            onDragEnter={(event) => setActiveDropIndex(getCardDropIndex(event, index))}
+                            style={{
+                              height: `${Math.max(1, slot.duration / MINUTES_PER_PIXEL)}px`,
+                              top: `${(toMinutes(slot.start) - practiceStartMinutes) / MINUTES_PER_PIXEL}px`
+                            }}
                             onDragEnd={() => {
                               setDraggedSlotId(null);
-                              setActiveDropIndex(null);
+                              setActiveDropMinutes(null);
                             }}
-                            onDragOver={(event) => handleCardDragOver(event, index)}
                             onDragStart={(event) => {
                               setDraggedSlotId(slot.id);
                               writeDragPayload(event, { type: "slot", slotId: slot.id });
                             }}
-                            onDrop={(event) => handleCardDrop(event, index)}
                           >
                             <div className="plan-slot-main">
+                              <button
+                                className="plan-resize-handle plan-resize-handle-top"
+                                type="button"
+                                aria-label={`${slotLabel}の開始時刻を変更`}
+                                onPointerDown={(event) => handleResizeStart(event, slot.id, "start")}
+                              >
+                                ↕
+                              </button>
                               <div className="plan-slot-top">
                                 <div className="plan-slot-heading">
                                   <span className="plan-slot-time">
@@ -568,49 +594,24 @@ export function AdminApp() {
                                     ))}
                                   </select>
                                 </label>
-                                <div className="plan-slot-move-buttons">
-                                  <button
-                                    className="secondary"
-                                    disabled={index === 0}
-                                    type="button"
-                                    onClick={() => moveSlot(slot.id, index - 1)}
-                                  >
-                                    上へ
-                                  </button>
-                                  <button
-                                    className="secondary"
-                                    disabled={index === sortedPlan.length - 1}
-                                    type="button"
-                                    onClick={() => moveSlot(slot.id, index + 2)}
-                                  >
-                                    下へ
-                                  </button>
-                                </div>
                                 <button
                                   className="danger"
                                   type="button"
-                                  onClick={() => updatePlanFromOrderedSlots(sortedPlan.filter((item) => item.id !== slot.id))}
+                                  onClick={() => updatePlan(sortedPlan.filter((item) => item.id !== slot.id))}
                                 >
                                   削除
                                 </button>
                               </div>
                               <button
-                                className="plan-resize-handle"
+                                className="plan-resize-handle plan-resize-handle-bottom"
                                 type="button"
-                                aria-label={`${slotLabel}の時間を変更`}
-                                onPointerDown={(event) => handleResizeStart(event, slot.id, slot.duration)}
+                                aria-label={`${slotLabel}の終了時刻を変更`}
+                                onPointerDown={(event) => handleResizeStart(event, slot.id, "end")}
                               >
                                 ↕
                               </button>
                             </div>
                           </article>
-                          <div
-                            className={`plan-drop-zone ${activeDropIndex === index + 1 ? "is-active" : ""}`}
-                            onDragEnter={() => setActiveDropIndex(index + 1)}
-                            onDragOver={(event) => event.preventDefault()}
-                            onDragLeave={() => setActiveDropIndex(null)}
-                            onDrop={(event) => handleDrop(event, index + 1)}
-                          />
                         </div>
                       );
                     })}
