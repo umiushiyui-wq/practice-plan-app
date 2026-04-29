@@ -105,15 +105,16 @@ button:disabled {
 .plan-timeline-track {
   position: relative;
   min-width: 0;
+  min-height: 100%;
 }
 
 .plan-timeline-track .plan-timeline {
-  display: grid;
-  gap: 0;
+  position: absolute;
+  inset: 0;
 }
 
 .plan-slot-row {
-  position: relative;
+  display: contents;
 }
 
 .plan-timeline-track > .plan-drop-zone,
@@ -156,7 +157,34 @@ button:disabled {
   background: #edf5ff;
 }
 
+.plan-drop-time-guide {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 8;
+  transform: translateY(-50%);
+  border-top: 2px solid #2563eb;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 800;
+  pointer-events: none;
+}
+
+.plan-drop-time-guide::after {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #2563eb;
+}
+
 .plan-slot-card {
+  position: absolute;
+  left: 0;
+  right: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 0;
@@ -165,7 +193,7 @@ button:disabled {
   border-left: 10px solid var(--plan-color, var(--accent));
   border-radius: 8px;
   background: var(--plan-bg, #fff);
-  cursor: grab;
+  cursor: move;
   overflow: hidden;
   transition:
     box-shadow 120ms ease,
@@ -228,24 +256,6 @@ button:disabled {
   grid-template-columns: minmax(220px, 2fr) minmax(150px, auto) 100px;
 }
 
-.plan-slot-move-buttons {
-  position: absolute;
-  top: 2px;
-  right: 4px;
-  z-index: 6;
-  display: flex;
-  gap: 4px;
-}
-
-.plan-slot-move-buttons button {
-  min-height: 18px;
-  padding: 0 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  line-height: 1;
-  white-space: nowrap;
-}
-
 .plan-slot-main {
   display: grid;
   gap: 4px;
@@ -256,7 +266,7 @@ button:disabled {
 
 .plan-slot-top {
   gap: 8px;
-  padding-right: 100px;
+  padding-top: 8px;
 }
 
 .plan-slot-heading {
@@ -284,7 +294,6 @@ button:disabled {
 .plan-resize-handle {
   position: absolute;
   right: -6px;
-  bottom: -10px;
   left: -6px;
   z-index: 3;
   width: calc(100% + 12px);
@@ -298,6 +307,16 @@ button:disabled {
   line-height: 1;
   box-shadow: none;
   touch-action: none;
+}
+
+.plan-resize-handle-top {
+  top: -10px;
+  bottom: auto;
+  border-radius: 8px 8px 0 0;
+}
+
+.plan-resize-handle-bottom {
+  bottom: -10px;
 }
 
 .plan-resize-handle:hover {
