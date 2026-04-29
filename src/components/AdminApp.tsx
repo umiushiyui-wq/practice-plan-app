@@ -271,6 +271,20 @@ export function AdminApp() {
     addSlotFromPalette(payload, targetIndex);
   }
 
+  function getCardDropIndex(event: DragEvent<HTMLElement>, index: number) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return event.clientY < rect.top + rect.height / 2 ? index : index + 1;
+  }
+
+  function handleCardDragOver(event: DragEvent<HTMLElement>, index: number) {
+    event.preventDefault();
+    setActiveDropIndex(getCardDropIndex(event, index));
+  }
+
+  function handleCardDrop(event: DragEvent<HTMLElement>, index: number) {
+    handleDrop(event, getCardDropIndex(event, index));
+  }
+
   function getPieceToneClass(pieceId: string | null) {
     if (!pieceId) return "";
     const pieceIndex = state.pieces.findIndex((piece) => piece.id === pieceId);
@@ -517,18 +531,18 @@ export function AdminApp() {
                             }${draggedSlotId === slot.id ? " is-dragging" : ""}`}
                             draggable
                             style={{ height: `${Math.max(1, slot.duration / MINUTES_PER_PIXEL)}px` }}
+                            onDragEnter={(event) => setActiveDropIndex(getCardDropIndex(event, index))}
                             onDragEnd={() => {
                               setDraggedSlotId(null);
                               setActiveDropIndex(null);
                             }}
+                            onDragOver={(event) => handleCardDragOver(event, index)}
                             onDragStart={(event) => {
                               setDraggedSlotId(slot.id);
                               writeDragPayload(event, { type: "slot", slotId: slot.id });
                             }}
+                            onDrop={(event) => handleCardDrop(event, index)}
                           >
-                            <div className="plan-slot-rail">
-                              <span className="plan-slot-index">{String(index + 1).padStart(2, "0")}</span>
-                            </div>
                             <div className="plan-slot-main">
                               <div className="plan-slot-top">
                                 <div className="plan-slot-heading">
