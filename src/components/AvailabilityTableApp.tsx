@@ -17,6 +17,11 @@ const ALL_PIECES_FILTER = "__all__";
 const OTHER_PIECES_FILTER = "__other__";
 const ALL_PARTS_FILTER = "__all__";
 
+function formatPracticeTimeAndLocation(day: { startTime: string; endTime: string; location: string }) {
+  const location = day.location.trim();
+  return location ? `${day.startTime}-${day.endTime} ＠${location}` : `${day.startTime}-${day.endTime}`;
+}
+
 export function AvailabilityTableApp() {
   const localState = useLocalPracticeState();
   const { state, updateState } = localState;
@@ -86,7 +91,7 @@ export function AvailabilityTableApp() {
             >
               {sortedPracticeDays.map((day) => (
                 <option key={day.id} value={day.id}>
-                  {getPracticeDayLabel(day)} {day.startTime}-{day.endTime}
+                  {day.practiceDate} {formatPracticeTimeAndLocation(day)}
                 </option>
               ))}
             </select>
