@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { getPracticeDayLabel, getSelectedPracticeDay, toMinutes, toTime, useLocalPracticeState } from "@/components/LocalPracticeApp";
+import {
+  getPracticeDayLabel,
+  getSelectedPracticeDay,
+  LocalStateStatusPanel,
+  toMinutes,
+  toTime,
+  useLocalPracticeState
+} from "@/components/LocalPracticeApp";
 
 const HEATMAP_SLOTS = Array.from({ length: 15 }, (_, index) => 8 * 60 + index * 60);
 
@@ -37,7 +44,8 @@ function getHeatmapColor(count: number) {
 }
 
 export function ColorMapApp() {
-  const { state, updateState } = useLocalPracticeState();
+  const localState = useLocalPracticeState();
+  const { state, updateState } = localState;
   const selectedDay = getSelectedPracticeDay(state);
   const [hoveredCell, setHoveredCell] = useState<HoveredCell | null>(null);
   const practiceStart = toMinutes(selectedDay.startTime);
@@ -105,6 +113,8 @@ export function ColorMapApp() {
           </Link>
         </div>
       </section>
+
+      <LocalStateStatusPanel {...localState} />
 
       <section className="panel stack">
         <div className="row page-section-head">
