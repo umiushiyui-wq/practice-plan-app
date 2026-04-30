@@ -24,18 +24,6 @@ export default function HomePage() {
         <div className="hero-copy">
           <p className="eyebrow">2027 OB演奏会</p>
           <h1>練習出欠・計画管理</h1>
-          <p>
-            奏者の出欠入力から、管理者の練習計画作成までをまとめて扱うためのページです。
-            まずは自分の役割に近い入口を選んでください。
-          </p>
-        </div>
-        <div className="hero-actions">
-          <Link className="button" href="/player">
-            奏者として入力
-          </Link>
-          <Link className="button secondary" href="/admin">
-            管理者として開く
-          </Link>
         </div>
       </section>
 
