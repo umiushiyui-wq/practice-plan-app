@@ -13,7 +13,7 @@ type StoredLocalState = {
 function redisConfig() {
   const url = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
-  return url && token ? { url, token } : null;
+  return url && token ? { url: url.replace(/\/$/, ""), token } : null;
 }
 
 function canUseFileFallback() {
@@ -47,13 +47,11 @@ async function readFromRedis() {
   const config = redisConfig();
   if (!config) throw new Error(STORAGE_NOT_CONFIGURED_MESSAGE);
 
-  const response = await fetch(config.url, {
-    method: "POST",
+  const response = await fetch(`${config.url}/get/${encodeURIComponent(STATE_KEY)}`, {
+    method: "GET",
     headers: {
-      Authorization: `Bearer ${config.token}`,
-      "Content-Type": "application/json"
+      Authorization: `Bearer ${config.token}`
     },
-    body: JSON.stringify(["GET", STATE_KEY]),
     cache: "no-store"
   });
 
@@ -70,13 +68,13 @@ async function writeToRedis(state: unknown) {
   if (!config) throw new Error(STORAGE_NOT_CONFIGURED_MESSAGE);
   const stored = makeStoredState(state);
 
-  const response = await fetch(config.url, {
+  const response = await fetch(`${config.url}/set/${encodeURIComponent(STATE_KEY)}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${config.token}`,
-      "Content-Type": "application/json"
+      "Content-Type": "text/plain"
     },
-    body: JSON.stringify(["SET", STATE_KEY, JSON.stringify(stored)])
+    body: JSON.stringify(stored)
   });
 
   if (!response.ok) {
