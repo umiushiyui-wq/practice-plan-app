@@ -187,6 +187,31 @@ export function MemberPieceManagerApp() {
     setEditingPracticeDayId("");
   }
 
+  function deletePracticeDay(dayId: string) {
+    const day = state.practiceDays.find((item) => item.id === dayId);
+    if (!day || !confirm(`${getPracticeDayLabel(day)} を削除しますか？この日の出欠と練習計画も削除されます。`)) return;
+
+    const nextPracticeDays = state.practiceDays.filter((item) => item.id !== dayId);
+    const sortedNextPracticeDays = getSortedPracticeDays(nextPracticeDays);
+    const fallbackStartDayId = sortedNextPracticeDays[0]?.id ?? null;
+    const fallbackEndDayId = sortedNextPracticeDays[sortedNextPracticeDays.length - 1]?.id ?? null;
+
+    updateState({
+      selectedPracticeDayId:
+        state.selectedPracticeDayId === dayId ? fallbackStartDayId ?? "" : state.selectedPracticeDayId,
+      practiceDays: nextPracticeDays,
+      pieces: state.pieces.map((piece) => ({
+        ...piece,
+        targetRangeStartDayId: piece.targetRangeStartDayId === dayId ? fallbackStartDayId : piece.targetRangeStartDayId,
+        targetRangeEndDayId: piece.targetRangeEndDayId === dayId ? fallbackEndDayId : piece.targetRangeEndDayId
+      }))
+    });
+
+    if (editingPracticeDayId === dayId) {
+      setEditingPracticeDayId("");
+    }
+  }
+
   function addPiece(formData: FormData) {
     const title = String(formData.get("title") ?? "").trim();
     if (!title) return;
@@ -430,13 +455,18 @@ export function MemberPieceManagerApp() {
                         <span className="muted">{day.startTime} - {day.endTime}</span>
                         {day.location.trim() ? <span className="muted">＠{day.location.trim()}</span> : null}
                       </div>
-                      <button
-                        className="secondary"
-                        type="button"
-                        onClick={() => setEditingPracticeDayId(isEditing ? "" : day.id)}
-                      >
-                        {isEditing ? "閉じる" : "編集する"}
-                      </button>
+                      <div className="row">
+                        <button
+                          className="secondary"
+                          type="button"
+                          onClick={() => setEditingPracticeDayId(isEditing ? "" : day.id)}
+                        >
+                          {isEditing ? "閉じる" : "編集する"}
+                        </button>
+                        <button className="danger" type="button" onClick={() => deletePracticeDay(day.id)}>
+                          削除
+                        </button>
+                      </div>
                     </div>
                     {isEditing ? (
                       <form
