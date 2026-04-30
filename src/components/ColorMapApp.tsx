@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import {
   getPracticeDayLabel,
   getSelectedPracticeDay,
+  getSortedPracticeDays,
   LocalStateStatusPanel,
   toMinutes,
   toTime,
@@ -47,6 +48,7 @@ export function ColorMapApp() {
   const localState = useLocalPracticeState();
   const { state, updateState } = localState;
   const selectedDay = getSelectedPracticeDay(state);
+  const sortedPracticeDays = useMemo(() => getSortedPracticeDays(state.practiceDays), [state.practiceDays]);
   const [hoveredCell, setHoveredCell] = useState<HoveredCell | null>(null);
   const practiceStart = toMinutes(selectedDay.startTime);
   const practiceEnd = toMinutes(selectedDay.endTime);
@@ -128,7 +130,7 @@ export function ColorMapApp() {
               value={selectedDay.id}
               onChange={(event) => updateState({ selectedPracticeDayId: event.target.value })}
             >
-              {state.practiceDays.map((day) => (
+              {sortedPracticeDays.map((day) => (
                 <option key={day.id} value={day.id}>
                   {getPracticeDayLabel(day)} {day.startTime}-{day.endTime}
                 </option>
