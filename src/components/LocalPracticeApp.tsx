@@ -58,6 +58,8 @@ export type AppState = {
   recentMinutes: Record<string, number>;
 };
 
+export type SaveStatus = "idle" | "saving" | "saved" | "error";
+
 type LegacyPiece = Partial<Piece> & {
   id?: string;
   title?: string;
@@ -78,6 +80,7 @@ type LegacyAppState = Partial<AppState> & {
 
 const STORAGE_KEY = "nagosui-local-practice-app-v3";
 const LEGACY_STORAGE_KEY = "nagosui-local-practice-app-v2";
+const SAVE_ERROR_MESSAGE = "保存できていません。ネットワークまたはRedis/KV設定を確認してください。";
 
 function defaultPracticeDay(): LocalPracticeDay {
   return {
@@ -186,30 +189,104 @@ function migrateState(value: unknown): AppState {
   };
 }
 
+type LocalStatePayload = {
+  state: unknown | null;
+  updatedAt?: string | null;
+};
+
+function readLocalSavedState() {
+  if (typeof window === "undefined") return null;
+
+  for (const key of [STORAGE_KEY, LEGACY_STORAGE_KEY]) {
+    const saved = localStorage.getItem(key);
+    if (!saved) continue;
+
+    try {
+      return JSON.parse(saved) as unknown;
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function cacheStateLocally(state: AppState) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // localStorage is a backup cache only. Server persistence remains authoritative.
+  }
+}
+
+async function fetchServerState(): Promise<LocalStatePayload> {
+  const response = await fetch("/api/local-state", { cache: "no-store" });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(payload?.error ?? "Failed to load shared state");
+  }
+
+  return (await response.json()) as LocalStatePayload;
+}
+
+async function putServerState(state: AppState) {
+  const response = await fetch("/api/local-state", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ state })
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(payload?.error ?? SAVE_ERROR_MESSAGE);
+  }
+
+  return (await response.json()) as { ok: true; updatedAt?: string | null };
+}
+
 export function useLocalPracticeState() {
   const [state, setState] = useState<AppState>(defaultState);
   const [ready, setReady] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [saveError, setSaveError] = useState("");
+  const [serverUpdatedAt, setServerUpdatedAt] = useState<string | null>(null);
+  const [hasLocalMigrationCandidate, setHasLocalMigrationCandidate] = useState(false);
+  const [isReloading, setIsReloading] = useState(false);
   const shouldPersistRef = useRef(false);
+  const saveSequenceRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadState() {
-      const response = await fetch("/api/local-state").catch(() => null);
-      const payload = response?.ok ? await response.json().catch(() => null) : null;
+      try {
+        const payload = await fetchServerState();
+        if (cancelled) return;
 
-      if (cancelled) return;
-
-      if (payload?.state) {
-        setState(migrateState(payload.state));
-      } else {
-        const saved = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
-        if (saved) {
-          setState(migrateState(JSON.parse(saved)));
-          shouldPersistRef.current = response?.ok === true;
+        if (payload.state) {
+          const migrated = migrateState(payload.state);
+          shouldPersistRef.current = false;
+          setState(migrated);
+          cacheStateLocally(migrated);
+          setHasLocalMigrationCandidate(false);
+        } else {
+          shouldPersistRef.current = false;
+          setState(defaultState);
+          setHasLocalMigrationCandidate(readLocalSavedState() !== null);
         }
+        setServerUpdatedAt(payload.updatedAt ?? null);
+        setSaveError("");
+        setSaveStatus("idle");
+      } catch {
+        if (cancelled) return;
+        shouldPersistRef.current = false;
+        setState(defaultState);
+        setHasLocalMigrationCandidate(false);
+        setSaveStatus("error");
+        setSaveError(SAVE_ERROR_MESSAGE);
+      } finally {
+        if (!cancelled) setReady(true);
       }
-      setReady(true);
     }
 
     loadState();
@@ -221,12 +298,26 @@ export function useLocalPracticeState() {
   useEffect(() => {
     if (!ready || !shouldPersistRef.current) return;
 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    fetch("/api/local-state", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ state })
-    }).catch(() => {});
+    const sequence = ++saveSequenceRef.current;
+    const timeout = window.setTimeout(() => {
+      setSaveStatus("saving");
+      setSaveError("");
+
+      putServerState(state)
+        .then((payload) => {
+          if (sequence !== saveSequenceRef.current) return;
+          setSaveStatus("saved");
+          setServerUpdatedAt(payload.updatedAt ?? null);
+          cacheStateLocally(state);
+        })
+        .catch(() => {
+          if (sequence !== saveSequenceRef.current) return;
+          setSaveStatus("error");
+          setSaveError(SAVE_ERROR_MESSAGE);
+        });
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
   }, [ready, state]);
 
   function updateFullState(value: AppState | ((current: AppState) => AppState)) {
@@ -239,7 +330,138 @@ export function useLocalPracticeState() {
     setState((current) => ({ ...current, ...patch }));
   }
 
-  return { state, setState: updateFullState, updateState, ready };
+  async function reloadServerState() {
+    setIsReloading(true);
+    try {
+      const payload = await fetchServerState();
+      shouldPersistRef.current = false;
+
+      if (payload.state) {
+        const migrated = migrateState(payload.state);
+        setState(migrated);
+        cacheStateLocally(migrated);
+        setHasLocalMigrationCandidate(false);
+      } else {
+        setState(defaultState);
+        setHasLocalMigrationCandidate(readLocalSavedState() !== null);
+      }
+
+      setServerUpdatedAt(payload.updatedAt ?? null);
+      setSaveStatus("idle");
+      setSaveError("");
+    } catch {
+      setSaveStatus("error");
+      setSaveError(SAVE_ERROR_MESSAGE);
+    } finally {
+      setIsReloading(false);
+    }
+  }
+
+  async function migrateLocalStateToServer() {
+    const localState = readLocalSavedState();
+    if (!localState) {
+      setHasLocalMigrationCandidate(false);
+      return;
+    }
+
+    setSaveStatus("saving");
+    setSaveError("");
+
+    try {
+      const currentServer = await fetchServerState();
+      if (currentServer.state) {
+        const migratedServerState = migrateState(currentServer.state);
+        shouldPersistRef.current = false;
+        setState(migratedServerState);
+        cacheStateLocally(migratedServerState);
+        setServerUpdatedAt(currentServer.updatedAt ?? null);
+        setHasLocalMigrationCandidate(false);
+        setSaveStatus("saved");
+        return;
+      }
+
+      const migratedLocalState = migrateState(localState);
+      const payload = await putServerState(migratedLocalState);
+      shouldPersistRef.current = false;
+      setState(migratedLocalState);
+      cacheStateLocally(migratedLocalState);
+      setServerUpdatedAt(payload.updatedAt ?? null);
+      setHasLocalMigrationCandidate(false);
+      setSaveStatus("saved");
+    } catch {
+      setSaveStatus("error");
+      setSaveError(SAVE_ERROR_MESSAGE);
+    }
+  }
+
+  return {
+    state,
+    setState: updateFullState,
+    updateState,
+    ready,
+    saveStatus,
+    saveError,
+    serverUpdatedAt,
+    hasLocalMigrationCandidate,
+    isReloading,
+    reloadServerState,
+    migrateLocalStateToServer
+  };
+}
+
+type LocalStateStatusPanelProps = Pick<
+  ReturnType<typeof useLocalPracticeState>,
+  | "ready"
+  | "saveStatus"
+  | "saveError"
+  | "serverUpdatedAt"
+  | "hasLocalMigrationCandidate"
+  | "isReloading"
+  | "reloadServerState"
+  | "migrateLocalStateToServer"
+>;
+
+export function LocalStateStatusPanel({
+  ready,
+  saveStatus,
+  saveError,
+  serverUpdatedAt,
+  hasLocalMigrationCandidate,
+  isReloading,
+  reloadServerState,
+  migrateLocalStateToServer
+}: LocalStateStatusPanelProps) {
+  const statusLabel =
+    saveStatus === "saving"
+      ? "保存中"
+      : saveStatus === "saved"
+        ? "保存成功"
+        : saveStatus === "error"
+          ? "保存失敗"
+          : "共有データ";
+
+  return (
+    <section className={`local-state-panel ${saveStatus === "error" ? "error" : "notice"}`}>
+      <div className="row page-section-head">
+        <div>
+          <strong>{ready ? statusLabel : "共有データを読み込み中"}</strong>
+          {serverUpdatedAt ? <p className="muted">最終保存: {new Date(serverUpdatedAt).toLocaleString("ja-JP")}</p> : null}
+          {saveStatus === "error" && saveError ? <p>{saveError}</p> : null}
+        </div>
+        <button className="secondary" type="button" onClick={reloadServerState} disabled={isReloading}>
+          {isReloading ? "再読み込み中" : "最新データを再読み込み"}
+        </button>
+      </div>
+      {hasLocalMigrationCandidate ? (
+        <div className="local-state-migration">
+          <p>この端末に保存されている旧データがあります。これを共有データとしてサーバーへ移行しますか？</p>
+          <button type="button" onClick={migrateLocalStateToServer} disabled={saveStatus === "saving"}>
+            旧データをサーバーへ移行
+          </button>
+        </div>
+      ) : null}
+    </section>
+  );
 }
 
 export function getSelectedPracticeDay(state: AppState) {
