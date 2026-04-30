@@ -807,9 +807,23 @@ tbody tr:hover td {
 }
 
 .sheet-table {
-  min-width: 960px;
+  width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   background: white;
+}
+
+.sheet-table th:nth-child(1),
+.sheet-table th:nth-child(2) {
+  width: 18%;
+}
+
+.sheet-table th:nth-child(3) {
+  width: 12%;
+}
+
+.sheet-table th:nth-child(4) {
+  width: 52%;
 }
 
 .sheet-table th {
@@ -822,6 +836,7 @@ tbody tr:hover td {
 .sheet-table td {
   border: 1px solid #c5d0da;
   background: #ffffff;
+  overflow-wrap: anywhere;
 }
 
 .sheet-table tr:nth-child(even) td {
