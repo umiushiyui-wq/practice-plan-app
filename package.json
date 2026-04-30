@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --experimental-https",
     "build": "prisma generate && next build",
+    "lint": "tsc --noEmit",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",
