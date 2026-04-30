@@ -3,14 +3,11 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
-  getPlanSlotLabel,
   getPracticeDayLabel,
   getSortedPracticeDays,
-  sortPlanByTime,
   toMinutes,
   toTime,
-  useLocalPracticeState,
-  usePieceMap
+  useLocalPracticeState
 } from "@/components/LocalPracticeApp";
 
 const AVAILABILITY_SLOTS = Array.from({ length: ((22 - 8) * 60) / 10 + 1 }, (_, index) => 8 * 60 + index * 10);
@@ -115,7 +112,6 @@ function TimePartSelect({
 export function PlayerApp() {
   const localState = useLocalPracticeState();
   const { state, updateState } = localState;
-  const pieceMap = usePieceMap(state.pieces);
   const sortedPracticeDays = useMemo(() => getSortedPracticeDays(state.practiceDays), [state.practiceDays]);
   const [selectedPart, setSelectedPart] = useState("");
   const [memberId, setMemberId] = useState("");
@@ -278,17 +274,8 @@ export function PlayerApp() {
     return availabilityStart < slotEnd && slotStart < availabilityEnd;
   }
 
-  const visiblePlans = useMemo(
-    () =>
-      Object.fromEntries(
-        sortedPracticeDays.map((day) => [day.id, day.isPlanPublished ? sortPlanByTime(day.plan) : []])
-      ) as Record<string, ReturnType<typeof sortPlanByTime>>,
-    [sortedPracticeDays]
-  );
-
   const currentDraft = selectedInputDay ? draftsByDay[selectedInputDay.id] : null;
   const currentTimeOptions = selectedInputDay ? buildTimeOptions(selectedInputDay.startTime, selectedInputDay.endTime) : [];
-  const currentPlan = selectedInputDay ? visiblePlans[selectedInputDay.id] ?? [] : [];
 
   return (
     <main className="stack">
@@ -570,34 +557,6 @@ export function PlayerApp() {
                   <p className="muted">この日はすでに入力済みです。内容を確認・編集するにはパスワードが必要です。</p>
                 )}
 
-                {!selectedInputDay.isPlanPublished ? (
-                  <p className="muted">練習スケジュールはまだ公開されていません。</p>
-                ) : currentPlan.length > 0 ? (
-                  <div className="sheet-wrap">
-                    <table className="player-plan-table">
-                      <thead>
-                        <tr>
-                          <th>開始</th>
-                          <th>終了</th>
-                          <th>分</th>
-                          <th>内容</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {currentPlan.map((slot) => (
-                          <tr key={slot.id}>
-                            <td>{slot.start}</td>
-                            <td>{slot.end}</td>
-                            <td>{slot.duration}</td>
-                            <td>{getPlanSlotLabel(slot, slot.pieceId ? pieceMap.get(slot.pieceId)?.title : undefined)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="muted">まだこの日の練習計画はありません。</p>
-                )}
               </section>
             ) : (
               <p className="muted">まだ練習日がありません。</p>
