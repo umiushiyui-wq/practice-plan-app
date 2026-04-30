@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
   getPlanSlotLabel,
   getSelectedPracticeDay,
-  LocalStateStatusPanel,
   sortPlanByTime,
   useLocalPracticeState,
   usePieceMap
@@ -54,8 +53,6 @@ export function SheetViewApp() {
           <Link className="button secondary" href="/player">奏者入力URLへ</Link>
         </div>
       </section>
-
-      <LocalStateStatusPanel {...localState} />
 
       <section className="panel stack">
         <h2>{formatPracticeDateLabel(selectedDay.practiceDate, selectedDay.location)}</h2>
