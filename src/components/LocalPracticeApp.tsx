@@ -59,6 +59,13 @@ export type AppState = {
 };
 
 export type SaveStatus = "idle" | "saving" | "saved" | "error";
+export type AvailabilityPatch = {
+  practiceDayId: string;
+  memberId: string;
+  start: string;
+  end: string;
+  absent: boolean;
+};
 
 type LegacyPiece = Partial<Piece> & {
   id?: string;
@@ -244,6 +251,29 @@ async function putServerState(state: AppState) {
   return (await response.json()) as { ok: true; updatedAt?: string | null };
 }
 
+function applyAvailabilityPatch(state: AppState, patch: AvailabilityPatch): AppState {
+  return {
+    ...state,
+    practiceDays: state.practiceDays.map((day) => {
+      if (day.id !== patch.practiceDayId) return day;
+
+      return {
+        ...day,
+        availabilities: patch.absent
+          ? day.availabilities.filter((item) => item.memberId !== patch.memberId)
+          : [
+              ...day.availabilities.filter((item) => item.memberId !== patch.memberId),
+              { memberId: patch.memberId, start: patch.start, end: patch.end }
+            ],
+        absentMemberIds: patch.absent
+          ? Array.from(new Set([...day.absentMemberIds, patch.memberId]))
+          : day.absentMemberIds.filter((id) => id !== patch.memberId),
+        respondedMemberIds: Array.from(new Set([...day.respondedMemberIds, patch.memberId]))
+      };
+    })
+  };
+}
+
 export function useLocalPracticeState() {
   const [state, setState] = useState<AppState>(defaultState);
   const [ready, setReady] = useState(false);
@@ -394,6 +424,29 @@ export function useLocalPracticeState() {
     }
   }
 
+  async function saveAvailabilityPatch(patch: AvailabilityPatch) {
+    setSaveStatus("saving");
+    setSaveError("");
+
+    try {
+      const payload = await fetchServerState();
+      const serverState = payload.state ? migrateState(payload.state) : state;
+      const nextState = applyAvailabilityPatch(serverState, patch);
+      const saved = await putServerState(nextState);
+      shouldPersistRef.current = false;
+      setState(nextState);
+      cacheStateLocally(nextState);
+      setServerUpdatedAt(saved.updatedAt ?? null);
+      setHasLocalMigrationCandidate(false);
+      setSaveStatus("saved");
+      return nextState;
+    } catch {
+      setSaveStatus("error");
+      setSaveError(SAVE_ERROR_MESSAGE);
+      return null;
+    }
+  }
+
   return {
     state,
     setState: updateFullState,
@@ -405,7 +458,8 @@ export function useLocalPracticeState() {
     hasLocalMigrationCandidate,
     isReloading,
     reloadServerState,
-    migrateLocalStateToServer
+    migrateLocalStateToServer,
+    saveAvailabilityPatch
   };
 }
 
