@@ -771,6 +771,19 @@ tbody tr:hover td {
   background: #fbfdff;
 }
 
+.setup-practice-day-row {
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.setup-practice-day-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
 .setup-piece-list {
   gap: 12px;
 }
