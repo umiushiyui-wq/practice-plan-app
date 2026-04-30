@@ -6,7 +6,6 @@ import {
   getPlanSlotLabel,
   getPracticeDayLabel,
   getSortedPracticeDays,
-  LocalStateStatusPanel,
   sortPlanByTime,
   toMinutes,
   toTime,
@@ -305,8 +304,6 @@ export function PlayerApp() {
           </a>
         </div>
       </section>
-
-      <LocalStateStatusPanel {...localState} />
 
       <section className="panel stack">
         <h2>自分を選ぶ</h2>
