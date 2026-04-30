@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { getSelectedPracticeDay, toMinutes, toTime, useLocalPracticeState } from "@/components/LocalPracticeApp";
+import { getPracticeDayLabel, getSelectedPracticeDay, toMinutes, toTime, useLocalPracticeState } from "@/components/LocalPracticeApp";
 
 const AVAILABILITY_SLOTS = Array.from({ length: ((22 - 8) * 60) / 10 + 1 }, (_, index) => 8 * 60 + index * 10);
 const ALL_PIECES_FILTER = "__all__";
@@ -76,7 +76,7 @@ export function AvailabilityTableApp() {
             >
               {state.practiceDays.map((day) => (
                 <option key={day.id} value={day.id}>
-                  {day.practiceDate} {day.startTime}-{day.endTime}
+                  {getPracticeDayLabel(day)} {day.startTime}-{day.endTime}
                 </option>
               ))}
             </select>
@@ -123,7 +123,7 @@ export function AvailabilityTableApp() {
       </section>
 
       <section className="panel stack">
-        <h2>{selectedDay.practiceDate} の参加可能時間</h2>
+        <h2>{getPracticeDayLabel(selectedDay)} の参加可能時間</h2>
         {hoveredSlot !== null ? (
           <div className="notice">
             {toTime(hoveredSlot)} 時点で参加可能: {hoveredAvailableCount}人

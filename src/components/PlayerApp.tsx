@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   getPlanSlotLabel,
+  getPracticeDayLabel,
   getSortedPracticeDays,
   sortPlanByTime,
   toMinutes,
@@ -221,8 +222,8 @@ export function PlayerApp() {
     updateState({ practiceDays: nextPracticeDays });
     setSaveMessage(
       draft.absent
-        ? `${day.practiceDate} を欠席で保存しました。`
-        : `${day.practiceDate} を ${draft.start}-${draft.end} で保存しました。`
+        ? `${getPracticeDayLabel(day)} を欠席で保存しました。`
+        : `${getPracticeDayLabel(day)} を ${draft.start}-${draft.end} で保存しました。`
     );
   }
 
@@ -438,7 +439,7 @@ export function PlayerApp() {
                         return (
                           <tr key={day.id}>
                             <th>
-                              {day.practiceDate}
+                              {getPracticeDayLabel(day)}
                               <span className="muted">
                                 練習 {day.startTime}-{day.endTime} / 入力状況 {label}
                               </span>
@@ -490,7 +491,7 @@ export function PlayerApp() {
                   <select value={selectedInputDay.id} onChange={(event) => setSelectedInputDayId(event.target.value)}>
                     {sortedPracticeDays.map((day) => (
                       <option key={day.id} value={day.id}>
-                        {day.practiceDate} {day.startTime}-{day.endTime}
+                        {getPracticeDayLabel(day)} {day.startTime}-{day.endTime}
                       </option>
                     ))}
                   </select>
@@ -504,7 +505,7 @@ export function PlayerApp() {
               <section className="panel subtle-panel stack">
                 <div className="row page-section-head">
                   <div>
-                    <h3>{selectedInputDay.practiceDate}</h3>
+                    <h3>{getPracticeDayLabel(selectedInputDay)}</h3>
                     <p className="muted">
                       練習時間 {selectedInputDay.startTime}-{selectedInputDay.endTime}
                     </p>
