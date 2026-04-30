@@ -6,6 +6,7 @@ import {
   findOverlappingPlanSlots,
   generatePracticePlan,
   getPlanSlotLabel,
+  getPracticeDayLabel,
   getSelectedPracticeDay,
   makeId,
   sortPlanByTime,
@@ -383,8 +384,14 @@ export function AdminApp() {
           <Link className="button" href="/admin/setup">
             準備ページへ
           </Link>
-          <Link className="button secondary" href="/player">
-            奏者ページへ
+          <Link className="button secondary" href="/admin/setup#practice-days">
+            練習日の追加
+          </Link>
+          <Link className="button secondary" href="/admin/setup#members">
+            奏者の追加
+          </Link>
+          <Link className="button secondary" href="/admin/setup#pieces">
+            曲の追加
           </Link>
           <Link className="button secondary" href="/availability">
             可否一覧へ
@@ -413,7 +420,7 @@ export function AdminApp() {
             >
               {state.practiceDays.map((day) => (
                 <option key={day.id} value={day.id}>
-                  {day.practiceDate} {day.startTime}-{day.endTime}
+                  {getPracticeDayLabel(day)} {day.startTime}-{day.endTime}
                 </option>
               ))}
             </select>
@@ -429,6 +436,14 @@ export function AdminApp() {
               練習スケジュールを{selectedDay.isPlanPublished ? "公開中" : "非公開"}
             </span>
           </label>
+          <label>
+            練習場所
+            <input
+              value={selectedDay.location}
+              placeholder="例: 市民ホール"
+              onChange={(event) => updateSelectedDay({ location: event.target.value })}
+            />
+          </label>
         </div>
       </section>
 
@@ -436,7 +451,7 @@ export function AdminApp() {
         <div className="row page-section-head">
           <div>
             <p className="muted">Step 2</p>
-            <h2>{selectedDay.practiceDate} の練習計画を作る</h2>
+            <h2>{getPracticeDayLabel(selectedDay)} の練習計画を作る</h2>
           </div>
           <div className="row">
             <span className="muted">

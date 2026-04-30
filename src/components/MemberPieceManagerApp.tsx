@@ -1,9 +1,10 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   getPlannedMinutesByPiece,
+  getPracticeDayLabel,
   getSortedPracticeDays,
   makeId,
   resolvePieceTargetRange,
@@ -116,6 +117,7 @@ export function MemberPieceManagerApp() {
 
     const startTime = String(formData.get("startTime") ?? "18:00");
     const endTime = String(formData.get("endTime") ?? "21:00");
+    const location = String(formData.get("location") ?? "").trim();
     const id = makeId("d");
 
     updateState({
@@ -125,6 +127,7 @@ export function MemberPieceManagerApp() {
         {
           id,
           practiceDate,
+          location,
           startTime,
           endTime,
           availabilities: [],
@@ -244,7 +247,7 @@ export function MemberPieceManagerApp() {
       </section>
 
       <div className="stack">
-        <section className="panel stack">
+        <section id="members" className="panel stack">
           <div className="section-title">
             <p className="muted">Step 1</p>
             <h2>メンバーを追加</h2>
@@ -303,7 +306,7 @@ export function MemberPieceManagerApp() {
           </details>
         </section>
 
-        <section className="panel stack">
+        <section id="practice-days" className="panel stack">
           <div className="section-title">
             <p className="muted">Step 2</p>
             <h2>練習日を追加</h2>
@@ -319,6 +322,10 @@ export function MemberPieceManagerApp() {
             <label>
               日付
               <input name="practiceDate" type="date" required />
+            </label>
+            <label>
+              練習場所
+              <input name="location" placeholder="例: 市民ホール" />
             </label>
             <div className="date-time-grid">
               <label>
@@ -341,7 +348,7 @@ export function MemberPieceManagerApp() {
               {sortedPracticeDays.length === 0 ? <p className="muted">まだ練習日はありません。</p> : null}
               {sortedPracticeDays.map((day) => (
                 <div className="row" key={day.id}>
-                  <strong>{day.practiceDate}</strong>
+                  <strong>{getPracticeDayLabel(day)}</strong>
                   <span className="muted">
                     {day.startTime} - {day.endTime}
                   </span>
@@ -351,7 +358,7 @@ export function MemberPieceManagerApp() {
           </details>
         </section>
 
-        <section className="panel stack">
+        <section id="pieces" className="panel stack">
           <div className="section-title">
             <p className="muted">Step 3</p>
             <h2>曲を追加して設定する</h2>
@@ -468,7 +475,7 @@ export function MemberPieceManagerApp() {
                     >
                       {sortedPracticeDays.map((day) => (
                         <option key={day.id} value={day.id}>
-                          {day.practiceDate}
+                          {getPracticeDayLabel(day)}
                         </option>
                       ))}
                     </select>
@@ -482,7 +489,7 @@ export function MemberPieceManagerApp() {
                     >
                       {sortedPracticeDays.map((day) => (
                         <option key={day.id} value={day.id}>
-                          {day.practiceDate}
+                          {getPracticeDayLabel(day)}
                         </option>
                       ))}
                     </select>
