@@ -87,6 +87,11 @@ function clampNumber(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
+function formatPracticeTimeAndLocation(day: { startTime: string; endTime: string; location: string }) {
+  const location = day.location.trim();
+  return location ? `${day.startTime}-${day.endTime} ＠${location}` : `${day.startTime}-${day.endTime}`;
+}
+
 export function AdminApp() {
   const localState = useLocalPracticeState();
   const { state, updateState } = localState;
@@ -157,7 +162,7 @@ export function AdminApp() {
     updateSelectedDay({ plan: sortPlanByTime(plan) });
   }
 
-  function updateSlot(slotId: string, patch: { pieceId?: string | null }) {
+  function updateSlot(slotId: string, patch: { pieceId?: string | null; isLocked?: boolean }) {
     const nextPlan = sortedPlan.map((slot) =>
       slot.id === slotId
         ? {
@@ -168,6 +173,12 @@ export function AdminApp() {
         : slot
     );
     updatePlan(nextPlan);
+  }
+
+  function toggleSlotLock(slotId: string) {
+    const slot = sortedPlan.find((item) => item.id === slotId);
+    if (!slot) return;
+    updateSlot(slotId, { isLocked: !slot.isLocked });
   }
 
   function deleteSlot(slotId: string) {
@@ -426,7 +437,7 @@ export function AdminApp() {
             >
               {sortedPracticeDays.map((day) => (
                 <option key={day.id} value={day.id}>
-                  {getPracticeDayLabel(day)} {day.startTime}-{day.endTime}
+                  {day.practiceDate} {formatPracticeTimeAndLocation(day)}
                 </option>
               ))}
             </select>
@@ -441,14 +452,6 @@ export function AdminApp() {
             <span>
               練習スケジュールを{selectedDay.isPlanPublished ? "公開中" : "非公開"}
             </span>
-          </label>
-          <label>
-            練習場所
-            <input
-              value={selectedDay.location}
-              placeholder="例: 市民ホール"
-              onChange={(event) => updateSelectedDay({ location: event.target.value })}
-            />
           </label>
         </div>
       </section>
@@ -675,9 +678,24 @@ export function AdminApp() {
                             </div>
                             <div className="plan-slot-badges">
                               <span className="plan-badge">{formatMinutesLabel(slot.duration)}</span>
+                              {slot.isLocked ? <span className="plan-badge accent">固定</span> : null}
                               {overlappingSlotIds.has(slot.id) ? <span className="plan-badge danger">重なり</span> : null}
                             </div>
                           </div>
+                          <label
+                            className="plan-slot-lock-switch"
+                            title="固定"
+                            onPointerDown={(event) => event.stopPropagation()}
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={!!slot.isLocked}
+                              aria-label={`${slotLabel}を固定`}
+                              onChange={() => toggleSlotLock(slot.id)}
+                            />
+                            <span aria-hidden="true" />
+                          </label>
                           <button
                             className="plan-slot-delete-button"
                             type="button"
@@ -767,6 +785,9 @@ export function AdminApp() {
                     </button>
                     <button type="button" className="secondary" onClick={() => setSelectedSlotId(null)}>
                       選択解除
+                    </button>
+                    <button type="button" className="secondary" onClick={() => toggleSlotLock(selectedSlot.id)}>
+                      {selectedSlot.isLocked ? "固定解除" : "固定"}
                     </button>
                     <button type="button" className="danger" onClick={() => deleteSlot(selectedSlot.id)}>
                       削除
