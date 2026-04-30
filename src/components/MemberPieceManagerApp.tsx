@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -12,14 +12,14 @@ import {
 } from "@/components/LocalPracticeApp";
 
 const INSTRUMENT_OPTIONS = [
-  "????",
-  "??????",
-  "????",
-  "???",
-  "??????",
-  "??????",
-  "???????",
-  "???????"
+  "フルート",
+  "クラリネット",
+  "サックス",
+  "ホルン",
+  "トランペット",
+  "トロンボーン",
+  "ユーフォニアム",
+  "パーカッション"
 ];
 
 export function MemberPieceManagerApp() {
@@ -77,7 +77,7 @@ export function MemberPieceManagerApp() {
 
   function deleteMember(memberId: string) {
     const member = state.members.find((item) => item.id === memberId);
-    if (!member || !confirm(`${member.name} ????????`)) return;
+    if (!member || !confirm(`${member.name} を削除しますか？`)) return;
 
     updateState({
       members: state.members.filter((item) => item.id !== memberId),
@@ -97,7 +97,7 @@ export function MemberPieceManagerApp() {
 
   function resetMemberPassword(memberId: string) {
     const member = state.members.find((item) => item.id === memberId);
-    if (!member || !confirm(`${member.name} ????????????????`)) return;
+    if (!member || !confirm(`${member.name} のパスワードをリセットしますか？`)) return;
 
     updateState({
       members: state.members.map((item) =>
@@ -209,7 +209,7 @@ export function MemberPieceManagerApp() {
 
   function clearPieceSettings(pieceId: string) {
     const piece = state.pieces.find((item) => item.id === pieceId);
-    if (!piece || !confirm(`${piece.title} ??????????????????`)) return;
+    if (!piece || !confirm(`${piece.title} の練習時間と期間設定を消去しますか？`)) return;
 
     updateState({
       pieces: state.pieces.map((item) =>
@@ -235,7 +235,7 @@ export function MemberPieceManagerApp() {
 
   function deletePiece(pieceId: string) {
     const piece = state.pieces.find((item) => item.id === pieceId);
-    if (!piece || !confirm(`${piece.title} ?????????????`)) return;
+    if (!piece || !confirm(`${piece.title} を曲一覧から削除しますか？`)) return;
 
     const nextPieces = state.pieces.filter((item) => item.id !== piece.id);
     updateState({
@@ -258,12 +258,12 @@ export function MemberPieceManagerApp() {
   return (
     <main className="stack setup-page">
       <section className="panel stack">
-        <p className="muted">?????</p>
-        <h1>?????????????</h1>
-        <p>????????????????????????????????????????????????????</p>
+        <p className="muted">準備ページ</p>
+        <h1>メンバー・練習日・曲の追加</h1>
+        <p>このページでは、計画を作る前の準備だけをまとめて進めます。上から順番に埋めれば迷わない流れにしています。</p>
         <div className="row">
           <Link className="button secondary" href="/admin">
-            ????????
+            練習計画の画面へ
           </Link>
         </div>
       </section>
@@ -272,7 +272,7 @@ export function MemberPieceManagerApp() {
         <section id="members" className="panel stack">
           <div className="section-title">
             <p className="muted">Step 1</p>
-            <h2>???????</h2>
+            <h2>メンバーを追加</h2>
           </div>
           <form
             className="stack"
@@ -282,10 +282,10 @@ export function MemberPieceManagerApp() {
               event.currentTarget.reset();
             }}
           >
-            <input name="name" placeholder="??" required />
+            <input name="name" placeholder="名前" required />
             <select name="instrument" defaultValue="" required>
               <option value="" disabled>
-                ?????
+                楽器を選択
               </option>
               {INSTRUMENT_OPTIONS.map((instrument) => (
                 <option key={instrument} value={instrument}>
@@ -293,33 +293,33 @@ export function MemberPieceManagerApp() {
                 </option>
               ))}
             </select>
-            <input name="part" placeholder="????" />
+            <input name="part" placeholder="パート名" />
             <input type="hidden" name="password" value="__unset__" />
-            <button type="submit">???????</button>
+            <button type="submit">メンバーを追加</button>
           </form>
           <details className="fold-panel" open>
             <summary>
-              ???????
-              <span className="muted">{state.members.length}?</span>
+              現在のメンバー
+              <span className="muted">{state.members.length}人</span>
             </summary>
             <div className="fold-panel-body stack">
-              {state.members.length === 0 ? <p className="muted">?????????????????</p> : null}
+              {state.members.length === 0 ? <p className="muted">まだメンバーは登録されていません。</p> : null}
               {state.members.map((member) => (
                 <div className="row" key={member.id}>
                   <div>
                     <strong>{member.name}</strong>
                     <div className="muted">
-                      {member.instrument || "?????"}
+                      {member.instrument || "楽器未設定"}
                       {member.part ? ` / ${member.part}` : ""}
                     </div>
-                    <div className="muted">{member.password && member.password !== "__unset__" ? "?????????" : "??????????"}</div>
+                    <div className="muted">{member.password && member.password !== "__unset__" ? "パスワード設定済み" : "初回ログイン時に設定"}</div>
                   </div>
                   <div className="row">
                     <button className="secondary" type="button" onClick={() => resetMemberPassword(member.id)}>
-                      ?????????
+                      パスワードリセット
                     </button>
                     <button className="danger" type="button" onClick={() => deleteMember(member.id)}>
-                      ??
+                      削除
                     </button>
                   </div>
                 </div>
@@ -331,7 +331,7 @@ export function MemberPieceManagerApp() {
         <section id="practice-days" className="panel stack">
           <div className="section-title">
             <p className="muted">Step 2</p>
-            <h2>??????</h2>
+            <h2>練習日を追加</h2>
           </div>
           <form
             className="stack"
@@ -342,32 +342,32 @@ export function MemberPieceManagerApp() {
             }}
           >
             <label>
-              ??
+              日付
               <input name="practiceDate" type="date" required />
             </label>
             <label>
-              ????
-              <input name="location" placeholder="?: ?????" />
+              練習場所
+              <input name="location" placeholder="例: 市民ホール" />
             </label>
             <div className="date-time-grid">
               <label>
-                ??
+                開始
                 <input name="startTime" type="time" step="300" defaultValue="18:00" required />
               </label>
               <label>
-                ??
+                終了
                 <input name="endTime" type="time" step="300" defaultValue="21:00" required />
               </label>
             </div>
-            <button type="submit">??????</button>
+            <button type="submit">練習日を追加</button>
           </form>
           <details className="fold-panel" open>
             <summary>
-              ????????
-              <span className="muted">{sortedPracticeDays.length}?</span>
+              入力済みの練習日
+              <span className="muted">{sortedPracticeDays.length}日</span>
             </summary>
             <div className="fold-panel-body stack">
-              {sortedPracticeDays.length === 0 ? <p className="muted">????????????</p> : null}
+              {sortedPracticeDays.length === 0 ? <p className="muted">まだ練習日はありません。</p> : null}
               {sortedPracticeDays.map((day) => (
                 <form
                   className="stack setup-edit-form"
@@ -385,24 +385,24 @@ export function MemberPieceManagerApp() {
                       </div>
                     </div>
                     <button className="secondary" type="submit">
-                      ????????
+                      この練習日を保存
                     </button>
                   </div>
                   <label>
-                    ??
+                    日付
                     <input name="practiceDate" type="date" defaultValue={day.practiceDate} required />
                   </label>
                   <label>
-                    ????
-                    <input name="location" defaultValue={day.location} placeholder="?: ?????" />
+                    練習場所
+                    <input name="location" defaultValue={day.location} placeholder="例: 市民ホール" />
                   </label>
                   <div className="date-time-grid">
                     <label>
-                      ??
+                      開始
                       <input name="startTime" type="time" step="300" defaultValue={day.startTime} required />
                     </label>
                     <label>
-                      ??
+                      終了
                       <input name="endTime" type="time" step="300" defaultValue={day.endTime} required />
                     </label>
                   </div>
@@ -415,7 +415,7 @@ export function MemberPieceManagerApp() {
         <section id="pieces" className="panel stack">
           <div className="section-title">
             <p className="muted">Step 3</p>
-            <h2>??????????</h2>
+            <h2>曲を追加して設定する</h2>
           </div>
           <form
             className="stack"
@@ -425,10 +425,10 @@ export function MemberPieceManagerApp() {
               event.currentTarget.reset();
             }}
           >
-            <input name="title" placeholder="??" required />
+            <input name="title" placeholder="曲名" required />
             <select name="conductorId" required defaultValue="">
               <option value="" disabled>
-                ??????
+                指揮者を選択
               </option>
               {state.members.map((member) => (
                 <option key={member.id} value={member.id}>
@@ -436,15 +436,15 @@ export function MemberPieceManagerApp() {
                 </option>
               ))}
             </select>
-            <button type="submit">????</button>
+            <button type="submit">曲を追加</button>
           </form>
           <details className="fold-panel" open>
             <summary>
-              ??????
-              <span className="muted">{state.pieces.length}?</span>
+              追加済みの曲
+              <span className="muted">{state.pieces.length}曲</span>
             </summary>
             <div className="fold-panel-body stack">
-              {state.pieces.length === 0 ? <p className="muted">??????????</p> : null}
+              {state.pieces.length === 0 ? <p className="muted">まだ曲はありません。</p> : null}
               {state.pieces.map((piece) => (
                 <button
                   key={piece.id}
@@ -453,7 +453,7 @@ export function MemberPieceManagerApp() {
                   onClick={() => setSelectedPieceId(piece.id)}
                 >
                   <span>{piece.title}</span>
-                  <span className="muted">{state.members.find((member) => member.id === piece.conductorId)?.name ?? "??????"}</span>
+                  <span className="muted">{state.members.find((member) => member.id === piece.conductorId)?.name ?? "指揮者未設定"}</span>
                 </button>
               ))}
             </div>
@@ -463,15 +463,15 @@ export function MemberPieceManagerApp() {
             <section className="panel subtle-panel stack" key={selectedPiece.id}>
               <div className="row">
                 <div>
-                  <p className="muted">?????</p>
+                  <p className="muted">選択中の曲</p>
                   <h3>{selectedPiece.title}</h3>
                 </div>
                 <div className="row">
                   <button className="secondary" type="button" onClick={() => clearPieceSettings(selectedPiece.id)}>
-                    ????????????
+                    練習時間などの項目を消去
                   </button>
                   <button className="danger" type="button" onClick={() => deletePiece(selectedPiece.id)}>
-                    ????
+                    曲を削除
                   </button>
                 </div>
               </div>
@@ -479,24 +479,24 @@ export function MemberPieceManagerApp() {
               {selectedPieceSummary ? (
                 <div className="plan-summary-grid setup-summary-grid">
                   <article className="plan-stat-card">
-                    <span className="plan-stat-label">????</span>
+                    <span className="plan-stat-label">対象期間</span>
                     <strong>{selectedPieceSummary.targetRange.days.length}</strong>
                     <span className="muted">{selectedPieceSummary.targetRange.label}</span>
                   </article>
                   <article className="plan-stat-card">
-                    <span className="plan-stat-label">????</span>
-                    <strong>{selectedPiece.targetMinutes}?</strong>
-                    <span className="muted">????????????</span>
+                    <span className="plan-stat-label">期間目標</span>
+                    <strong>{selectedPiece.targetMinutes}分</strong>
+                    <span className="muted">期間全体で確保したい時間</span>
                   </article>
                   <article className="plan-stat-card">
-                    <span className="plan-stat-label">??</span>
-                    <strong>{selectedPieceSummary.plannedMinutes}?</strong>
-                    <span className="muted">??????????</span>
+                    <span className="plan-stat-label">現在</span>
+                    <strong>{selectedPieceSummary.plannedMinutes}分</strong>
+                    <span className="muted">計画に入っている時間</span>
                   </article>
                   <article className="plan-stat-card">
-                    <span className="plan-stat-label">??</span>
-                    <strong>{selectedPieceSummary.remainingMinutes}?</strong>
-                    <span className="muted">???????</span>
+                    <span className="plan-stat-label">残り</span>
+                    <strong>{selectedPieceSummary.remainingMinutes}分</strong>
+                    <span className="muted">まだ必要な時間</span>
                   </article>
                 </div>
               ) : null}
@@ -509,13 +509,13 @@ export function MemberPieceManagerApp() {
                 }}
               >
                 <label>
-                  ??
+                  曲名
                   <input name="title" defaultValue={selectedPiece.title} required />
                 </label>
                 <label>
-                  ???
+                  指揮者
                   <select name="conductorId" defaultValue={selectedPiece.conductorId}>
-                    <option value="">??????</option>
+                    <option value="">指揮者を選択</option>
                     {state.members.map((member) => (
                       <option key={member.id} value={member.id}>
                         {member.name}
@@ -525,7 +525,7 @@ export function MemberPieceManagerApp() {
                 </label>
                 <div className="date-time-grid">
                   <label>
-                    ??????
+                    期間の開始日
                     <select
                       name="targetRangeStartDayId"
                       defaultValue={selectedPiece.targetRangeStartDayId ?? defaultStartDayId}
@@ -539,7 +539,7 @@ export function MemberPieceManagerApp() {
                     </select>
                   </label>
                   <label>
-                    ??????
+                    期間の終了日
                     <select
                       name="targetRangeEndDayId"
                       defaultValue={selectedPiece.targetRangeEndDayId ?? defaultEndDayId}
@@ -554,11 +554,11 @@ export function MemberPieceManagerApp() {
                   </label>
                 </div>
                 <label>
-                  ??????????????
+                  その期間で確保したい練習時間
                   <input name="targetMinutes" type="number" min="0" step="5" defaultValue={selectedPiece.targetMinutes} />
                 </label>
                 <label>
-                  1????????
+                  1日の最大練習時間
                   <input
                     name="dailyMaxMinutes"
                     type="number"
@@ -567,19 +567,19 @@ export function MemberPieceManagerApp() {
                     defaultValue={selectedPiece.dailyMaxMinutes}
                   />
                 </label>
-                <button type="submit">?????????</button>
+                <button type="submit">この曲の設定を保存</button>
               </form>
             </section>
           ) : (
             <div className="plan-empty-state">
-              <strong>?????????????????</strong>
-              <p className="muted">?????????????? 1 ?????????</p>
+              <strong>曲を選ぶと、ここに設定欄が出ます。</strong>
+              <p className="muted">まず上の「追加済みの曲」から 1 曲選んでください。</p>
             </div>
           )}
 
           <div className="stack setup-piece-list">
-            <strong>????</strong>
-            {state.pieces.length === 0 ? <p className="muted">??????????</p> : null}
+            <strong>現在の曲</strong>
+            {state.pieces.length === 0 ? <p className="muted">まだ曲はありません。</p> : null}
             {state.pieces.map((piece) => {
               const targetRange = resolvePieceTargetRange(state, piece);
               const plannedMinutes =
@@ -593,15 +593,15 @@ export function MemberPieceManagerApp() {
                   <div>
                     <strong>{piece.title}</strong>
                     <div className="muted">
-                      ???: {state.members.find((member) => member.id === piece.conductorId)?.name ?? "???"}
+                      指揮者: {state.members.find((member) => member.id === piece.conductorId)?.name ?? "未設定"}
                     </div>
-                    <div className="muted">????: {targetRange.label}</div>
+                    <div className="muted">対象期間: {targetRange.label}</div>
                     <div className="muted">
-                      ???? {piece.targetMinutes}? / ?? {plannedMinutes}? / ?? {remainingMinutes}?
+                      期間目標 {piece.targetMinutes}分 / 現在 {plannedMinutes}分 / 残り {remainingMinutes}分
                     </div>
                   </div>
                   <button className="secondary setup-piece-edit-button" type="button" onClick={() => setSelectedPieceId(piece.id)}>
-                    ??????
+                    この曲を編集
                   </button>
                 </div>
               );
