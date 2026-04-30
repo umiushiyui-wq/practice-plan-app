@@ -435,6 +435,7 @@ export function PlayerApp() {
                       {sortedPracticeDays.map((day) => {
                         const draft = draftsByDay[day.id];
                         const hasSaved = day.respondedMemberIds.includes(selected.id);
+                        const isAbsent = hasSaved && day.absentMemberIds.includes(selected.id);
                         const label = draft
                           ? hasSaved
                             ? draft.absent
@@ -463,6 +464,7 @@ export function PlayerApp() {
                                 isPractice ? "practice-window-cell" : "",
                                 isPractice && !isPreviousPractice ? "practice-start-cell" : "",
                                 isPractice && !isNextPractice ? "practice-end-cell" : "",
+                                isAbsent ? "absent-cell" : "",
                                 isAvailable ? "available-cell" : ""
                               ]
                                 .filter(Boolean)
