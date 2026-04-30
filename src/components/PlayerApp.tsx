@@ -46,6 +46,12 @@ function getClosestTime(value: string, options: string[]) {
       : closest
   );
 }
+
+function formatPracticeTimeAndLocation(day: { startTime: string; endTime: string; location: string }) {
+  const location = day.location.trim();
+  return location ? `${day.startTime}-${day.endTime} ＠${location}` : `${day.startTime}-${day.endTime}`;
+}
+
 function TimePartSelect({
   label,
   value,
@@ -439,9 +445,9 @@ export function PlayerApp() {
                         return (
                           <tr key={day.id}>
                             <th>
-                              {getPracticeDayLabel(day)}
+                              {day.practiceDate}
                               <span className="muted">
-                                練習 {day.startTime}-{day.endTime} / 入力状況 {label}
+                                練習 {formatPracticeTimeAndLocation(day)} / 入力状況 {label}
                               </span>
                             </th>
                             {AVAILABILITY_SLOTS.map((minutes, index) => {
@@ -491,7 +497,7 @@ export function PlayerApp() {
                   <select value={selectedInputDay.id} onChange={(event) => setSelectedInputDayId(event.target.value)}>
                     {sortedPracticeDays.map((day) => (
                       <option key={day.id} value={day.id}>
-                        {getPracticeDayLabel(day)} {day.startTime}-{day.endTime}
+                        {day.practiceDate} {formatPracticeTimeAndLocation(day)}
                       </option>
                     ))}
                   </select>
@@ -505,9 +511,9 @@ export function PlayerApp() {
               <section className="panel subtle-panel stack">
                 <div className="row page-section-head">
                   <div>
-                    <h3>{getPracticeDayLabel(selectedInputDay)}</h3>
+                    <h3>{selectedInputDay.practiceDate}</h3>
                     <p className="muted">
-                      練習時間 {selectedInputDay.startTime}-{selectedInputDay.endTime}
+                      練習時間 {formatPracticeTimeAndLocation(selectedInputDay)}
                     </p>
                   </div>
                   {canEditSelectedDay ? (
