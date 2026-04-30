@@ -351,6 +351,16 @@ button:disabled {
   background: #ffffff;
 }
 
+.plan-slot-attendance {
+  width: fit-content;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--plan-color, var(--accent)) 14%, #ffffff);
+  color: #1f2937;
+  padding: 1px 8px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .plan-slot-badges {
   gap: 6px;
   padding-right: 54px;
