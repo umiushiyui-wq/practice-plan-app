@@ -478,6 +478,22 @@ tbody tr:hover td {
   padding: 12px;
 }
 
+.local-state-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.local-state-panel p {
+  margin-bottom: 0;
+}
+
+.local-state-migration {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid rgb(18 63 80 / 0.16);
+  padding-top: 12px;
+}
+
 .error {
   border: 1px solid #efb4ae;
   background: #fff1f0;
