@@ -162,14 +162,14 @@ export function AvailabilityTableApp() {
               {visibleMembers.map((member) => {
                 const availability = selectedDay.availabilities.find((item) => item.memberId === member.id);
                 const hasSaved = selectedDay.respondedMemberIds.includes(member.id);
-                const isAbsent = !hasSaved || selectedDay.absentMemberIds.includes(member.id);
+                const isAbsent = hasSaved && selectedDay.absentMemberIds.includes(member.id);
                 const availabilityLabel = isAbsent
-                  ? hasSaved
-                    ? "欠席"
-                    : "未回答"
+                  ? "欠席"
                   : availability
                     ? `${availability.start}-${availability.end}`
-                    : "未入力";
+                    : hasSaved
+                      ? "未入力"
+                      : "未回答";
                 const isHighlighted = isMemberHighlighted(member.id);
 
                 return (
@@ -192,6 +192,7 @@ export function AvailabilityTableApp() {
                         isPractice ? "practice-window-cell" : "",
                         isPractice && !isPreviousPractice ? "practice-start-cell" : "",
                         isPractice && !isNextPractice ? "practice-end-cell" : "",
+                        isAbsent ? "absent-cell" : "",
                         isAvailable ? "available-cell" : ""
                       ]
                         .filter(Boolean)
