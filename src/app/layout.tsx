@@ -21,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/player">奏者</Link>
               <Link href="/admin">管理</Link>
               <Link href="/availability">可否一覧</Link>
+              <Link href="/sheet">表</Link>
             </nav>
           </div>
         </header>
