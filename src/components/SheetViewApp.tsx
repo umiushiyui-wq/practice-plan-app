@@ -63,34 +63,21 @@ export function SheetViewApp() {
             <table className="sheet-table">
               <thead>
                 <tr>
-                  <th>順番</th>
                   <th>開始</th>
                   <th>終了</th>
                   <th>分</th>
                   <th>曲 / 休憩</th>
-                  <th>指揮者</th>
-                  <th>出演者数</th>
-                  <th>スコア</th>
-                  <th>理由</th>
                 </tr>
               </thead>
               <tbody>
-                {sortedPlan.map((slot, index) => {
+                {sortedPlan.map((slot) => {
                   const piece = slot.pieceId ? pieceMap.get(slot.pieceId) : null;
-                  const conductor = piece
-                    ? state.members.find((member) => member.id === piece.conductorId)
-                    : null;
                   return (
                     <tr key={slot.id}>
-                      <td>{index + 1}</td>
                       <td>{slot.start}</td>
                       <td>{slot.end}</td>
                       <td>{slot.duration}</td>
                       <td>{getPlanSlotLabel(slot, piece?.title)}</td>
-                      <td>{conductor?.name ?? ""}</td>
-                      <td>{piece ? `${piece.memberIds.length}人` : ""}</td>
-                      <td>{slot.score ?? ""}</td>
-                      <td>{piece ? slot.reason ?? "" : ""}</td>
                     </tr>
                   );
                 })}
