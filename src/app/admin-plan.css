@@ -353,7 +353,7 @@ button:disabled {
 
 .plan-slot-badges {
   gap: 6px;
-  padding-right: 26px;
+  padding-right: 54px;
 }
 
 .plan-badge {
@@ -385,6 +385,60 @@ button:disabled {
 .plan-slot-delete-button:hover {
   border-color: #dc2626;
   background: #fef2f2;
+}
+
+.plan-slot-lock-switch {
+  position: absolute;
+  top: 50%;
+  right: 34px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  width: 28px;
+  height: 18px;
+  transform: translateY(-50%);
+}
+
+.plan-slot-lock-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.plan-slot-lock-switch span {
+  display: block;
+  width: 28px;
+  height: 16px;
+  border: 1px solid color-mix(in srgb, var(--plan-color, var(--accent)) 45%, #ffffff);
+  border-radius: 999px;
+  background: #ffffff;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.plan-slot-lock-switch span::before {
+  content: "";
+  display: block;
+  width: 12px;
+  height: 12px;
+  margin: 1px;
+  border-radius: 999px;
+  background: #94a3b8;
+  transition:
+    background-color 120ms ease,
+    transform 120ms ease;
+}
+
+.plan-slot-lock-switch input:checked + span {
+  border-color: var(--plan-color, var(--accent));
+  background: color-mix(in srgb, var(--plan-color, var(--accent)) 18%, #ffffff);
+}
+
+.plan-slot-lock-switch input:checked + span::before {
+  background: var(--plan-color, var(--accent));
+  transform: translateX(10px);
 }
 
 .plan-resize-handle {
