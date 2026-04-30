@@ -26,6 +26,7 @@ export function MemberPieceManagerApp() {
   const { state, updateState } = useLocalPracticeState();
   const sortedPracticeDays = getSortedPracticeDays(state.practiceDays);
   const [selectedPieceId, setSelectedPieceId] = useState("");
+  const [editingPracticeDayId, setEditingPracticeDayId] = useState("");
 
   const selectedPiece =
     state.pieces.find((piece) => piece.id === selectedPieceId) ?? state.pieces[0] ?? null;
@@ -157,6 +158,7 @@ export function MemberPieceManagerApp() {
           : day
       )
     });
+    setEditingPracticeDayId("");
   }
 
   function addPiece(formData: FormData) {
@@ -368,46 +370,57 @@ export function MemberPieceManagerApp() {
             </summary>
             <div className="fold-panel-body stack">
               {sortedPracticeDays.length === 0 ? <p className="muted">まだ練習日はありません。</p> : null}
-              {sortedPracticeDays.map((day) => (
-                <form
-                  className="stack setup-edit-form"
-                  key={day.id}
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    updatePracticeDayDetails(day.id, new FormData(event.currentTarget));
-                  }}
-                >
-                  <div className="row">
-                    <div>
-                      <strong>{getPracticeDayLabel(day)}</strong>
-                      <div className="muted">
-                        {day.startTime} - {day.endTime}
+              {sortedPracticeDays.map((day) => {
+                const isEditing = editingPracticeDayId === day.id;
+
+                return (
+                  <div className="stack setup-edit-form" key={day.id}>
+                    <div className="row setup-practice-day-row">
+                      <div className="setup-practice-day-summary">
+                        <strong>{day.practiceDate}</strong>
+                        <span className="muted">{day.startTime} - {day.endTime}</span>
+                        {day.location.trim() ? <span className="muted">＠{day.location.trim()}</span> : null}
                       </div>
+                      <button
+                        className="secondary"
+                        type="button"
+                        onClick={() => setEditingPracticeDayId(isEditing ? "" : day.id)}
+                      >
+                        {isEditing ? "閉じる" : "編集する"}
+                      </button>
                     </div>
-                    <button className="secondary" type="submit">
-                      この練習日を保存
-                    </button>
+                    {isEditing ? (
+                      <form
+                        className="stack"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          updatePracticeDayDetails(day.id, new FormData(event.currentTarget));
+                        }}
+                      >
+                        <label>
+                          日付
+                          <input name="practiceDate" type="date" defaultValue={day.practiceDate} required />
+                        </label>
+                        <div className="date-time-grid">
+                          <label>
+                            開始
+                            <input name="startTime" type="time" step="300" defaultValue={day.startTime} required />
+                          </label>
+                          <label>
+                            終了
+                            <input name="endTime" type="time" step="300" defaultValue={day.endTime} required />
+                          </label>
+                          <label>
+                            練習場所
+                            <input name="location" defaultValue={day.location} placeholder="例: 市民ホール" />
+                          </label>
+                        </div>
+                        <button type="submit">この練習日を保存</button>
+                      </form>
+                    ) : null}
                   </div>
-                  <label>
-                    日付
-                    <input name="practiceDate" type="date" defaultValue={day.practiceDate} required />
-                  </label>
-                  <label>
-                    練習場所
-                    <input name="location" defaultValue={day.location} placeholder="例: 市民ホール" />
-                  </label>
-                  <div className="date-time-grid">
-                    <label>
-                      開始
-                      <input name="startTime" type="time" step="300" defaultValue={day.startTime} required />
-                    </label>
-                    <label>
-                      終了
-                      <input name="endTime" type="time" step="300" defaultValue={day.endTime} required />
-                    </label>
-                  </div>
-                </form>
-              ))}
+                );
+              })}
             </div>
           </details>
         </section>
