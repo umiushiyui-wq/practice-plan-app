@@ -764,6 +764,13 @@ tbody tr:hover td {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.setup-edit-form {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fbfdff;
+}
+
 .setup-piece-list {
   gap: 12px;
 }
