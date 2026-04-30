@@ -137,6 +137,7 @@ export function PlayerApp() {
   const canViewAvailabilityTable = !!selected && (!hasUsablePassword || authenticatedMemberId === selected.id);
   const selectedDayHasSavedInput =
     !!selectedInputDay && !!selected && selectedInputDay.respondedMemberIds.includes(selected.id);
+  const selectedInputDayNeedsResponse = !!selectedInputDay && !!selected && !selectedInputDay.respondedMemberIds.includes(selected.id);
   const requiresPassword = selectedDayHasSavedInput && hasUsablePassword && authenticatedMemberId !== selected.id;
   const needsPasswordSetup = selectedDayHasSavedInput && !hasUsablePassword;
   const canEditSelectedDay = !!selected && (!selectedDayHasSavedInput || authenticatedMemberId === selected.id);
@@ -495,15 +496,22 @@ export function PlayerApp() {
                 <label className="compact-field">
                   練習日
                   <select value={selectedInputDay.id} onChange={(event) => setSelectedInputDayId(event.target.value)}>
-                    {sortedPracticeDays.map((day) => (
-                      <option key={day.id} value={day.id}>
-                        {day.practiceDate} {formatPracticeTimeAndLocation(day)}
-                      </option>
-                    ))}
+                    {sortedPracticeDays.map((day) => {
+                      const needsResponse = !!selected && !day.respondedMemberIds.includes(selected.id);
+
+                      return (
+                        <option key={day.id} value={day.id}>
+                          {needsResponse ? "未入力: " : ""}
+                          {day.practiceDate} {formatPracticeTimeAndLocation(day)}
+                        </option>
+                      );
+                    })}
                   </select>
                 </label>
               ) : null}
             </div>
+
+            {selectedInputDayNeedsResponse ? <p className="error">この練習日はまだ入力していません。</p> : null}
 
             {saveMessage ? <div className="notice">{saveMessage}</div> : null}
 
