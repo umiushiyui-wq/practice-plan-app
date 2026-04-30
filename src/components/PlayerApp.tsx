@@ -10,7 +10,6 @@ import {
   sortPlanByTime,
   toMinutes,
   toTime,
-  updatePracticeDay,
   useLocalPracticeState,
   usePieceMap
 } from "@/components/LocalPracticeApp";
@@ -207,31 +206,31 @@ export function PlayerApp() {
     }));
   }
 
-  function saveAvailability(dayId: string) {
+  async function saveAvailability(dayId: string) {
     if (!selected) return;
 
     const day = state.practiceDays.find((item) => item.id === dayId);
     const draft = draftsByDay[dayId];
     if (!day || !draft) return;
 
-    const nextPracticeDays = updatePracticeDay(state, dayId, {
-      availabilities: draft.absent
-        ? day.availabilities.filter((item) => item.memberId !== selected.id)
-        : [
-            ...day.availabilities.filter((item) => item.memberId !== selected.id),
-            { memberId: selected.id, start: draft.start, end: draft.end }
-          ],
-      absentMemberIds: draft.absent
-        ? Array.from(new Set([...day.absentMemberIds, selected.id]))
-        : day.absentMemberIds.filter((id) => id !== selected.id),
-      respondedMemberIds: Array.from(new Set([...day.respondedMemberIds, selected.id]))
+    const savedState = await localState.saveAvailabilityPatch({
+      practiceDayId: dayId,
+      memberId: selected.id,
+      start: draft.start,
+      end: draft.end,
+      absent: draft.absent
     });
 
-    updateState({ practiceDays: nextPracticeDays });
+    if (!savedState) {
+      setSaveMessage("保存できていません。ネットワークまたはRedis/KV設定を確認してください。");
+      return;
+    }
+
+    const savedDay = savedState.practiceDays.find((item) => item.id === dayId) ?? day;
     setSaveMessage(
       draft.absent
-        ? `${getPracticeDayLabel(day)} を欠席で保存しました。`
-        : `${getPracticeDayLabel(day)} を ${draft.start}-${draft.end} で保存しました。`
+        ? `${getPracticeDayLabel(savedDay)} を欠席で保存しました。`
+        : `${getPracticeDayLabel(savedDay)} を ${draft.start}-${draft.end} で保存しました。`
     );
   }
 
@@ -521,8 +520,12 @@ export function PlayerApp() {
                     </p>
                   </div>
                   {canEditSelectedDay ? (
-                    <button type="button" onClick={() => saveAvailability(selectedInputDay.id)}>
-                      この日の入力を保存
+                    <button
+                      type="button"
+                      onClick={() => saveAvailability(selectedInputDay.id)}
+                      disabled={localState.saveStatus === "saving"}
+                    >
+                      {localState.saveStatus === "saving" ? "保存中" : "この日の入力を保存"}
                     </button>
                   ) : null}
                 </div>
