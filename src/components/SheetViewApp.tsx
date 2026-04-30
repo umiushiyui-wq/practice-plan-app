@@ -4,15 +4,17 @@ import Link from "next/link";
 import {
   getPlanSlotLabel,
   getSelectedPracticeDay,
+  LocalStateStatusPanel,
   sortPlanByTime,
   useLocalPracticeState,
   usePieceMap
 } from "@/components/LocalPracticeApp";
 
-function formatPracticeDateLabel(date: string) {
+function formatPracticeDateLabel(date: string, location: string) {
   const parsed = new Date(`${date}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return `${date}練習内容`;
-  return `${parsed.getMonth() + 1}月${parsed.getDate()}日練習内容`;
+  const locationLabel = location.trim() ? ` ＠${location.trim()}` : "";
+  if (Number.isNaN(parsed.getTime())) return `${date}練習内容${locationLabel}`;
+  return `${parsed.getMonth() + 1}月${parsed.getDate()}日練習内容${locationLabel}`;
 }
 
 function formatPracticeTimeAndLocation(day: { startTime: string; endTime: string; location: string }) {
@@ -21,7 +23,8 @@ function formatPracticeTimeAndLocation(day: { startTime: string; endTime: string
 }
 
 export function SheetViewApp() {
-  const { state, updateState } = useLocalPracticeState();
+  const localState = useLocalPracticeState();
+  const { state, updateState } = localState;
   const selectedDay = getSelectedPracticeDay(state);
   const pieceMap = usePieceMap(state.pieces);
   const sortedPlan = sortPlanByTime(selectedDay.plan);
@@ -52,8 +55,10 @@ export function SheetViewApp() {
         </div>
       </section>
 
+      <LocalStateStatusPanel {...localState} />
+
       <section className="panel stack">
-        <h2>{formatPracticeDateLabel(selectedDay.practiceDate)}</h2>
+        <h2>{formatPracticeDateLabel(selectedDay.practiceDate, selectedDay.location)}</h2>
         {!selectedDay.isPlanPublished ? (
           <p className="muted">まだ非公開です。</p>
         ) : selectedDay.plan.length === 0 ? (
