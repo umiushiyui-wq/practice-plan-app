@@ -54,9 +54,13 @@ SLACK_REMINDER_CHANNEL_ID
 
 ## Vercelで公開URLを作る
 
-ローカル保存版の `/admin`、`/player`、`/availability`、`/sheet` は、`/api/local-state` に状態を保存します。
+ローカル保存版の `/admin`、`/player`、`/availability`、`/sheet` は、`/api/local-state` 経由で共有 state を保存します。
 
-ローカルでは `.data/local-practice-state.json` に保存します。Vercelではサーバー内ファイルが永続化されないため、Upstash Redis か Vercel KV のREST API環境変数を設定してください。
+正式な保存先は Upstash Redis または Vercel KV です。Vercel のサーバー内ファイル保存は永続化されないため、本番環境では使いません。
+
+ローカル開発時だけ、Redis / KV が未設定の場合に `.data/local-practice-state.json` へフォールバックします。`NODE_ENV=production` では Redis / KV が未設定だと `/api/local-state` は 500 を返します。
+
+ブラウザの `localStorage` は正式な保存先ではありません。サーバーに state がある場合は必ずサーバー state を優先します。サーバー state が空で、この端末にだけ古い `localStorage` データがある場合は、画面上の「旧データをサーバーへ移行」ボタンを押した時だけ共有 state として保存します。自動移行はしません。
 
 ### 必要な環境変数
 
@@ -68,6 +72,13 @@ LOCAL_STATE_KEY
 ```
 
 Vercel KVを使う場合は、Vercel側が作る `KV_REST_API_URL` と `KV_REST_API_TOKEN` でも動きます。
+
+```text
+DATABASE_URL
+KV_REST_API_URL
+KV_REST_API_TOKEN
+LOCAL_STATE_KEY
+```
 
 ローカル保存版だけをまず公開する場合でも、Prisma client生成のために `DATABASE_URL` は必要です。最初は `file:./dev.db` を入れてください。
 
