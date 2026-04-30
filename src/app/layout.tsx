@@ -18,10 +18,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               2027 OB演奏会
             </Link>
             <nav className="topnav" aria-label="主要ページ">
-              <Link href="/player">奏者</Link>
               <Link href="/admin">管理</Link>
-              <Link href="/availability">可否一覧</Link>
-              <Link href="/sheet">表</Link>
+              <Link href="/player">奏者</Link>
+              <Link href="/sheet">練習表</Link>
             </nav>
           </div>
         </header>
