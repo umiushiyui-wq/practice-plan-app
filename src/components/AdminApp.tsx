@@ -8,6 +8,7 @@ import {
   getPlanSlotLabel,
   getPracticeDayLabel,
   getSelectedPracticeDay,
+  LocalStateStatusPanel,
   makeId,
   sortPlanByTime,
   toMinutes,
@@ -86,7 +87,8 @@ function clampNumber(value: number, min: number, max: number) {
 }
 
 export function AdminApp() {
-  const { state, updateState } = useLocalPracticeState();
+  const localState = useLocalPracticeState();
+  const { state, updateState } = localState;
   const [planMessage, setPlanMessage] = useState("");
   const [draggedSlotId, setDraggedSlotId] = useState<string | null>(null);
   const [activeDropMinutes, setActiveDropMinutes] = useState<number | null>(null);
@@ -405,6 +407,8 @@ export function AdminApp() {
         </div>
         {planMessage ? <div className="notice">{planMessage}</div> : null}
       </section>
+
+      <LocalStateStatusPanel {...localState} />
 
       <section className="panel stack">
         <div className="row page-section-head">
