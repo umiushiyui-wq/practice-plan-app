@@ -6,6 +6,7 @@ import {
   getPlannedMinutesByPiece,
   getPracticeDayLabel,
   getSortedPracticeDays,
+  LocalStateStatusPanel,
   makeId,
   resolvePieceTargetRange,
   useLocalPracticeState
@@ -23,7 +24,8 @@ const INSTRUMENT_OPTIONS = [
 ];
 
 export function MemberPieceManagerApp() {
-  const { state, updateState } = useLocalPracticeState();
+  const localState = useLocalPracticeState();
+  const { state, updateState } = localState;
   const sortedPracticeDays = getSortedPracticeDays(state.practiceDays);
   const [selectedPieceId, setSelectedPieceId] = useState("");
   const [editingPracticeDayId, setEditingPracticeDayId] = useState("");
@@ -269,6 +271,8 @@ export function MemberPieceManagerApp() {
           </Link>
         </div>
       </section>
+
+      <LocalStateStatusPanel {...localState} />
 
       <div className="stack">
         <section id="members" className="panel stack">
