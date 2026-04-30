@@ -3,18 +3,21 @@
 import Link from "next/link";
 import {
   getPlanSlotLabel,
-  getPracticeDayLabel,
   getSelectedPracticeDay,
   sortPlanByTime,
   useLocalPracticeState,
   usePieceMap
 } from "@/components/LocalPracticeApp";
 
-function formatPracticeDateLabel(date: string, location: string) {
+function formatPracticeDateLabel(date: string) {
   const parsed = new Date(`${date}T00:00:00`);
-  const locationLabel = location.trim() ? `＠${location.trim()}` : "";
-  if (Number.isNaN(parsed.getTime())) return `${date}${locationLabel}練習内容`;
-  return `${parsed.getMonth() + 1}月${parsed.getDate()}日${locationLabel}練習内容`;
+  if (Number.isNaN(parsed.getTime())) return `${date}練習内容`;
+  return `${parsed.getMonth() + 1}月${parsed.getDate()}日練習内容`;
+}
+
+function formatPracticeTimeAndLocation(day: { startTime: string; endTime: string; location: string }) {
+  const location = day.location.trim();
+  return location ? `${day.startTime}〜${day.endTime} ＠${location}` : `${day.startTime}〜${day.endTime}`;
 }
 
 export function SheetViewApp() {
@@ -26,7 +29,6 @@ export function SheetViewApp() {
   return (
     <main className="stack">
       <section className="panel stack">
-        <p className="muted">表ビュー</p>
         <h1>練習計画表</h1>
         <label>
           表示する日付
@@ -36,13 +38,13 @@ export function SheetViewApp() {
           >
             {state.practiceDays.map((day) => (
               <option key={day.id} value={day.id}>
-                {getPracticeDayLabel(day)} {day.startTime}-{day.endTime}
+                {day.practiceDate} {formatPracticeTimeAndLocation(day)}
               </option>
             ))}
           </select>
         </label>
         <p>
-          {getPracticeDayLabel(selectedDay)} / {selectedDay.startTime}〜{selectedDay.endTime}
+          {selectedDay.practiceDate} / {formatPracticeTimeAndLocation(selectedDay)}
         </p>
         <div className="row">
           <Link className="button secondary" href="/admin">管理者用URLへ</Link>
@@ -51,7 +53,7 @@ export function SheetViewApp() {
       </section>
 
       <section className="panel stack">
-        <h2>{formatPracticeDateLabel(selectedDay.practiceDate, selectedDay.location)}</h2>
+        <h2>{formatPracticeDateLabel(selectedDay.practiceDate)}</h2>
         {!selectedDay.isPlanPublished ? (
           <p className="muted">この日の練習スケジュールはまだ公開されていません。</p>
         ) : selectedDay.plan.length === 0 ? (
