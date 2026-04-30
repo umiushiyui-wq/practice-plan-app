@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { getPracticeDayLabel, getSelectedPracticeDay, toMinutes, toTime, useLocalPracticeState } from "@/components/LocalPracticeApp";
+import {
+  getPracticeDayLabel,
+  getSelectedPracticeDay,
+  LocalStateStatusPanel,
+  toMinutes,
+  toTime,
+  useLocalPracticeState
+} from "@/components/LocalPracticeApp";
 
 const AVAILABILITY_SLOTS = Array.from({ length: ((22 - 8) * 60) / 10 + 1 }, (_, index) => 8 * 60 + index * 10);
 const ALL_PIECES_FILTER = "__all__";
@@ -10,7 +17,8 @@ const OTHER_PIECES_FILTER = "__other__";
 const ALL_PARTS_FILTER = "__all__";
 
 export function AvailabilityTableApp() {
-  const { state, updateState } = useLocalPracticeState();
+  const localState = useLocalPracticeState();
+  const { state, updateState } = localState;
   const selectedDay = getSelectedPracticeDay(state);
   const [selectedPieceFilter, setSelectedPieceFilter] = useState(ALL_PIECES_FILTER);
   const [selectedPartFilter, setSelectedPartFilter] = useState(ALL_PARTS_FILTER);
@@ -121,6 +129,8 @@ export function AvailabilityTableApp() {
           </Link>
         </div>
       </section>
+
+      <LocalStateStatusPanel {...localState} />
 
       <section className="panel stack">
         <h2>{getPracticeDayLabel(selectedDay)} の参加可能時間</h2>
