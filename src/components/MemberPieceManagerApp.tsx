@@ -20,6 +20,7 @@ const INSTRUMENT_OPTIONS = [
   "トランペット",
   "トロンボーン",
   "ユーフォニアム",
+  "低音",
   "パーカッション"
 ];
 
@@ -90,7 +91,7 @@ export function MemberPieceManagerApp() {
       id: makeId("m"),
       name,
       instrument: String(formData.get("instrument") ?? ""),
-      part: String(formData.get("part") ?? "").trim(),
+      part: "",
       password
     };
 
@@ -367,7 +368,6 @@ export function MemberPieceManagerApp() {
                 </option>
               ))}
             </select>
-            <input name="part" placeholder="パート名" />
             <input type="hidden" name="password" value="__unset__" />
             <button type="submit">奏者を追加</button>
           </form>
