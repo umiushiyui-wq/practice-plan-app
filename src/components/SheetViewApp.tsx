@@ -3,16 +3,18 @@
 import Link from "next/link";
 import {
   getPlanSlotLabel,
+  getPracticeDayLabel,
   getSelectedPracticeDay,
   sortPlanByTime,
   useLocalPracticeState,
   usePieceMap
 } from "@/components/LocalPracticeApp";
 
-function formatPracticeDateLabel(date: string) {
+function formatPracticeDateLabel(date: string, location: string) {
   const parsed = new Date(`${date}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return `${date}練習内容`;
-  return `${parsed.getMonth() + 1}月${parsed.getDate()}日練習内容`;
+  const locationLabel = location.trim() ? `＠${location.trim()}` : "";
+  if (Number.isNaN(parsed.getTime())) return `${date}${locationLabel}練習内容`;
+  return `${parsed.getMonth() + 1}月${parsed.getDate()}日${locationLabel}練習内容`;
 }
 
 export function SheetViewApp() {
@@ -34,13 +36,13 @@ export function SheetViewApp() {
           >
             {state.practiceDays.map((day) => (
               <option key={day.id} value={day.id}>
-                {day.practiceDate} {day.startTime}-{day.endTime}
+                {getPracticeDayLabel(day)} {day.startTime}-{day.endTime}
               </option>
             ))}
           </select>
         </label>
         <p>
-          {selectedDay.practiceDate} / {selectedDay.startTime}〜{selectedDay.endTime}
+          {getPracticeDayLabel(selectedDay)} / {selectedDay.startTime}〜{selectedDay.endTime}
         </p>
         <div className="row">
           <Link className="button secondary" href="/admin">管理者用URLへ</Link>
@@ -49,7 +51,7 @@ export function SheetViewApp() {
       </section>
 
       <section className="panel stack">
-        <h2>{formatPracticeDateLabel(selectedDay.practiceDate)}</h2>
+        <h2>{formatPracticeDateLabel(selectedDay.practiceDate, selectedDay.location)}</h2>
         {!selectedDay.isPlanPublished ? (
           <p className="muted">この日の練習スケジュールはまだ公開されていません。</p>
         ) : selectedDay.plan.length === 0 ? (

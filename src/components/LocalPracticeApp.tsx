@@ -40,6 +40,7 @@ export type PlanSlot = {
 export type LocalPracticeDay = {
   id: string;
   practiceDate: string;
+  location: string;
   startTime: string;
   endTime: string;
   availabilities: Availability[];
@@ -82,6 +83,7 @@ function defaultPracticeDay(): LocalPracticeDay {
   return {
     id: "d1",
     practiceDate: new Date().toISOString().slice(0, 10),
+    location: "",
     startTime: "18:00",
     endTime: "21:00",
     availabilities: [],
@@ -153,6 +155,7 @@ function migrateState(value: unknown): AppState {
       recentMinutes,
       practiceDays: saved.practiceDays.map((day) => ({
         ...day,
+        location: typeof day.location === "string" ? day.location : "",
         absentMemberIds: day.absentMemberIds ?? [],
         respondedMemberIds: day.respondedMemberIds ?? [],
         isPlanPublished: typeof day.isPlanPublished === "boolean" ? day.isPlanPublished : true
@@ -164,6 +167,7 @@ function migrateState(value: unknown): AppState {
   const migratedDay: LocalPracticeDay = {
     id: "d1",
     practiceDate: saved.practiceDate ?? defaultDay.practiceDate,
+    location: "",
     startTime: saved.startTime ?? defaultDay.startTime,
     endTime: saved.endTime ?? defaultDay.endTime,
     availabilities: saved.availabilities ?? defaultDay.availabilities,
@@ -240,6 +244,11 @@ export function useLocalPracticeState() {
 
 export function getSelectedPracticeDay(state: AppState) {
   return state.practiceDays.find((day) => day.id === state.selectedPracticeDayId) ?? state.practiceDays[0];
+}
+
+export function getPracticeDayLabel(day: Pick<LocalPracticeDay, "practiceDate" | "location">) {
+  const location = day.location.trim();
+  return location ? `${day.practiceDate}＠${location}` : day.practiceDate;
 }
 
 export function updatePracticeDay(

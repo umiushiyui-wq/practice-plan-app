@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { getSelectedPracticeDay, toMinutes, toTime, useLocalPracticeState } from "@/components/LocalPracticeApp";
+import { getPracticeDayLabel, getSelectedPracticeDay, toMinutes, toTime, useLocalPracticeState } from "@/components/LocalPracticeApp";
 
 const HEATMAP_SLOTS = Array.from({ length: 15 }, (_, index) => 8 * 60 + index * 60);
 
@@ -120,7 +120,7 @@ export function ColorMapApp() {
             >
               {state.practiceDays.map((day) => (
                 <option key={day.id} value={day.id}>
-                  {day.practiceDate} {day.startTime}-{day.endTime}
+                  {getPracticeDayLabel(day)} {day.startTime}-{day.endTime}
                 </option>
               ))}
             </select>
@@ -138,7 +138,7 @@ export function ColorMapApp() {
             <strong>
               {selectedDay.startTime} - {selectedDay.endTime}
             </strong>
-            <span className="muted">{selectedDay.practiceDate}</span>
+            <span className="muted">{getPracticeDayLabel(selectedDay)}</span>
           </article>
           <article className="plan-stat-card">
             <span className="plan-stat-label">表示幅</span>
