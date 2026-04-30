@@ -7,13 +7,6 @@ const actions = [
     title: "出欠と参加曲を入力",
     description: "自分の名前を選んで、練習日ごとの参加可能時間と出演する曲を登録します。",
     primary: true
-  },
-  {
-    href: "/sheet",
-    label: "表ビュー",
-    title: "計画表を確認",
-    description: "作成済みの練習計画を、共有しやすい表形式で確認します。",
-    primary: false
   }
 ];
 
