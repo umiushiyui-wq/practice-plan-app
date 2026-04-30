@@ -33,6 +33,7 @@ export type PlanSlot = {
   start: string;
   end: string;
   duration: number;
+  isLocked?: boolean;
   score?: number;
   reason?: string;
 };
@@ -645,9 +646,16 @@ export function generatePracticePlan(state: AppState): PlanSlot[] {
   const effectiveAvailabilities = getEffectiveAvailabilities(day);
   const dayStart = toMinutes(day.startTime);
   const dayEnd = toMinutes(day.endTime);
-  const selected: PlanSlot[] = [];
+  const lockedSlots = sortPlanByTime(day.plan.filter((slot) => slot.isLocked));
+  const selected: PlanSlot[] = [...lockedSlots];
   const dailyMinutes = new Map<string, number>();
   const occurrences = new Map<string, number>();
+
+  for (const slot of lockedSlots) {
+    if (!slot.pieceId) continue;
+    dailyMinutes.set(slot.pieceId, (dailyMinutes.get(slot.pieceId) ?? 0) + slot.duration);
+    occurrences.set(slot.pieceId, (occurrences.get(slot.pieceId) ?? 0) + 1);
+  }
 
   while (true) {
     const candidates: Array<PlanSlot & { piece: Piece }> = [];
