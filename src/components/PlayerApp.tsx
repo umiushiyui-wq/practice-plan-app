@@ -6,6 +6,7 @@ import {
   getPlanSlotLabel,
   getPracticeDayLabel,
   getSortedPracticeDays,
+  LocalStateStatusPanel,
   sortPlanByTime,
   toMinutes,
   toTime,
@@ -114,7 +115,8 @@ function TimePartSelect({
 }
 
 export function PlayerApp() {
-  const { state, updateState } = useLocalPracticeState();
+  const localState = useLocalPracticeState();
+  const { state, updateState } = localState;
   const pieceMap = usePieceMap(state.pieces);
   const sortedPracticeDays = useMemo(() => getSortedPracticeDays(state.practiceDays), [state.practiceDays]);
   const [selectedPart, setSelectedPart] = useState("");
@@ -304,6 +306,8 @@ export function PlayerApp() {
           </a>
         </div>
       </section>
+
+      <LocalStateStatusPanel {...localState} />
 
       <section className="panel stack">
         <h2>自分を選ぶ</h2>
