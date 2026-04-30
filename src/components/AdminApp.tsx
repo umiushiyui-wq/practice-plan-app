@@ -9,6 +9,7 @@ import {
   getPracticeDayLabel,
   getSelectedPracticeDay,
   getSortedPracticeDays,
+  isAvailable,
   LocalStateStatusPanel,
   makeId,
   sortPlanByTime,
@@ -109,10 +110,7 @@ export function AdminApp() {
   const plannedMinutes = sortedPlan.reduce((total, slot) => total + slot.duration, 0);
   const freeMinutes = Math.max(0, practiceMinutes - plannedMinutes);
   const overlappingSlotIds = findOverlappingPlanSlots(selectedDay.plan);
-  const pieceSlotCount = sortedPlan.filter((slot) => slot.pieceId).length;
-  const utilitySlotCount = sortedPlan.length - pieceSlotCount;
   const coverageRatio = practiceMinutes > 0 ? Math.min(1, plannedMinutes / practiceMinutes) : 0;
-  const usedPieceCount = new Set(sortedPlan.map((slot) => slot.pieceId).filter(Boolean)).size;
   const practiceStartMinutes = toMinutes(selectedDay.startTime);
   const practiceEndMinutes = toMinutes(selectedDay.endTime);
   const timelineHeight = Math.max(1, practiceMinutes / MINUTES_PER_PIXEL);
@@ -389,6 +387,19 @@ export function AdminApp() {
     return getPlanSlotLabel(slot, slot.pieceId ? pieceMap.get(slot.pieceId)?.title : undefined);
   }
 
+  function getSlotAttendanceCount(slot: (typeof selectedDay.plan)[number]) {
+    if (!slot.pieceId) return null;
+    const piece = pieceMap.get(slot.pieceId);
+    if (!piece) return null;
+
+    const memberIds = Array.from(new Set([piece.conductorId, ...piece.memberIds].filter(Boolean)));
+    const absentMemberIds = new Set(selectedDay.absentMemberIds);
+    const start = toMinutes(slot.start);
+    return memberIds.filter(
+      (memberId) => !absentMemberIds.has(memberId) && isAvailable(selectedDay.availabilities, memberId, start, start + 1)
+    ).length;
+  }
+
   return (
     <main className="stack">
       <section className="panel stack">
@@ -470,31 +481,6 @@ export function AdminApp() {
               この練習日で自動生成
             </button>
           </div>
-        </div>
-
-        <div className="plan-summary-grid">
-          <article className="plan-stat-card">
-            <span className="plan-stat-label">埋まり具合</span>
-            <strong>{Math.round(coverageRatio * 100)}%</strong>
-            <span className="muted">
-              {formatMinutesLabel(plannedMinutes)} / {formatMinutesLabel(practiceMinutes)}
-            </span>
-          </article>
-          <article className="plan-stat-card">
-            <span className="plan-stat-label">曲の枠</span>
-            <strong>{pieceSlotCount}</strong>
-            <span className="muted">{usedPieceCount}曲を使用中</span>
-          </article>
-          <article className="plan-stat-card">
-            <span className="plan-stat-label">補助の枠</span>
-            <strong>{utilitySlotCount}</strong>
-            <span className="muted">休憩・合奏準備・片付け</span>
-          </article>
-          <article className="plan-stat-card">
-            <span className="plan-stat-label">空き時間</span>
-            <strong>{formatMinutesLabel(freeMinutes)}</strong>
-            <span className="muted">{overlappingSlotIds.size > 0 ? "時間重なりあり" : "まだ追加できます"}</span>
-          </article>
         </div>
 
         <div className="plan-progress-card">
@@ -610,6 +596,7 @@ export function AdminApp() {
                 {sortedPlan.map((slot) => {
                   const slotLabel = getSlotLabel(slot);
                   const slotVariant = getSlotVariant(slotLabel);
+                  const attendanceCount = getSlotAttendanceCount(slot);
 
                   return (
                     <div className="plan-slot-row" key={slot.id}>
@@ -675,6 +662,7 @@ export function AdminApp() {
                                   </option>
                                 ))}
                               </select>
+                              {attendanceCount !== null ? <span className="plan-slot-attendance">{attendanceCount}人</span> : null}
                             </div>
                             <div className="plan-slot-badges">
                               <span className="plan-badge">{formatMinutesLabel(slot.duration)}</span>
