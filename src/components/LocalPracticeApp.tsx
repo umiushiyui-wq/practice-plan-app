@@ -158,7 +158,7 @@ function migrateState(value: unknown): AppState {
         location: typeof day.location === "string" ? day.location : "",
         absentMemberIds: day.absentMemberIds ?? [],
         respondedMemberIds: day.respondedMemberIds ?? [],
-        isPlanPublished: typeof day.isPlanPublished === "boolean" ? day.isPlanPublished : true
+        isPlanPublished: typeof day.isPlanPublished === "boolean" ? day.isPlanPublished : false
       })),
       selectedPracticeDayId: saved.selectedPracticeDayId ?? saved.practiceDays[0].id
     };
@@ -173,7 +173,7 @@ function migrateState(value: unknown): AppState {
     availabilities: saved.availabilities ?? defaultDay.availabilities,
     absentMemberIds: [],
     respondedMemberIds: [],
-    isPlanPublished: true,
+    isPlanPublished: false,
     plan: saved.plan ?? []
   };
 
