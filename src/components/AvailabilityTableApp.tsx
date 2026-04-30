@@ -192,7 +192,7 @@ export function AvailabilityTableApp() {
                         isPractice ? "practice-window-cell" : "",
                         isPractice && !isPreviousPractice ? "practice-start-cell" : "",
                         isPractice && !isNextPractice ? "practice-end-cell" : "",
-                        isAbsent ? "absent-cell" : "",
+                        isPractice && isAbsent ? "absent-cell" : "",
                         isAvailable ? "available-cell" : ""
                       ]
                         .filter(Boolean)
