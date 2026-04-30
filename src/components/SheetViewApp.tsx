@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   getPlanSlotLabel,
   getSelectedPracticeDay,
+  getSortedPracticeDays,
   sortPlanByTime,
   useLocalPracticeState,
   usePieceMap
@@ -25,6 +26,7 @@ export function SheetViewApp() {
   const localState = useLocalPracticeState();
   const { state, updateState } = localState;
   const selectedDay = getSelectedPracticeDay(state);
+  const sortedPracticeDays = getSortedPracticeDays(state.practiceDays);
   const pieceMap = usePieceMap(state.pieces);
   const sortedPlan = sortPlanByTime(selectedDay.plan);
 
@@ -38,7 +40,7 @@ export function SheetViewApp() {
             value={selectedDay.id}
             onChange={(event) => updateState({ selectedPracticeDayId: event.target.value })}
           >
-            {state.practiceDays.map((day) => (
+            {sortedPracticeDays.map((day) => (
               <option key={day.id} value={day.id}>
                 {day.practiceDate} {formatPracticeTimeAndLocation(day)}
               </option>
