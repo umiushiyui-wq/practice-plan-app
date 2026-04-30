@@ -8,6 +8,7 @@ import {
   getPlanSlotLabel,
   getPracticeDayLabel,
   getSelectedPracticeDay,
+  getSortedPracticeDays,
   LocalStateStatusPanel,
   makeId,
   sortPlanByTime,
@@ -94,6 +95,7 @@ export function AdminApp() {
   const [activeDropMinutes, setActiveDropMinutes] = useState<number | null>(null);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const selectedDay = getSelectedPracticeDay(state);
+  const sortedPracticeDays = getSortedPracticeDays(state.practiceDays);
   const pieceMap = usePieceMap(state.pieces);
 
   const practiceMinutes = toMinutes(selectedDay.endTime) - toMinutes(selectedDay.startTime);
@@ -422,7 +424,7 @@ export function AdminApp() {
               value={selectedDay.id}
               onChange={(event) => updateState({ selectedPracticeDayId: event.target.value })}
             >
-              {state.practiceDays.map((day) => (
+              {sortedPracticeDays.map((day) => (
                 <option key={day.id} value={day.id}>
                   {getPracticeDayLabel(day)} {day.startTime}-{day.endTime}
                 </option>
