@@ -330,7 +330,6 @@ export function PlayerApp() {
       <section className="panel stack">
         <p className="muted">奏者ページ</p>
         <h1>参加可能時間と参加曲の入力</h1>
-        <p>自分の名前を選ぶと、登録済みのすべての練習日について入力できます。青い枠が練習時間、緑が自分が出席する時間です。</p>
         <div className="row">
           <Link className="button secondary" href="/admin">
             管理画面へ
