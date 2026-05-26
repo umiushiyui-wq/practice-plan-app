@@ -1330,3 +1330,58 @@ tbody tr:hover td {
     grid-template-columns: 1fr;
   }
 }
+
+
+.player-page {
+  width: min(980px, calc(100% - 32px));
+}
+
+.player-page > .panel {
+  border-color: #d5e2e8;
+}
+
+.player-hero {
+  background: #ffffff;
+  border-left: 5px solid var(--accent);
+  padding: 22px 24px;
+}
+
+.player-hero h1 {
+  font-size: clamp(28px, 4vw, 42px);
+  line-height: 1.12;
+}
+
+.player-hero .row {
+  margin-top: 4px;
+}
+
+.player-selector-panel {
+  background: #f7fbfd;
+}
+
+.player-selector-panel select {
+  max-width: 420px;
+}
+
+.player-input-panel {
+  border-color: #c7dbe5;
+  box-shadow: 0 10px 26px rgb(10 31 51 / 0.07);
+}
+
+.player-input-panel .subtle-panel {
+  background: #fbfdfe;
+}
+
+@media (max-width: 720px) {
+  .player-page {
+    width: 100%;
+  }
+
+  .player-hero {
+    padding: 18px;
+  }
+
+  .player-selector-panel select {
+    max-width: none;
+  }
+}

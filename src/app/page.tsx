@@ -20,8 +20,8 @@ export default function HomePage() {
     <main className="stack">
       <section className="hero-panel">
         <div className="hero-copy">
-          <p className="eyebrow">2027 OB演奏会</p>
-          <h1>練習出欠・計画管理</h1>
+          <p className="eyebrow">2027年　OB演奏会</p>
+          <h1>練習出欠</h1>
         </div>
       </section>
 

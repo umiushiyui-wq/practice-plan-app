@@ -326,8 +326,8 @@ export function PlayerApp() {
   const currentTimeOptions = selectedInputDay ? buildTimeOptions(selectedInputDay.startTime, selectedInputDay.endTime) : [];
 
   return (
-    <main className="stack">
-      <section className="panel stack">
+    <main className="stack player-page">
+      <section className="panel stack player-hero">
         <p className="muted">奏者ページ</p>
         <h1>参加可能時間と参加曲の入力</h1>
         <div className="row">
@@ -340,7 +340,7 @@ export function PlayerApp() {
         </div>
       </section>
 
-      <section className="panel stack">
+      <section className="panel stack player-selector-panel">
         <h2>自分を選ぶ</h2>
         <select value={activePart} onChange={(event) => setSelectedPart(event.target.value)}>
           {partOptions.map((part) => (
@@ -365,7 +365,7 @@ export function PlayerApp() {
         <>
           {hasUsablePassword || selectedIsReady ? (
             <>
-          <section className="panel stack">
+          <section className="panel stack player-input-panel">
             <div className="row page-section-head">
               <div>
                 <h2>練習日ごとの入力</h2>
