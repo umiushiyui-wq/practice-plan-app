@@ -872,6 +872,10 @@ tbody tr:hover td {
   overflow-wrap: anywhere;
 }
 
+.sheet-table td:nth-child(4) {
+  white-space: pre-wrap;
+}
+
 .sheet-table tr:nth-child(even) td {
   background: #f7fafc;
 }
