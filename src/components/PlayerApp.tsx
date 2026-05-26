@@ -12,6 +12,7 @@ import {
   toTime,
   useLocalPracticeState
 } from "@/components/LocalPracticeApp";
+import type { LocalPracticeDay } from "@/components/LocalPracticeApp";
 
 const AVAILABILITY_SLOTS = Array.from({ length: ((22 - 8) * 60) / 10 + 1 }, (_, index) => 8 * 60 + index * 10);
 
@@ -49,6 +50,52 @@ function getClosestTime(value: string, options: string[]) {
 function formatPracticeTimeAndLocation(day: { startTime: string; endTime: string; location: string }) {
   const location = day.location.trim();
   return location ? `${day.startTime}-${day.endTime} ＠${location}` : `${day.startTime}-${day.endTime}`;
+}
+
+function escapeCalendarText(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
+}
+
+function formatCalendarDateTime(date: string, time: string) {
+  return `${date.replace(/-/g, "")}T${time.replace(":", "")}00`;
+}
+
+function formatCalendarStamp(date: Date) {
+  return date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+}
+
+function downloadCalendarEvent(day: LocalPracticeDay, availability: { start: string; end: string }) {
+  const title = "OB\u6f14\u594f\u4f1a\u3000\u7df4\u7fd2";
+  const createdAt = new Date();
+  const uid = `practice-${day.id}-${availability.start}-${availability.end}@practice-plan-app`;
+  const description = `${day.practiceDate} ${availability.start}-${availability.end}`;
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Practice Plan App//JA",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    `UID:${escapeCalendarText(uid)}`,
+    `DTSTAMP:${formatCalendarStamp(createdAt)}`,
+    `SUMMARY:${escapeCalendarText(title)}`,
+    `DTSTART:${formatCalendarDateTime(day.practiceDate, availability.start)}`,
+    `DTEND:${formatCalendarDateTime(day.practiceDate, availability.end)}`,
+    `DESCRIPTION:${escapeCalendarText(description)}`,
+    day.location.trim() ? `LOCATION:${escapeCalendarText(day.location.trim())}` : null,
+    "END:VEVENT",
+    "END:VCALENDAR"
+  ].filter((line): line is string => Boolean(line));
+  const blob = new Blob([`${lines.join("\r\n")}\r\n`], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = `OB\u6f14\u594f\u4f1a_\u7df4\u7fd2_${day.practiceDate}.ics`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function TimePartSelect({
@@ -322,7 +369,19 @@ export function PlayerApp() {
     return availabilityStart < slotEnd && slotStart < availabilityEnd;
   }
 
+  function getCalendarAvailability(day: LocalPracticeDay) {
+    if (!selected || !day.respondedMemberIds.includes(selected.id) || day.absentMemberIds.includes(selected.id)) return null;
+    const savedAvailability = day.availabilities.find((item) => item.memberId === selected.id);
+    if (!savedAvailability || toMinutes(savedAvailability.start) >= toMinutes(savedAvailability.end)) return null;
+
+    return {
+      start: savedAvailability.start,
+      end: savedAvailability.end
+    };
+  }
+
   const currentDraft = selectedInputDay ? draftsByDay[selectedInputDay.id] : null;
+  const currentCalendarAvailability = selectedInputDay ? getCalendarAvailability(selectedInputDay) : null;
   const currentTimeOptions = selectedInputDay ? buildTimeOptions(selectedInputDay.startTime, selectedInputDay.endTime) : [];
 
   return (
@@ -410,6 +469,11 @@ export function PlayerApp() {
                       disabled={localState.saveStatus === "saving"}
                     >
                       {localState.saveStatus === "saving" ? "保存中" : "この日の入力を保存"}
+                    </button>
+                  ) : null}
+                  {currentCalendarAvailability ? (
+                    <button type="button" className="secondary" onClick={() => downloadCalendarEvent(selectedInputDay, currentCalendarAvailability)}>
+                      {"\u30ab\u30ec\u30f3\u30c0\u30fc\u306b\u8ffd\u52a0"}
                     </button>
                   ) : null}
                 </div>
@@ -523,6 +587,19 @@ export function PlayerApp() {
                               <span className="muted">
                                 練習 {formatPracticeTimeAndLocation(day)} / 入力状況 {label}
                               </span>
+                              {(() => {
+                                const calendarAvailability = getCalendarAvailability(day);
+
+                                return calendarAvailability ? (
+                                  <button
+                                    type="button"
+                                    className="secondary calendar-add-button"
+                                    onClick={() => downloadCalendarEvent(day, calendarAvailability)}
+                                  >
+                                    {"\u30ab\u30ec\u30f3\u30c0\u30fc\u306b\u8ffd\u52a0"}
+                                  </button>
+                                ) : null;
+                              })()}
                             </th>
                             {AVAILABILITY_SLOTS.map((minutes, index) => {
                               const previousMinutes = AVAILABILITY_SLOTS[index - 1];
