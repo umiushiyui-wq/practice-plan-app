@@ -528,7 +528,7 @@ export function PlayerApp() {
             {selectedInputDayNeedsResponse ? <p className="error">この練習日はまだ入力していません。</p> : null}
 
             {saveMessage ? <div className="notice">{saveMessage}</div> : null}
-            {hasCurrentUnsavedChanges ? <div className="notice">???????????</div> : null}
+            {hasCurrentUnsavedChanges ? <div className="notice">{"\u307e\u3060\u4fdd\u5b58\u3055\u308c\u3066\u3044\u307e\u305b\u3093"}</div> : null}
 
             {selectedInputDay && currentDraft ? (
               <section className="panel subtle-panel stack">
@@ -692,8 +692,8 @@ export function PlayerApp() {
                               ? savedAvailability.breaks.length > 0
                                 ? `${savedAvailability.start}-${savedAvailability.end} / ${"\u4e2d\u629c\u3051"} ${savedAvailability.breaks.length}${"\u4ef6"}`
                                 : `${savedAvailability.start}-${savedAvailability.end}`
-                              : "???"
-                          : "???";
+                              : "\u672a\u5165\u529b"
+                          : "\u672a\u5165\u529b";
 
                         return (
                           <tr key={day.id}>
