@@ -30,6 +30,7 @@ export type Availability = {
 export type PlanSlot = {
   id: string;
   pieceId: string | null;
+  customTitle?: string;
   start: string;
   end: string;
   duration: number;
@@ -597,6 +598,7 @@ export function findOverlappingPlanSlots(plan: PlanSlot[]) {
 }
 
 export function getPlanSlotLabel(slot: PlanSlot, pieceTitle?: string) {
+  if (typeof slot.customTitle === "string") return slot.customTitle.trim() || "名称未設定";
   if (slot.pieceId) return pieceTitle ?? "曲";
   if (slot.reason?.includes("準備")) return "合奏準備";
   if (slot.reason?.includes("片付け")) return "片付け";

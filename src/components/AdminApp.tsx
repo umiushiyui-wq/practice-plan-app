@@ -65,11 +65,13 @@ function formatMinutesLabel(minutes: number) {
   return `${hours}時間${rest}分`;
 }
 
-function getSlotVariant(slotLabel: string) {
-  if (slotLabel.includes("休憩")) return "break";
-  if (slotLabel.includes("合奏準備")) return "setup";
-  if (slotLabel.includes("片付け")) return "cleanup";
-  return "piece";
+function getSlotVariant(slot: { pieceId: string | null; reason?: string }) {
+  if (slot.pieceId) return "piece";
+
+  const utilityKind = UTILITY_SLOT_TEMPLATES.find((template) => template.reason === slot.reason)?.kind;
+  if (utilityKind === "setup") return "setup";
+  if (utilityKind === "cleanup") return "cleanup";
+  return "break";
 }
 
 function getUtilityTemplate(kind: UtilitySlotKind) {
@@ -160,17 +162,24 @@ export function AdminApp() {
     updateSelectedDay({ plan: sortPlanByTime(plan) });
   }
 
-  function updateSlot(slotId: string, patch: { pieceId?: string | null; isLocked?: boolean }) {
+  function updateSlot(
+    slotId: string,
+    patch: { pieceId?: string | null; customTitle?: string; reason?: string; isLocked?: boolean }
+  ) {
     const nextPlan = sortedPlan.map((slot) =>
       slot.id === slotId
         ? {
             ...slot,
             ...patch,
-            reason: patch.pieceId !== undefined ? "管理者が手動で調整した枠です。" : slot.reason
+            reason: patch.reason ?? slot.reason
           }
         : slot
     );
     updatePlan(nextPlan);
+  }
+
+  function updateSlotTitle(slotId: string, customTitle: string) {
+    updateSlot(slotId, { customTitle });
   }
 
   function toggleSlotLock(slotId: string) {
@@ -193,7 +202,9 @@ export function AdminApp() {
 
   function updateSlotContent(slotId: string, value: string) {
     if (value.startsWith("piece:")) {
-      updateSlot(slotId, { pieceId: value.replace("piece:", "") });
+      const pieceId = value.replace("piece:", "");
+      const piece = pieceMap.get(pieceId);
+      updateSlot(slotId, { pieceId, customTitle: piece?.title ?? "" });
       return;
     }
 
@@ -201,16 +212,7 @@ export function AdminApp() {
 
     const utilityKind = value.replace("utility:", "") as UtilitySlotKind;
     const template = getUtilityTemplate(utilityKind);
-    const nextPlan = sortedPlan.map((slot) =>
-      slot.id === slotId
-        ? {
-            ...slot,
-            pieceId: null,
-            reason: template.reason
-          }
-        : slot
-    );
-    updatePlan(nextPlan);
+    updateSlot(slotId, { pieceId: null, customTitle: template.label, reason: template.reason });
   }
 
   function updateSlotTimeInput(slotId: string, boundary: "start" | "end", value: string) {
@@ -288,6 +290,7 @@ export function AdminApp() {
       return {
         id: makeId("s"),
         pieceId: piece.id,
+        customTitle: piece.title,
         start: toTime(start),
         end: toTime(end),
         duration: end - start,
@@ -302,6 +305,7 @@ export function AdminApp() {
     return {
       id: makeId("s"),
       pieceId: null,
+      customTitle: template.label,
       start: toTime(start),
       end: toTime(end),
       duration: end - start,
@@ -595,7 +599,7 @@ export function AdminApp() {
               <div className="plan-timeline">
                 {sortedPlan.map((slot) => {
                   const slotLabel = getSlotLabel(slot);
-                  const slotVariant = getSlotVariant(slotLabel);
+                  const slotVariant = getSlotVariant(slot);
                   const attendanceCount = getSlotAttendanceCount(slot);
 
                   return (
@@ -636,32 +640,44 @@ export function AdminApp() {
                               <span className="plan-slot-time">
                                 {slot.start} - {slot.end}
                               </span>
-                              <select
-                                className="plan-slot-title-select"
-                                aria-label={`${slotLabel}の内容・曲を変更`}
-                                title="内容・曲を変更"
-                                value={getSlotContentValue(slot)}
+                              <div
+                                className="plan-slot-content-controls"
                                 onPointerDown={(event) => event.stopPropagation()}
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   setSelectedSlotId(slot.id);
                                 }}
-                                onChange={(event) => {
-                                  updateSlotContent(slot.id, event.target.value);
-                                  setSelectedSlotId(slot.id);
-                                }}
                               >
-                                {UTILITY_SLOT_TEMPLATES.map((template) => (
-                                  <option key={template.kind} value={`utility:${template.kind}`}>
-                                    {template.label}
-                                  </option>
-                                ))}
-                                {state.pieces.map((piece) => (
-                                  <option key={piece.id} value={`piece:${piece.id}`}>
-                                    {piece.title}
-                                  </option>
-                                ))}
-                              </select>
+                                <input
+                                  className="plan-slot-title-input"
+                                  aria-label="表示文字を編集"
+                                  title="表示文字を編集"
+                                  value={slot.customTitle ?? slotLabel}
+                                  onChange={(event) => updateSlotTitle(slot.id, event.target.value)}
+                                  onFocus={() => setSelectedSlotId(slot.id)}
+                                />
+                                <select
+                                  className="plan-slot-content-select"
+                                  aria-label="曲・内容を選択"
+                                  title="曲・内容を選択"
+                                  value={getSlotContentValue(slot)}
+                                  onChange={(event) => {
+                                    updateSlotContent(slot.id, event.target.value);
+                                    setSelectedSlotId(slot.id);
+                                  }}
+                                >
+                                  {UTILITY_SLOT_TEMPLATES.map((template) => (
+                                    <option key={template.kind} value={`utility:${template.kind}`}>
+                                      {template.label}
+                                    </option>
+                                  ))}
+                                  {state.pieces.map((piece) => (
+                                    <option key={piece.id} value={`piece:${piece.id}`}>
+                                      {piece.title}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
                               {attendanceCount !== null ? <span className="plan-slot-attendance">{attendanceCount}人</span> : null}
                             </div>
                             <div className="plan-slot-badges">
@@ -727,6 +743,13 @@ export function AdminApp() {
                     </span>
                   </div>
                   <div className="plan-detail-grid">
+                    <label>
+                      表示文字
+                      <input
+                        value={selectedSlot.customTitle ?? getSlotLabel(selectedSlot)}
+                        onChange={(event) => updateSlotTitle(selectedSlot.id, event.target.value)}
+                      />
+                    </label>
                     <label>
                       内容・曲
                       <select
