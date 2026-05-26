@@ -364,6 +364,8 @@ export function PlayerApp() {
 
       {selected ? (
         <>
+          {hasUsablePassword || selectedIsReady ? (
+            <>
           <section className="panel stack">
             <div className="row page-section-head">
               <div>
@@ -452,6 +454,9 @@ export function PlayerApp() {
             )}
           </section>
 
+            </>
+          ) : null}
+
           <section className="panel stack">
             <h2>{hasUsablePassword ? "パスワードを入力" : "パスワードを設定"}</h2>
             <p className="muted">{hasUsablePassword ? "入力済みの日を確認・修正するときはパスワードを入力してください。" : "初回のみ、確認のため同じパスワードを2回入力してください。"}</p>
@@ -486,7 +491,73 @@ export function PlayerApp() {
                 </button>
               </>
             ) : (
-              <p className="notice">パスワード確認済みです。</p>
+              <>
+          <section id="my-availability" className="panel stack">
+            <h2>{selected.name} の参加可能時間表</h2>
+                <div className="availability-wrap">
+                  <table className="availability-table player-availability-table">
+                    <thead>
+                      <tr>
+                        <th>練習日</th>
+                        {AVAILABILITY_SLOTS.map((minutes) => (
+                          <th key={minutes}>{minutes % 60 === 0 ? toTime(minutes) : ""}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedPracticeDays.map((day) => {
+                        const draft = draftsByDay[day.id];
+                        const hasSaved = day.respondedMemberIds.includes(selected.id);
+                        const isAbsent = hasSaved && day.absentMemberIds.includes(selected.id);
+                        const label = draft
+                          ? hasSaved
+                            ? draft.absent
+                              ? "欠席"
+                              : `${draft.start}-${draft.end}`
+                            : "未入力"
+                          : "未入力";
+
+                        return (
+                          <tr key={day.id}>
+                            <th>
+                              {day.practiceDate}
+                              <span className="muted">
+                                練習 {formatPracticeTimeAndLocation(day)} / 入力状況 {label}
+                              </span>
+                            </th>
+                            {AVAILABILITY_SLOTS.map((minutes, index) => {
+                              const previousMinutes = AVAILABILITY_SLOTS[index - 1];
+                              const nextMinutes = AVAILABILITY_SLOTS[index + 1];
+                              const isPractice = isPracticeSlot(day.id, minutes);
+                              const isAvailable = isMemberAvailableAtSlot(day.id, minutes);
+                              const isPreviousPractice = previousMinutes !== undefined && isPracticeSlot(day.id, previousMinutes);
+                              const isNextPractice = nextMinutes !== undefined && isPracticeSlot(day.id, nextMinutes);
+                              const classNames = [
+                                minutes % 60 === 0 ? "hour-divider-cell" : "",
+                                isPractice ? "practice-window-cell" : "",
+                                isPractice && !isPreviousPractice ? "practice-start-cell" : "",
+                                isPractice && !isNextPractice ? "practice-end-cell" : "",
+                                isPractice && isAbsent ? "absent-cell" : "",
+                                isAvailable ? "available-cell" : ""
+                              ]
+                                .filter(Boolean)
+                                .join(" ");
+
+                              return <td key={`${day.id}-${minutes}`} className={classNames} />;
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="legend-row">
+                  <span className="legend-chip practice">青枠: 練習時間</span>
+                  <span className="legend-chip available">緑: 出席する時間</span>
+                </div>
+
+          </section>
+              </>
             )}
           </section>
 
