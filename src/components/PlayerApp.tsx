@@ -416,13 +416,34 @@ export function PlayerApp() {
     const day = sortedPracticeDays.find((item) => item.id === dayId);
     if (!day || !day.respondedMemberIds.includes(selected.id)) return false;
 
-    const draft = draftsByDay[dayId];
-    if (!draft || draft.absent) return false;
+    if (day.absentMemberIds.includes(selected.id)) return false;
+    const savedAvailability = day.availabilities.find((item) => item.memberId === selected.id);
+    if (!savedAvailability) return false;
 
     const slotEnd = slotStart + 10;
-    return getAvailableSegments(draft).some((segment) => segment.start < slotEnd && slotStart < segment.end);
+    return getAvailableSegments(savedAvailability).some((segment) => segment.start < slotEnd && slotStart < segment.end);
   }
 
+  function normalizeBreaksForCompare(breaks: Array<{ start: string; end: string }>) {
+    return [...breaks].sort((a, b) => toMinutes(a.start) - toMinutes(b.start) || toMinutes(a.end) - toMinutes(b.end));
+  }
+
+  function hasUnsavedAvailabilityChanges(day: LocalPracticeDay, draft: DraftByDay[string]) {
+    const hasSaved = !!selected && day.respondedMemberIds.includes(selected.id);
+    const savedIsAbsent = !!selected && hasSaved && day.absentMemberIds.includes(selected.id);
+    if (draft.absent !== savedIsAbsent) return true;
+    if (draft.absent) return false;
+
+    const savedAvailability = selected ? day.availabilities.find((item) => item.memberId === selected.id) : null;
+    if (!savedAvailability) return hasSaved;
+    if (draft.start !== savedAvailability.start || draft.end !== savedAvailability.end) return true;
+
+    const draftBreaks = normalizeBreaksForCompare(draft.breaks);
+    const savedBreaks = normalizeBreaksForCompare(savedAvailability.breaks);
+    if (draftBreaks.length !== savedBreaks.length) return true;
+
+    return draftBreaks.some((item, index) => item.start !== savedBreaks[index].start || item.end !== savedBreaks[index].end);
+  }
   function getCalendarAvailability(day: LocalPracticeDay) {
     if (!selected || !day.respondedMemberIds.includes(selected.id) || day.absentMemberIds.includes(selected.id)) return null;
     const savedAvailability = day.availabilities.find((item) => item.memberId === selected.id);
@@ -436,6 +457,7 @@ export function PlayerApp() {
 
   const currentDraft = selectedInputDay ? draftsByDay[selectedInputDay.id] : null;
   const currentCalendarAvailability = selectedInputDay ? getCalendarAvailability(selectedInputDay) : null;
+  const hasCurrentUnsavedChanges = !!selectedInputDay && !!currentDraft && hasUnsavedAvailabilityChanges(selectedInputDay, currentDraft);
   const currentTimeOptions = selectedInputDay ? buildTimeOptions(selectedInputDay.startTime, selectedInputDay.endTime) : [];
 
   return (
@@ -506,6 +528,7 @@ export function PlayerApp() {
             {selectedInputDayNeedsResponse ? <p className="error">この練習日はまだ入力していません。</p> : null}
 
             {saveMessage ? <div className="notice">{saveMessage}</div> : null}
+            {hasCurrentUnsavedChanges ? <div className="notice">???????????</div> : null}
 
             {selectedInputDay && currentDraft ? (
               <section className="panel subtle-panel stack">
@@ -659,18 +682,18 @@ export function PlayerApp() {
                     </thead>
                     <tbody>
                       {sortedPracticeDays.map((day) => {
-                        const draft = draftsByDay[day.id];
+                        const savedAvailability = day.availabilities.find((item) => item.memberId === selected.id);
                         const hasSaved = day.respondedMemberIds.includes(selected.id);
                         const isAbsent = hasSaved && day.absentMemberIds.includes(selected.id);
-                        const label = draft
-                          ? hasSaved
-                            ? draft.absent
-                              ? "欠席"
-                              : draft.breaks.length > 0
-                                ? `${draft.start}-${draft.end} / ${"\u4e2d\u629c\u3051"} ${draft.breaks.length}${"\u4ef6"}`
-                                : `${draft.start}-${draft.end}`
-                            : "未入力"
-                          : "未入力";
+                        const label = hasSaved
+                          ? isAbsent
+                            ? "??"
+                            : savedAvailability
+                              ? savedAvailability.breaks.length > 0
+                                ? `${savedAvailability.start}-${savedAvailability.end} / ${"\u4e2d\u629c\u3051"} ${savedAvailability.breaks.length}${"\u4ef6"}`
+                                : `${savedAvailability.start}-${savedAvailability.end}`
+                              : "???"
+                          : "???";
 
                         return (
                           <tr key={day.id}>
