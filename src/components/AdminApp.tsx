@@ -50,9 +50,9 @@ const UTILITY_SLOT_TEMPLATES: Array<{
   defaultMinutes: number;
   reason: string;
 }> = [
-  { kind: "setup", label: "合奏準備", defaultMinutes: 5, reason: "合奏準備として手動追加した枠です。" },
+  { kind: "setup", label: "合奏準備", defaultMinutes: 30, reason: "合奏準備として手動追加した枠です。" },
   { kind: "break", label: "休憩", defaultMinutes: 5, reason: "休憩として手動追加した枠です。" },
-  { kind: "cleanup", label: "片付け", defaultMinutes: 5, reason: "片付けとして手動追加した枠です。" }
+  { kind: "cleanup", label: "片付け", defaultMinutes: 30, reason: "片付けとして手動追加した枠です。" }
 ];
 
 function formatMinutesLabel(minutes: number) {
