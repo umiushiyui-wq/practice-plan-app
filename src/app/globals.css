@@ -1385,6 +1385,25 @@ tbody tr:hover td {
     padding: 18px;
   }
 
+  .player-page .panel,
+  .player-page .subtle-panel,
+  .player-page .row,
+  .player-page .page-section-head,
+  .player-page .compact-field,
+  .player-page .grid,
+  .player-page .time-parts {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .player-page .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .player-page .compact-field {
+    width: 100%;
+  }
+
   .player-page input,
   .player-page select,
   .player-page textarea,
@@ -1395,6 +1414,7 @@ tbody tr:hover td {
 
   .player-page .availability-wrap {
     max-width: 100%;
+    min-width: 0;
   }
 
   .player-selector-panel select {
