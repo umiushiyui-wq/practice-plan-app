@@ -471,12 +471,22 @@ export function PlayerApp() {
                       {localState.saveStatus === "saving" ? "保存中" : "この日の入力を保存"}
                     </button>
                   ) : null}
-                  {currentCalendarAvailability ? (
-                    <button type="button" className="secondary" onClick={() => downloadCalendarEvent(selectedInputDay, currentCalendarAvailability)}>
+                </div>
+
+                {selectedIsReady ? (
+                  <div className="calendar-add-row">
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => {
+                        if (currentCalendarAvailability) downloadCalendarEvent(selectedInputDay, currentCalendarAvailability);
+                      }}
+                      disabled={!currentCalendarAvailability}
+                    >
                       {"\u30ab\u30ec\u30f3\u30c0\u30fc\u306b\u8ffd\u52a0"}
                     </button>
-                  ) : null}
-                </div>
+                  </div>
+                ) : null}
 
                 {canEditSelectedDay ? (
                   <>
@@ -587,19 +597,6 @@ export function PlayerApp() {
                               <span className="muted">
                                 練習 {formatPracticeTimeAndLocation(day)} / 入力状況 {label}
                               </span>
-                              {(() => {
-                                const calendarAvailability = getCalendarAvailability(day);
-
-                                return calendarAvailability ? (
-                                  <button
-                                    type="button"
-                                    className="secondary calendar-add-button"
-                                    onClick={() => downloadCalendarEvent(day, calendarAvailability)}
-                                  >
-                                    {"\u30ab\u30ec\u30f3\u30c0\u30fc\u306b\u8ffd\u52a0"}
-                                  </button>
-                                ) : null;
-                              })()}
                             </th>
                             {AVAILABILITY_SLOTS.map((minutes, index) => {
                               const previousMinutes = AVAILABILITY_SLOTS[index - 1];

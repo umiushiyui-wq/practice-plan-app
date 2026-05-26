@@ -1421,3 +1421,16 @@ tbody tr:hover td {
     max-width: none;
   }
 }
+
+button:disabled,
+button:disabled:hover {
+  opacity: 0.42;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.calendar-add-row {
+  display: grid;
+  justify-items: start;
+}
