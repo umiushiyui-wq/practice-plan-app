@@ -120,8 +120,6 @@ export function PlayerApp() {
   const [memberId, setMemberId] = useState("");
   const [memberPassword, setMemberPassword] = useState("");
   const [memberPasswordConfirmation, setMemberPasswordConfirmation] = useState("");
-  const [availabilityPassword, setAvailabilityPassword] = useState("");
-  const [availabilityTableUnlocked, setAvailabilityTableUnlocked] = useState(false);
   const [authenticatedMemberId, setAuthenticatedMemberId] = useState("");
   const [selectedInputDayId, setSelectedInputDayId] = useState("");
   const [draftsByDay, setDraftsByDay] = useState<DraftByDay>({});
@@ -143,9 +141,10 @@ export function PlayerApp() {
   const canContinueWithPassword = hasUsablePassword
     ? !!selected && !!memberPassword.trim()
     : !!selected && !!memberPassword.trim() && !!memberPasswordConfirmation.trim() && passwordInputsMatch;
-  const canViewAvailabilityTable = selectedIsReady && availabilityTableUnlocked;
+  const selectedDayHasSavedInput =
+    !!selectedInputDay && !!selected && selectedInputDay.respondedMemberIds.includes(selected.id);
   const selectedInputDayNeedsResponse = !!selectedInputDay && !!selected && !selectedInputDay.respondedMemberIds.includes(selected.id);
-  const canEditSelectedDay = selectedIsReady;
+  const canEditSelectedDay = !!selected && (!selectedDayHasSavedInput || selectedIsReady);
   const hasUnsubmittedPracticeDays =
     !!selected && sortedPracticeDays.some((day) => !day.respondedMemberIds.includes(selected.id));
 
@@ -157,6 +156,7 @@ export function PlayerApp() {
 
   useEffect(() => {
     setMemberPassword("");
+    setMemberPasswordConfirmation("");
     setAuthenticatedMemberId("");
     setAuthError("");
   }, [memberId]);
@@ -291,29 +291,8 @@ export function PlayerApp() {
     }
 
     setAuthenticatedMemberId(selected.id);
-    setAvailabilityTableUnlocked(false);
-    setAvailabilityPassword("");
     setAuthError("");
     setSaveMessage("");
-  }
-
-  function unlockAvailabilityTable() {
-    if (!selected) return;
-
-    const currentPassword = selected.password && selected.password !== "__unset__" ? selected.password : memberPassword;
-    if (!availabilityPassword.trim()) {
-      setAuthError("パスワードを入力してください。");
-      return;
-    }
-
-    if (availabilityPassword !== currentPassword) {
-      setAuthError("パスワードが違います。");
-      return;
-    }
-
-    setAvailabilityTableUnlocked(true);
-    setAvailabilityPassword("");
-    setAuthError("");
   }
 
   function isPracticeSlot(dayId: string, slotStart: number) {
@@ -385,60 +364,6 @@ export function PlayerApp() {
 
       {selected ? (
         <>
-          {!selectedIsReady ? (
-            <>
-          <section className="panel stack">
-            <h2>自分が出る曲</h2>
-            {state.pieces.length === 0 ? <p className="muted">まだ曲が登録されていません。</p> : null}
-            {state.pieces.map((piece) => (
-              <label className="row" key={piece.id}>
-                <input
-                  style={{ width: "auto" }}
-                  type="checkbox"
-                  checked={piece.memberIds.includes(selected.id)}
-                  onChange={(event) => togglePiece(piece.id, event.target.checked)}
-                />
-                {piece.title}
-              </label>
-            ))}
-          </section>
-
-          {!selectedIsReady ? (
-            <section className="panel stack">
-              <h2>{hasUsablePassword ? "パスワードを入力" : "パスワードを設定"}</h2>
-              <p className="muted">{hasUsablePassword ? "設定済みのパスワードを入力してください。" : "確認のため同じパスワードを2回入力してください。"}</p>
-              <input
-                type="password"
-                value={memberPassword}
-                onChange={(event) => {
-                  setMemberPassword(event.target.value);
-                  setAuthError("");
-                }}
-                placeholder="パスワード"
-              />
-              {!hasUsablePassword ? (
-                <input
-                  type="password"
-                  value={memberPasswordConfirmation}
-                  onChange={(event) => {
-                    setMemberPasswordConfirmation(event.target.value);
-                    setAuthError("");
-                  }}
-                  placeholder="パスワードをもう一度"
-                />
-              ) : null}
-              {!hasUsablePassword && memberPassword && memberPasswordConfirmation && !passwordInputsMatch ? (
-                <p className="error">パスワードが一致していません。</p>
-              ) : null}
-              {authError ? <p className="error">{authError}</p> : null}
-              <button type="button" onClick={handlePasswordContinue} disabled={!canContinueWithPassword}>
-                {hasUsablePassword ? "入力へ進む" : "保存して入力へ進む"}
-              </button>
-            </section>
-          ) : null}
-            </>
-          ) : (
-            <>
           <section className="panel stack">
             <div className="row page-section-head">
               <div>
@@ -527,92 +452,43 @@ export function PlayerApp() {
             )}
           </section>
 
-          <section id="my-availability" className="panel stack">
-            <h2>{selected.name} の参加可能時間表</h2>
-            {canViewAvailabilityTable ? (
+          <section className="panel stack">
+            <h2>{hasUsablePassword ? "パスワードを入力" : "パスワードを設定"}</h2>
+            <p className="muted">{hasUsablePassword ? "入力済みの日を確認・修正するときはパスワードを入力してください。" : "初回のみ、確認のため同じパスワードを2回入力してください。"}</p>
+            {!selectedIsReady ? (
               <>
-                <div className="availability-wrap">
-                  <table className="availability-table player-availability-table">
-                    <thead>
-                      <tr>
-                        <th>練習日</th>
-                        {AVAILABILITY_SLOTS.map((minutes) => (
-                          <th key={minutes}>{minutes % 60 === 0 ? toTime(minutes) : ""}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sortedPracticeDays.map((day) => {
-                        const draft = draftsByDay[day.id];
-                        const hasSaved = day.respondedMemberIds.includes(selected.id);
-                        const isAbsent = hasSaved && day.absentMemberIds.includes(selected.id);
-                        const label = draft
-                          ? hasSaved
-                            ? draft.absent
-                              ? "欠席"
-                              : `${draft.start}-${draft.end}`
-                            : "未入力"
-                          : "未入力";
-
-                        return (
-                          <tr key={day.id}>
-                            <th>
-                              {day.practiceDate}
-                              <span className="muted">
-                                練習 {formatPracticeTimeAndLocation(day)} / 入力状況 {label}
-                              </span>
-                            </th>
-                            {AVAILABILITY_SLOTS.map((minutes, index) => {
-                              const previousMinutes = AVAILABILITY_SLOTS[index - 1];
-                              const nextMinutes = AVAILABILITY_SLOTS[index + 1];
-                              const isPractice = isPracticeSlot(day.id, minutes);
-                              const isAvailable = isMemberAvailableAtSlot(day.id, minutes);
-                              const isPreviousPractice = previousMinutes !== undefined && isPracticeSlot(day.id, previousMinutes);
-                              const isNextPractice = nextMinutes !== undefined && isPracticeSlot(day.id, nextMinutes);
-                              const classNames = [
-                                minutes % 60 === 0 ? "hour-divider-cell" : "",
-                                isPractice ? "practice-window-cell" : "",
-                                isPractice && !isPreviousPractice ? "practice-start-cell" : "",
-                                isPractice && !isNextPractice ? "practice-end-cell" : "",
-                                isPractice && isAbsent ? "absent-cell" : "",
-                                isAvailable ? "available-cell" : ""
-                              ]
-                                .filter(Boolean)
-                                .join(" ");
-
-                              return <td key={`${day.id}-${minutes}`} className={classNames} />;
-                            })}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="legend-row">
-                  <span className="legend-chip practice">青枠: 練習時間</span>
-                  <span className="legend-chip available">緑: 出席する時間</span>
-                </div>
-              </>
-            ) : (
-              <div className="stack">
-                <p className="muted">開くにはパスワードが必要です。</p>
                 <input
                   type="password"
-                  value={availabilityPassword}
+                  value={memberPassword}
                   onChange={(event) => {
-                    setAvailabilityPassword(event.target.value);
+                    setMemberPassword(event.target.value);
                     setAuthError("");
                   }}
                   placeholder="パスワード"
                 />
+                {!hasUsablePassword ? (
+                  <input
+                    type="password"
+                    value={memberPasswordConfirmation}
+                    onChange={(event) => {
+                      setMemberPasswordConfirmation(event.target.value);
+                      setAuthError("");
+                    }}
+                    placeholder="パスワードをもう一度"
+                  />
+                ) : null}
+                {!hasUsablePassword && memberPassword && memberPasswordConfirmation && !passwordInputsMatch ? (
+                  <p className="error">パスワードが一致していません。</p>
+                ) : null}
                 {authError ? <p className="error">{authError}</p> : null}
-                <button type="button" onClick={unlockAvailabilityTable} disabled={!availabilityPassword.trim()}>
-                  表示する
+                <button type="button" onClick={handlePasswordContinue} disabled={!canContinueWithPassword}>
+                  {hasUsablePassword ? "確認する" : "保存する"}
                 </button>
-              </div>
+              </>
+            ) : (
+              <p className="notice">パスワード確認済みです。</p>
             )}
           </section>
-
 
           <section className="panel stack">
             <h2>自分が出る曲</h2>
@@ -629,8 +505,6 @@ export function PlayerApp() {
               </label>
             ))}
           </section>
-            </>
-          )}
         </>
       ) : (
         <section className="panel stack">
