@@ -1334,10 +1334,13 @@ tbody tr:hover td {
 
 .player-page {
   width: min(980px, calc(100% - 32px));
+  max-width: calc(100vw - 20px);
+  overflow-x: hidden;
 }
 
 .player-page > .panel {
   border-color: #d5e2e8;
+  min-width: 0;
 }
 
 .player-hero {
@@ -1374,11 +1377,24 @@ tbody tr:hover td {
 
 @media (max-width: 720px) {
   .player-page {
-    width: 100%;
+    width: calc(100vw - 20px);
+    max-width: calc(100vw - 20px);
   }
 
   .player-hero {
     padding: 18px;
+  }
+
+  .player-page input,
+  .player-page select,
+  .player-page textarea,
+  .player-page button,
+  .player-page .button {
+    max-width: 100%;
+  }
+
+  .player-page .availability-wrap {
+    max-width: 100%;
   }
 
   .player-selector-panel select {
