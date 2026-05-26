@@ -10,17 +10,23 @@ type StoredLocalState = {
   updatedAt: string;
 };
 
+type AvailabilityBreak = {
+  start: string;
+  end: string;
+};
+
 type AvailabilityPatch = {
   practiceDayId: string;
   memberId: string;
   start: string;
   end: string;
+  breaks: AvailabilityBreak[];
   absent: boolean;
 };
 
 type PracticeDayLike = {
   id?: unknown;
-  availabilities?: Array<{ memberId?: unknown; start?: unknown; end?: unknown }>;
+  availabilities?: Array<{ memberId?: unknown; start?: unknown; end?: unknown; breaks?: unknown }>;
   absentMemberIds?: unknown[];
   respondedMemberIds?: unknown[];
   [key: string]: unknown;
@@ -164,6 +170,13 @@ function parsePatch(value: unknown): AvailabilityPatch | null {
     memberId: candidate.memberId,
     start: typeof candidate.start === "string" ? candidate.start : "",
     end: typeof candidate.end === "string" ? candidate.end : "",
+    breaks: Array.isArray(candidate.breaks)
+      ? candidate.breaks
+          .filter((item): item is AvailabilityBreak => {
+            return !!item && typeof item === "object" && typeof item.start === "string" && typeof item.end === "string";
+          })
+          .map((item) => ({ start: item.start, end: item.end }))
+      : [],
     absent: candidate.absent
   };
 }
@@ -191,7 +204,7 @@ function patchAvailability(state: unknown, patch: AvailabilityPatch) {
         ? availabilities.filter((item) => item.memberId !== patch.memberId)
         : [
             ...availabilities.filter((item) => item.memberId !== patch.memberId),
-            { memberId: patch.memberId, start: patch.start, end: patch.end }
+            { memberId: patch.memberId, start: patch.start, end: patch.end, breaks: patch.breaks }
           ],
       absentMemberIds: patch.absent
         ? Array.from(new Set([...absentMemberIds, patch.memberId]))

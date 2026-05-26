@@ -9,6 +9,7 @@ import {
   getSelectedPracticeDay,
   getSortedPracticeDays,
   getSortedInstrumentOptions,
+  isAvailable,
   LocalStateStatusPanel,
   toMinutes,
   toTime,
@@ -57,13 +58,7 @@ export function AvailabilityTableApp() {
       return false;
     }
 
-    const slotEnd = slotStart + 10;
-    return selectedDay.availabilities.some((availability) => {
-      if (availability.memberId !== memberId) return false;
-      const availabilityStart = toMinutes(availability.start);
-      const availabilityEnd = toMinutes(availability.end);
-      return availabilityStart < slotEnd && slotStart < availabilityEnd;
-    });
+    return isAvailable(selectedDay.availabilities, memberId, slotStart, slotStart + 10);
   }
 
   function isMemberHighlighted(memberId: string) {
@@ -177,7 +172,9 @@ export function AvailabilityTableApp() {
                 const availabilityLabel = isAbsent
                   ? "欠席"
                   : availability
-                    ? `${availability.start}-${availability.end}`
+                    ? availability.breaks.length > 0
+                      ? `${availability.start}-${availability.end} / ${"\u4e2d\u629c\u3051"} ${availability.breaks.length}${"\u4ef6"}`
+                      : `${availability.start}-${availability.end}`
                     : hasSaved
                       ? "未入力"
                       : "未回答";

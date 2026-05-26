@@ -1434,3 +1434,20 @@ button:disabled:hover {
   display: grid;
   justify-items: start;
 }
+
+.break-list {
+  gap: 10px;
+}
+
+.break-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+@media (max-width: 720px) {
+  .break-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

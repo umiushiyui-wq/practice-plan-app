@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
+  getAvailableSegments,
   getPracticeDayLabel,
   getSelectedPracticeDay,
   getSortedPracticeDays,
@@ -66,7 +67,7 @@ export function ColorMapApp() {
       if (!respondedMemberIds.has(availability.memberId) || absentMemberIds.has(availability.memberId)) continue;
 
       const windows = availabilityMap.get(availability.memberId) ?? [];
-      windows.push({ start: toMinutes(availability.start), end: toMinutes(availability.end) });
+      windows.push(...getAvailableSegments(availability));
       availabilityMap.set(availability.memberId, windows);
     }
 

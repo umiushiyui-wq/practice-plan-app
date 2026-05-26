@@ -70,10 +70,16 @@ export type Piece = {
   targetRangeEndDayId: string | null;
 };
 
+export type AvailabilityBreak = {
+  start: string;
+  end: string;
+};
+
 export type Availability = {
   memberId: string;
   start: string;
   end: string;
+  breaks: AvailabilityBreak[];
 };
 
 export type PlanSlot = {
@@ -115,6 +121,7 @@ export type AvailabilityPatch = {
   memberId: string;
   start: string;
   end: string;
+  breaks: AvailabilityBreak[];
   absent: boolean;
 };
 
@@ -132,9 +139,22 @@ type LegacyAppState = Partial<AppState> & {
   practiceDate?: string;
   startTime?: string;
   endTime?: string;
-  availabilities?: Availability[];
+  availabilities?: Array<Partial<Availability> & { memberId?: string; start?: string; end?: string }>;
   plan?: PlanSlot[];
 };
+
+function normalizeAvailability(value: Partial<Availability> & { memberId?: string; start?: string; end?: string }): Availability {
+  return {
+    memberId: value.memberId ?? "",
+    start: value.start ?? "",
+    end: value.end ?? "",
+    breaks: Array.isArray(value.breaks)
+      ? value.breaks
+          .filter((item): item is AvailabilityBreak => !!item && typeof item.start === "string" && typeof item.end === "string")
+          .map((item) => ({ start: item.start, end: item.end }))
+      : []
+  };
+}
 
 const STORAGE_KEY = "nagosui-local-practice-app-v3";
 const LEGACY_STORAGE_KEY = "nagosui-local-practice-app-v2";
@@ -219,7 +239,8 @@ function migrateState(value: unknown): AppState {
         location: typeof day.location === "string" ? day.location : "",
         absentMemberIds: day.absentMemberIds ?? [],
         respondedMemberIds: day.respondedMemberIds ?? [],
-        isPlanPublished: typeof day.isPlanPublished === "boolean" ? day.isPlanPublished : false
+        isPlanPublished: typeof day.isPlanPublished === "boolean" ? day.isPlanPublished : false,
+        availabilities: Array.isArray(day.availabilities) ? day.availabilities.map(normalizeAvailability) : []
       })),
       selectedPracticeDayId: saved.selectedPracticeDayId ?? saved.practiceDays[0].id
     };
@@ -231,7 +252,7 @@ function migrateState(value: unknown): AppState {
     location: "",
     startTime: saved.startTime ?? defaultDay.startTime,
     endTime: saved.endTime ?? defaultDay.endTime,
-    availabilities: saved.availabilities ?? defaultDay.availabilities,
+    availabilities: Array.isArray(saved.availabilities) ? saved.availabilities.map(normalizeAvailability) : defaultDay.availabilities,
     absentMemberIds: [],
     respondedMemberIds: [],
     isPlanPublished: false,
@@ -644,9 +665,30 @@ export function getPlanSlotLabel(slot: PlanSlot, pieceTitle?: string) {
   return "休憩";
 }
 
+export function getAvailableSegments(availability: Pick<Availability, "start" | "end" | "breaks">) {
+  const start = toMinutes(availability.start);
+  const end = toMinutes(availability.end);
+  if (start >= end) return [];
+
+  const normalizedBreaks = availability.breaks
+    .map((item) => ({ start: Math.max(start, toMinutes(item.start)), end: Math.min(end, toMinutes(item.end)) }))
+    .filter((item) => item.start < item.end)
+    .sort((a, b) => a.start - b.start || a.end - b.end);
+  const segments: Array<{ start: number; end: number }> = [];
+  let cursor = start;
+
+  for (const breakRange of normalizedBreaks) {
+    if (cursor < breakRange.start) segments.push({ start: cursor, end: breakRange.start });
+    cursor = Math.max(cursor, breakRange.end);
+  }
+
+  if (cursor < end) segments.push({ start: cursor, end });
+  return segments;
+}
+
 export function isAvailable(availabilities: Availability[], memberId: string, start: number, end: number) {
   return availabilities.some(
-    (item) => item.memberId === memberId && toMinutes(item.start) <= start && toMinutes(item.end) >= end
+    (item) => item.memberId === memberId && getAvailableSegments(item).some((segment) => segment.start <= start && segment.end >= end)
   );
 }
 

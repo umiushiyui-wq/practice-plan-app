@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   compareMembersByInstrument,
+  getAvailableSegments,
   getInstrumentLabel,
   getPracticeDayLabel,
   getSortedInstrumentOptions,
@@ -21,6 +22,7 @@ type DraftByDay = Record<
   {
     start: string;
     end: string;
+    breaks: Array<{ start: string; end: string }>;
     absent: boolean;
   }
 >;
@@ -222,6 +224,7 @@ export function PlayerApp() {
           {
             start: savedAvailability?.start ?? day.startTime,
             end: savedAvailability?.end ?? day.endTime,
+            breaks: savedAvailability?.breaks ?? [],
             absent: hasSaved ? isAbsent : false
           }
         ];
@@ -258,6 +261,53 @@ export function PlayerApp() {
     }));
   }
 
+  function addBreak(dayId: string) {
+    const draft = draftsByDay[dayId];
+    if (!draft) return;
+
+    const startMinutes = toMinutes(draft.start);
+    const endMinutes = toMinutes(draft.end);
+    const breakStart = Math.min(startMinutes + 10, Math.max(startMinutes, endMinutes - 10));
+    const breakEnd = Math.min(endMinutes, breakStart + 10);
+
+    updateDayDraft(dayId, {
+      breaks: [...draft.breaks, { start: toTime(breakStart), end: toTime(breakEnd) }]
+    });
+  }
+
+  function updateBreak(dayId: string, index: number, patch: Partial<{ start: string; end: string }>) {
+    const draft = draftsByDay[dayId];
+    if (!draft) return;
+
+    updateDayDraft(dayId, {
+      breaks: draft.breaks.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item))
+    });
+  }
+
+  function removeBreak(dayId: string, index: number) {
+    const draft = draftsByDay[dayId];
+    if (!draft) return;
+
+    updateDayDraft(dayId, {
+      breaks: draft.breaks.filter((_, itemIndex) => itemIndex !== index)
+    });
+  }
+
+  function getBreakValidationError(draft: DraftByDay[string]) {
+    const attendanceStart = toMinutes(draft.start);
+    const attendanceEnd = toMinutes(draft.end);
+    if (!draft.absent && attendanceStart >= attendanceEnd) return "\u958b\u59cb\u6642\u9593\u306f\u7d42\u4e86\u6642\u9593\u3088\u308a\u524d\u306b\u3057\u3066\u304f\u3060\u3055\u3044\u3002";
+
+    for (const breakRange of draft.breaks) {
+      const breakStart = toMinutes(breakRange.start);
+      const breakEnd = toMinutes(breakRange.end);
+      if (breakStart >= breakEnd) return "\u4e2d\u629c\u3051\u306e\u958b\u59cb\u6642\u9593\u306f\u7d42\u4e86\u6642\u9593\u3088\u308a\u524d\u306b\u3057\u3066\u304f\u3060\u3055\u3044\u3002";
+      if (breakStart < attendanceStart || breakEnd > attendanceEnd) return "\u4e2d\u629c\u3051\u306f\u51fa\u5e2d\u6642\u9593\u306e\u4e2d\u306b\u53ce\u3081\u3066\u304f\u3060\u3055\u3044\u3002";
+    }
+
+    return "";
+  }
+
   async function saveAvailability(dayId: string) {
     if (!selected) return;
 
@@ -265,11 +315,18 @@ export function PlayerApp() {
     const draft = draftsByDay[dayId];
     if (!day || !draft) return;
 
+    const validationError = getBreakValidationError(draft);
+    if (validationError) {
+      setSaveMessage(validationError);
+      return;
+    }
+
     const savedState = await localState.saveAvailabilityPatch({
       practiceDayId: dayId,
       memberId: selected.id,
       start: draft.start,
       end: draft.end,
+      breaks: draft.breaks,
       absent: draft.absent
     });
 
@@ -363,10 +420,7 @@ export function PlayerApp() {
     if (!draft || draft.absent) return false;
 
     const slotEnd = slotStart + 10;
-    const availabilityStart = toMinutes(draft.start);
-    const availabilityEnd = toMinutes(draft.end);
-
-    return availabilityStart < slotEnd && slotStart < availabilityEnd;
+    return getAvailableSegments(draft).some((segment) => segment.start < slotEnd && slotStart < segment.end);
   }
 
   function getCalendarAvailability(day: LocalPracticeDay) {
@@ -516,6 +570,32 @@ export function PlayerApp() {
                         onChange={(value) => updateDayDraft(selectedInputDay.id, { end: value })}
                       />
                     </div>
+                    <div className="break-list stack">
+                      {currentDraft.breaks.map((breakRange, index) => (
+                        <div className="break-row" key={`${selectedInputDay.id}-break-${index}`}>
+                          <TimePartSelect
+                            label={"\u4e2d\u629c\u3051\u958b\u59cb"}
+                            value={breakRange.start}
+                            options={currentTimeOptions}
+                            disabled={currentDraft.absent}
+                            onChange={(value) => updateBreak(selectedInputDay.id, index, { start: value })}
+                          />
+                          <TimePartSelect
+                            label={"\u4e2d\u629c\u3051\u7d42\u4e86"}
+                            value={breakRange.end}
+                            options={currentTimeOptions}
+                            disabled={currentDraft.absent}
+                            onChange={(value) => updateBreak(selectedInputDay.id, index, { end: value })}
+                          />
+                          <button type="button" className="secondary" onClick={() => removeBreak(selectedInputDay.id, index)} disabled={currentDraft.absent}>
+                            {"\u524a\u9664"}
+                          </button>
+                        </div>
+                      ))}
+                      <button type="button" className="secondary" onClick={() => addBreak(selectedInputDay.id)} disabled={currentDraft.absent}>
+                        {"\u4e2d\u629c\u3051\u3092\u8ffd\u52a0"}
+                      </button>
+                    </div>
                   </>
                 ) : (
                   <p className="muted">この日はすでに入力済みです。内容を確認・編集するにはパスワードが必要です。</p>
@@ -586,7 +666,9 @@ export function PlayerApp() {
                           ? hasSaved
                             ? draft.absent
                               ? "欠席"
-                              : `${draft.start}-${draft.end}`
+                              : draft.breaks.length > 0
+                                ? `${draft.start}-${draft.end} / ${"\u4e2d\u629c\u3051"} ${draft.breaks.length}${"\u4ef6"}`
+                                : `${draft.start}-${draft.end}`
                             : "未入力"
                           : "未入力";
 
