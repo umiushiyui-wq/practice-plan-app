@@ -325,6 +325,54 @@ export function AdminApp() {
     setPlanMessage(`${getSlotLabel(nextSlot)} を ${nextSlot.start} から追加しました。`);
   }
 
+  function insertBreaksIntoOpenTimes() {
+    const template = getUtilityTemplate("break");
+    const occupiedRanges = sortPlanByTime(sortedPlan)
+      .map((slot) => ({
+        start: clampNumber(toMinutes(slot.start), practiceStartMinutes, practiceEndMinutes),
+        end: clampNumber(toMinutes(slot.end), practiceStartMinutes, practiceEndMinutes)
+      }))
+      .filter((range) => range.end > range.start);
+
+    const mergedRanges: Array<{ start: number; end: number }> = [];
+    for (const range of occupiedRanges) {
+      const previousRange = mergedRanges[mergedRanges.length - 1];
+      if (!previousRange || range.start > previousRange.end) {
+        mergedRanges.push({ ...range });
+      } else {
+        previousRange.end = Math.max(previousRange.end, range.end);
+      }
+    }
+
+    const gaps: Array<{ start: number; end: number }> = [];
+    for (let index = 1; index < mergedRanges.length; index += 1) {
+      const previousRange = mergedRanges[index - 1];
+      const currentRange = mergedRanges[index];
+      if (currentRange.start - previousRange.end >= MIN_SLOT_MINUTES) {
+        gaps.push({ start: previousRange.end, end: currentRange.start });
+      }
+    }
+
+    if (gaps.length === 0) {
+      setPlanMessage("休憩を入れられる空き時間はありません。");
+      return;
+    }
+
+    const breakSlots = gaps.map((gap) => ({
+      id: makeId("s"),
+      pieceId: null,
+      customTitle: template.label,
+      start: toTime(gap.start),
+      end: toTime(gap.end),
+      duration: gap.end - gap.start,
+      reason: template.reason
+    }));
+
+    updatePlan([...sortedPlan, ...breakSlots]);
+    setSelectedSlotId(breakSlots[0]?.id ?? null);
+    setPlanMessage(`休憩を${breakSlots.length}件追加しました。`);
+  }
+
   function writeDragPayload(event: DragEvent, payload: PaletteDragPayload | SlotDragPayload) {
     event.dataTransfer.effectAllowed = payload.type === "slot" ? "move" : "copy";
     event.dataTransfer.setData(DRAG_DATA_TYPE, JSON.stringify(payload));
@@ -553,6 +601,9 @@ export function AdminApp() {
                   </button>
                 ))}
               </div>
+              <button className="secondary plan-bulk-break-button" type="button" onClick={insertBreaksIntoOpenTimes}>
+                間に休憩を一括挿入
+              </button>
             </div>
           </aside>
 
