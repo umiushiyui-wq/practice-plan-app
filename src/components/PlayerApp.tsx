@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
+  compareMembersByInstrument,
+  getInstrumentLabel,
   getPracticeDayLabel,
+  getSortedInstrumentOptions,
   getSortedPracticeDays,
   toMinutes,
   toTime,
@@ -122,9 +125,11 @@ export function PlayerApp() {
   const [saveMessage, setSaveMessage] = useState("");
   const [authError, setAuthError] = useState("");
 
-  const partOptions = Array.from(new Set(state.members.map((member) => member.instrument || "未設定")));
+  const partOptions = getSortedInstrumentOptions(state.members.map((member) => member.instrument));
   const activePart = partOptions.includes(selectedPart) ? selectedPart : partOptions[0] ?? "";
-  const filteredMembers = state.members.filter((member) => (member.instrument || "未設定") === activePart);
+  const filteredMembers = [...state.members]
+    .sort(compareMembersByInstrument)
+    .filter((member) => getInstrumentLabel(member.instrument) === activePart);
   const selected = filteredMembers.find((member) => member.id === memberId) ?? null;
   const selectedInputDay = selected
     ? sortedPracticeDays.find((day) => day.id === selectedInputDayId) ?? sortedPracticeDays[0] ?? null

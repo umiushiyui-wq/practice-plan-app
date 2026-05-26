@@ -3,26 +3,18 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
+  compareMembersByInstrument,
+  getInstrumentLabel,
   getPlannedMinutesByPiece,
   getPracticeDayLabel,
   getSortedPracticeDays,
+  INSTRUMENT_OPTIONS,
   LocalStateStatusPanel,
   makeId,
   resolvePieceTargetRange,
   useLocalPracticeState
 } from "@/components/LocalPracticeApp";
 
-const INSTRUMENT_OPTIONS = [
-  "フルート",
-  "クラリネット",
-  "サックス",
-  "ホルン",
-  "トランペット",
-  "トロンボーン",
-  "ユーフォニアム",
-  "低音",
-  "パーカッション"
-];
 
 const SETUP_SECTIONS = [
   { id: "practice-days", label: "練習日の追加" },
@@ -378,12 +370,12 @@ export function MemberPieceManagerApp() {
             </summary>
             <div className="fold-panel-body stack">
               {state.members.length === 0 ? <p className="muted">まだ奏者は登録されていません。</p> : null}
-              {state.members.map((member) => (
+              {[...state.members].sort(compareMembersByInstrument).map((member) => (
                 <div className="row" key={member.id}>
                   <div>
                     <strong>{member.name}</strong>
                     <div className="muted">
-                      {member.instrument || "楽器未設定"}
+                      {getInstrumentLabel(member.instrument)}
                       {member.part ? ` / ${member.part}` : ""}
                     </div>
                     <div className="muted">{member.password && member.password !== "__unset__" ? "パスワード設定済み" : "初回ログイン時に設定"}</div>
@@ -524,7 +516,7 @@ export function MemberPieceManagerApp() {
               <option value="" disabled>
                 指揮者を選択
               </option>
-              {state.members.map((member) => (
+              {[...state.members].sort(compareMembersByInstrument).map((member) => (
                 <option key={member.id} value={member.id}>
                   {member.name}
                 </option>
@@ -610,7 +602,7 @@ export function MemberPieceManagerApp() {
                   指揮者
                   <select name="conductorId" defaultValue={selectedPiece.conductorId}>
                     <option value="">指揮者を選択</option>
-                    {state.members.map((member) => (
+                    {[...state.members].sort(compareMembersByInstrument).map((member) => (
                       <option key={member.id} value={member.id}>
                         {member.name}
                       </option>

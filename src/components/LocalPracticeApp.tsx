@@ -2,6 +2,55 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+export const INSTRUMENT_OPTIONS = [
+  "ふるぼえ",
+  "クラリネット",
+  "サックス",
+  "トランペット",
+  "トロンボーン",
+  "ホルン",
+  "ユーフォニアム",
+  "低音",
+  "パーカッション"
+];
+
+const INSTRUMENT_ALIASES: Record<string, string> = {
+  "フルート": "ふるぼえ"
+};
+
+export function normalizeInstrumentName(instrument: string) {
+  const trimmed = instrument.trim();
+  return INSTRUMENT_ALIASES[trimmed] ?? trimmed;
+}
+
+export function getInstrumentLabel(instrument: string) {
+  return normalizeInstrumentName(instrument) || "未設定";
+}
+
+export function getInstrumentSortIndex(instrument: string) {
+  const normalized = getInstrumentLabel(instrument);
+  const index = INSTRUMENT_OPTIONS.indexOf(normalized);
+  return index === -1 ? INSTRUMENT_OPTIONS.length : index;
+}
+
+export function getSortedInstrumentOptions(instruments: string[]) {
+  const options = new Set(INSTRUMENT_OPTIONS);
+
+  for (const instrument of instruments) {
+    options.add(getInstrumentLabel(instrument));
+  }
+
+  return Array.from(options).sort((a, b) => {
+    const order = getInstrumentSortIndex(a) - getInstrumentSortIndex(b);
+    return order || a.localeCompare(b, "ja");
+  });
+}
+
+export function compareMembersByInstrument<T extends { instrument: string; name: string }>(first: T, second: T) {
+  const order = getInstrumentSortIndex(first.instrument) - getInstrumentSortIndex(second.instrument);
+  return order || first.name.localeCompare(second.name, "ja");
+}
+
 export type Member = {
   id: string;
   name: string;

@@ -3,9 +3,12 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
+  compareMembersByInstrument,
+  getInstrumentLabel,
   getPracticeDayLabel,
   getSelectedPracticeDay,
   getSortedPracticeDays,
+  getSortedInstrumentOptions,
   LocalStateStatusPanel,
   toMinutes,
   toTime,
@@ -32,13 +35,14 @@ export function AvailabilityTableApp() {
   const [hoveredSlot, setHoveredSlot] = useState<number | null>(null);
 
   const partOptions = useMemo(
-    () => Array.from(new Set(state.members.map((member) => member.instrument || "未設定"))),
+    () => getSortedInstrumentOptions(state.members.map((member) => member.instrument)),
     [state.members]
   );
 
   const visibleMembers = useMemo(() => {
-    if (selectedPartFilter === ALL_PARTS_FILTER) return state.members;
-    return state.members.filter((member) => (member.instrument || "未設定") === selectedPartFilter);
+    const sortedMembers = [...state.members].sort(compareMembersByInstrument);
+    if (selectedPartFilter === ALL_PARTS_FILTER) return sortedMembers;
+    return sortedMembers.filter((member) => getInstrumentLabel(member.instrument) === selectedPartFilter);
   }, [selectedPartFilter, state.members]);
 
   function isPracticeSlot(slotStart: number) {
@@ -184,7 +188,7 @@ export function AvailabilityTableApp() {
                     <th>
                       {member.name}
                       <span className="muted">
-                        {(member.instrument || "未設定") + " / " + availabilityLabel}
+                        {getInstrumentLabel(member.instrument) + " / " + availabilityLabel}
                       </span>
                     </th>
                     {AVAILABILITY_SLOTS.map((minutes, index) => {
