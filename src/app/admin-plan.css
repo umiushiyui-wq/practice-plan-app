@@ -363,11 +363,14 @@ button:disabled {
 }
 
 .plan-slot-title-input {
-  min-height: 28px;
+  min-height: 44px;
+  max-height: 86px;
   font-size: 16px;
   font-weight: 900;
   line-height: 1.25;
   padding: 2px 6px;
+  resize: vertical;
+  white-space: pre-wrap;
 }
 
 .plan-slot-content-select {

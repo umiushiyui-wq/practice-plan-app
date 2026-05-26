@@ -648,10 +648,11 @@ export function AdminApp() {
                                   setSelectedSlotId(slot.id);
                                 }}
                               >
-                                <input
+                                <textarea
                                   className="plan-slot-title-input"
                                   aria-label="表示文字を編集"
                                   title="表示文字を編集"
+                                  rows={2}
                                   value={slot.customTitle ?? slotLabel}
                                   onChange={(event) => updateSlotTitle(slot.id, event.target.value)}
                                   onFocus={() => setSelectedSlotId(slot.id)}
@@ -745,7 +746,8 @@ export function AdminApp() {
                   <div className="plan-detail-grid">
                     <label>
                       表示文字
-                      <input
+                      <textarea
+                        rows={3}
                         value={selectedSlot.customTitle ?? getSlotLabel(selectedSlot)}
                         onChange={(event) => updateSlotTitle(selectedSlot.id, event.target.value)}
                       />
