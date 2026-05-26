@@ -253,27 +253,19 @@ async function putServerState(state: AppState) {
   return (await response.json()) as { ok: true; updatedAt?: string | null };
 }
 
-function applyAvailabilityPatch(state: AppState, patch: AvailabilityPatch): AppState {
-  return {
-    ...state,
-    practiceDays: state.practiceDays.map((day) => {
-      if (day.id !== patch.practiceDayId) return day;
+async function putAvailabilityPatch(patch: AvailabilityPatch) {
+  const response = await fetch("/api/local-state/availability", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ patch })
+  });
 
-      return {
-        ...day,
-        availabilities: patch.absent
-          ? day.availabilities.filter((item) => item.memberId !== patch.memberId)
-          : [
-              ...day.availabilities.filter((item) => item.memberId !== patch.memberId),
-              { memberId: patch.memberId, start: patch.start, end: patch.end }
-            ],
-        absentMemberIds: patch.absent
-          ? Array.from(new Set([...day.absentMemberIds, patch.memberId]))
-          : day.absentMemberIds.filter((id) => id !== patch.memberId),
-        respondedMemberIds: Array.from(new Set([...day.respondedMemberIds, patch.memberId]))
-      };
-    })
-  };
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(payload?.error ?? SAVE_ERROR_MESSAGE);
+  }
+
+  return (await response.json()) as { ok: true; state: unknown; updatedAt?: string | null };
 }
 
 export function useLocalPracticeState() {
@@ -431,10 +423,8 @@ export function useLocalPracticeState() {
     setSaveError("");
 
     try {
-      const payload = await fetchServerState();
-      const serverState = payload.state ? migrateState(payload.state) : state;
-      const nextState = applyAvailabilityPatch(serverState, patch);
-      const saved = await putServerState(nextState);
+      const saved = await putAvailabilityPatch(patch);
+      const nextState = saved.state ? migrateState(saved.state) : state;
       shouldPersistRef.current = false;
       setState(nextState);
       cacheStateLocally(nextState);
