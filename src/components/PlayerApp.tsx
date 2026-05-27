@@ -100,6 +100,22 @@ function downloadCalendarEvent(day: LocalPracticeDay, availability: { start: str
   URL.revokeObjectURL(url);
 }
 
+function openGoogleCalendarEvent(day: LocalPracticeDay, availability: { start: string; end: string }) {
+  const title = "OB\u6f14\u594f\u4f1a\u3000\u7df4\u7fd2";
+  const description = `${day.practiceDate} ${availability.start}-${availability.end}`;
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: title,
+    dates: `${formatCalendarDateTime(day.practiceDate, availability.start)}/${formatCalendarDateTime(day.practiceDate, availability.end)}`,
+    details: description
+  });
+
+  if (day.location.trim()) {
+    params.set("location", day.location.trim());
+  }
+
+  window.open(`https://calendar.google.com/calendar/render?${params.toString()}`, "_blank", "noopener,noreferrer");
+}
 function TimePartSelect({
   label,
   value,
@@ -561,6 +577,16 @@ export function PlayerApp() {
                       disabled={!currentCalendarAvailability}
                     >
                       {"\u30ab\u30ec\u30f3\u30c0\u30fc\u306b\u8ffd\u52a0"}
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => {
+                        if (currentCalendarAvailability) openGoogleCalendarEvent(selectedInputDay, currentCalendarAvailability);
+                      }}
+                      disabled={!currentCalendarAvailability}
+                    >
+                      {"Google\u30ab\u30ec\u30f3\u30c0\u30fc\u306b\u8ffd\u52a0"}
                     </button>
                   </div>
                 ) : null}
