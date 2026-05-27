@@ -68,7 +68,6 @@ export function SheetViewApp() {
               <thead>
                 <tr>
                   <th>開始</th>
-                  <th>終了</th>
                   <th>分</th>
                   <th>曲 / 休憩</th>
                 </tr>
@@ -79,7 +78,6 @@ export function SheetViewApp() {
                   return (
                     <tr key={slot.id}>
                       <td>{slot.start}</td>
-                      <td>{slot.end}</td>
                       <td>{slot.duration}</td>
                       <td>{getPlanSlotLabel(slot, piece?.title)}</td>
                     </tr>

@@ -846,17 +846,16 @@ tbody tr:hover td {
   background: white;
 }
 
-.sheet-table th:nth-child(1),
-.sheet-table th:nth-child(2) {
-  width: 18%;
+.sheet-table th:nth-child(1) {
+  width: 22%;
 }
 
-.sheet-table th:nth-child(3) {
+.sheet-table th:nth-child(2) {
   width: 12%;
 }
 
-.sheet-table th:nth-child(4) {
-  width: 52%;
+.sheet-table th:nth-child(3) {
+  width: 66%;
 }
 
 .sheet-table th {
@@ -872,7 +871,7 @@ tbody tr:hover td {
   overflow-wrap: anywhere;
 }
 
-.sheet-table td:nth-child(4) {
+.sheet-table td:nth-child(3) {
   white-space: pre-wrap;
 }
 
