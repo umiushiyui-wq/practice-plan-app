@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   compareMembersByInstrument,
+  formatPracticeDateLabel,
   getInstrumentLabel,
   getPracticeDayLabel,
   getSelectedPracticeDay,
@@ -90,7 +91,7 @@ export function AvailabilityTableApp() {
             >
               {sortedPracticeDays.map((day) => (
                 <option key={day.id} value={day.id}>
-                  {day.practiceDate} {formatPracticeTimeAndLocation(day)}
+                  {formatPracticeDateLabel(day.practiceDate)} {formatPracticeTimeAndLocation(day)}
                 </option>
               ))}
             </select>

@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import {
+  formatPracticeDateLabel,
+  getPracticeDayLabel,
   getPlanSlotLabel,
   getSelectedPracticeDay,
   getSortedPracticeDays,
@@ -9,13 +11,6 @@ import {
   useLocalPracticeState,
   usePieceMap
 } from "@/components/LocalPracticeApp";
-
-function formatPracticeDateLabel(date: string, location: string) {
-  const parsed = new Date(`${date}T00:00:00`);
-  const locationLabel = location.trim() ? ` ＠${location.trim()}` : "";
-  if (Number.isNaN(parsed.getTime())) return `${date}練習内容${locationLabel}`;
-  return `${parsed.getMonth() + 1}月${parsed.getDate()}日練習内容${locationLabel}`;
-}
 
 function formatPracticeTimeAndLocation(day: { startTime: string; endTime: string; location: string }) {
   const location = day.location.trim();
@@ -42,13 +37,13 @@ export function SheetViewApp() {
           >
             {sortedPracticeDays.map((day) => (
               <option key={day.id} value={day.id}>
-                {day.practiceDate} {formatPracticeTimeAndLocation(day)}
+                {formatPracticeDateLabel(day.practiceDate)} {formatPracticeTimeAndLocation(day)}
               </option>
             ))}
           </select>
         </label>
         <p>
-          {selectedDay.practiceDate} / {formatPracticeTimeAndLocation(selectedDay)}
+          {formatPracticeDateLabel(selectedDay.practiceDate)} / {formatPracticeTimeAndLocation(selectedDay)}
         </p>
         <div className="row">
           <Link className="button secondary" href="/admin">管理者用URLへ</Link>
@@ -57,7 +52,7 @@ export function SheetViewApp() {
       </section>
 
       <section className="panel stack">
-        <h2>{formatPracticeDateLabel(selectedDay.practiceDate, selectedDay.location)}</h2>
+        <h2>{getPracticeDayLabel(selectedDay)} {"\u7df4\u7fd2\u5185\u5bb9"}</h2>
         {!selectedDay.isPlanPublished ? (
           <p className="muted">まだ非公開です。</p>
         ) : selectedDay.plan.length === 0 ? (

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
+  formatPracticeDateLabel,
   compareMembersByInstrument,
   getAvailableSegments,
   getInstrumentLabel,
@@ -550,7 +551,7 @@ export function PlayerApp() {
                       return (
                         <option key={day.id} value={day.id}>
                           {needsResponse ? "未入力: " : ""}
-                          {day.practiceDate} {formatPracticeTimeAndLocation(day)}
+                          {formatPracticeDateLabel(day.practiceDate)} {formatPracticeTimeAndLocation(day)}
                         </option>
                       );
                     })}
@@ -568,7 +569,7 @@ export function PlayerApp() {
               <section className="panel subtle-panel stack">
                 <div className="row page-section-head">
                   <div>
-                    <h3>{selectedInputDay.practiceDate}</h3>
+                    <h3>{formatPracticeDateLabel(selectedInputDay.practiceDate)}</h3>
                     <p className="muted">
                       練習時間 {formatPracticeTimeAndLocation(selectedInputDay)}
                     </p>
@@ -719,7 +720,7 @@ export function PlayerApp() {
                         return (
                           <tr key={day.id}>
                             <th>
-                              {day.practiceDate}
+                              {formatPracticeDateLabel(day.practiceDate)}
                               <span className="muted">
                                 練習 {formatPracticeTimeAndLocation(day)} / 入力状況 {label}
                               </span>

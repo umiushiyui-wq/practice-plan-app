@@ -584,9 +584,18 @@ export function getSelectedPracticeDay(state: AppState) {
   return state.practiceDays.find((day) => day.id === state.selectedPracticeDayId) ?? state.practiceDays[0];
 }
 
+export function formatPracticeDateLabel(date: string) {
+  const parsed = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return date;
+
+  const weekdays = ["\u65e5", "\u6708", "\u706b", "\u6c34", "\u6728", "\u91d1", "\u571f"];
+  return `${date}\uff08${weekdays[parsed.getDay()]}\uff09`;
+}
+
 export function getPracticeDayLabel(day: Pick<LocalPracticeDay, "practiceDate" | "location">) {
   const location = day.location.trim();
-  return location ? `${day.practiceDate}＠${location}` : day.practiceDate;
+  const dateLabel = formatPracticeDateLabel(day.practiceDate);
+  return location ? `${dateLabel}\uff20${location}` : dateLabel;
 }
 
 export function updatePracticeDay(

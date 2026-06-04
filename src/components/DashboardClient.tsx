@@ -32,6 +32,14 @@ type CurrentUser = UserOption & {
   role: "member" | "admin";
 };
 
+function formatPracticeDateLabel(date: string) {
+  const parsed = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return date;
+
+  const weekdays = ["\u65e5", "\u6708", "\u706b", "\u6c34", "\u6728", "\u91d1", "\u571f"];
+  return `${date}\uff08${weekdays[parsed.getDay()]}\uff09`;
+}
+
 function statusLabel(status: string) {
   const labels: Record<string, string> = {
     draft: "下書き",
@@ -110,7 +118,7 @@ export function DashboardClient({
         <article className="metric-card">
           <span className="metric-label">練習日</span>
           <strong>{practiceDays.length}</strong>
-          <span className="muted">{nextPracticeDay ? `${nextPracticeDay.practiceDate} が最新` : "未登録"}</span>
+          <span className="muted">{nextPracticeDay ? `${formatPracticeDateLabel(nextPracticeDay.practiceDate)} が最新` : "未登録"}</span>
         </article>
         <article className="metric-card">
           <span className="metric-label">曲</span>
@@ -275,7 +283,7 @@ export function DashboardClient({
             <tbody>
               {practiceDays.map((day) => (
                 <tr key={day.id}>
-                  <td>{day.practiceDate}</td>
+                  <td>{formatPracticeDateLabel(day.practiceDate)}</td>
                   <td>
                     {day.startTime} - {day.endTime}
                   </td>

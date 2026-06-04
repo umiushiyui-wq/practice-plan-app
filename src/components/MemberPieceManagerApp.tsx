@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
+  formatPracticeDateLabel,
   compareMembersByInstrument,
   getInstrumentLabel,
   getPlannedMinutesByPiece,
@@ -443,7 +444,7 @@ export function MemberPieceManagerApp() {
                   <div className="stack setup-edit-form" key={day.id}>
                     <div className="row setup-practice-day-row">
                       <div className="setup-practice-day-summary">
-                        <strong>{day.practiceDate}</strong>
+                        <strong>{formatPracticeDateLabel(day.practiceDate)}</strong>
                         <span className="muted">{day.startTime} - {day.endTime}</span>
                         {day.location.trim() ? <span className="muted">＠{day.location.trim()}</span> : null}
                       </div>

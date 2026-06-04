@@ -6,6 +6,7 @@ import {
   findOverlappingPlanSlots,
   generatePracticePlan,
   getPlanSlotLabel,
+  formatPracticeDateLabel,
   getPracticeDayLabel,
   getSelectedPracticeDay,
   getSortedPracticeDays,
@@ -134,7 +135,7 @@ export function AdminApp() {
     if (state.practiceDays.length <= 1) return;
 
     const currentDay = state.practiceDays.find((day) => day.id === dayId);
-    if (!currentDay || !confirm(`${currentDay.practiceDate} の練習日を削除しますか？`)) return;
+    if (!currentDay || !confirm(`${formatPracticeDateLabel(currentDay.practiceDate)} の練習日を削除しますか？`)) return;
 
     const nextDays = state.practiceDays.filter((day) => day.id !== dayId);
     updateState({
@@ -500,7 +501,7 @@ export function AdminApp() {
             >
               {sortedPracticeDays.map((day) => (
                 <option key={day.id} value={day.id}>
-                  {day.practiceDate} {formatPracticeTimeAndLocation(day)}
+                  {formatPracticeDateLabel(day.practiceDate)} {formatPracticeTimeAndLocation(day)}
                 </option>
               ))}
             </select>
