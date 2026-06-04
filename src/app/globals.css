@@ -940,6 +940,27 @@ tbody tr:hover td {
   margin-top: 2px;
 }
 
+.availability-day-button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  display: block;
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.availability-day-button:hover,
+.availability-day-button:focus-visible {
+  color: var(--accent-dark);
+  text-decoration: underline;
+  box-shadow: none;
+}
+
 .availability-table td {
   height: 22px;
   min-width: 38px;
@@ -1427,6 +1448,10 @@ button:disabled:hover {
   cursor: not-allowed;
   box-shadow: none;
   transform: none;
+}
+
+.player-page button.availability-day-button {
+  min-height: 0;
 }
 
 .calendar-add-row {

@@ -491,6 +491,13 @@ export function PlayerApp() {
     );
   }
 
+  function selectPracticeDayForInput(dayId: string) {
+    setSelectedInputDayId(dayId);
+    window.setTimeout(() => {
+      document.getElementById("daily-practice-input")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  }
+
   const currentDraft = selectedInputDay ? draftsByDay[selectedInputDay.id] : null;
   const hasCurrentUnsavedChanges = !!selectedInputDay && !!currentDraft && hasUnsavedAvailabilityChanges(selectedInputDay, currentDraft);
   const currentTimeOptions = selectedInputDay ? buildTimeOptions(selectedInputDay.startTime, selectedInputDay.endTime) : [];
@@ -535,7 +542,7 @@ export function PlayerApp() {
         <>
           {hasUsablePassword || selectedIsReady ? (
             <>
-          <section className="panel stack player-input-panel">
+          <section id="daily-practice-input" className="panel stack player-input-panel">
             <div className="row page-section-head">
               <div>
                 <h2>練習日ごとの入力</h2>
@@ -720,10 +727,16 @@ export function PlayerApp() {
                         return (
                           <tr key={day.id}>
                             <th>
-                              {formatPracticeDateLabel(day.practiceDate)}
-                              <span className="muted">
-                                練習 {formatPracticeTimeAndLocation(day)} / 入力状況 {label}
-                              </span>
+                              <button
+                                type="button"
+                                className="availability-day-button"
+                                onClick={() => selectPracticeDayForInput(day.id)}
+                              >
+                                <span>{formatPracticeDateLabel(day.practiceDate)}</span>
+                                <span className="muted">
+                                  {"\u7df4\u7fd2"} {formatPracticeTimeAndLocation(day)} / {"\u5165\u529b\u72b6\u6cc1"} {label}
+                                </span>
+                              </button>
                             </th>
                             {AVAILABILITY_SLOTS.map((minutes, index) => {
                               const previousMinutes = AVAILABILITY_SLOTS[index - 1];
