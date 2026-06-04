@@ -15,7 +15,6 @@ import {
 } from "@/components/LocalPracticeApp";
 import type { LocalPracticeDay } from "@/components/LocalPracticeApp";
 
-const CALENDAR_ADDED_STORAGE_KEY = "practice-plan-calendar-added";
 const AVAILABILITY_SLOTS = Array.from({ length: ((22 - 8) * 60) / 10 + 1 }, (_, index) => 8 * 60 + index * 10);
 
 type DraftByDay = Record<
@@ -191,7 +190,6 @@ export function PlayerApp() {
   const [draftsByDay, setDraftsByDay] = useState<DraftByDay>({});
   const [saveMessage, setSaveMessage] = useState("");
   const [authError, setAuthError] = useState("");
-  const [addedCalendarKeys, setAddedCalendarKeys] = useState<string[]>([]);
 
   const partOptions = getSortedInstrumentOptions(state.members.map((member) => member.instrument));
   const activePart = partOptions.includes(selectedPart) ? selectedPart : partOptions[0] ?? "";
@@ -221,17 +219,6 @@ export function PlayerApp() {
     }
   }, [activePart, selectedPart]);
 
-  useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(CALENDAR_ADDED_STORAGE_KEY);
-      const parsed = saved ? JSON.parse(saved) : [];
-      if (Array.isArray(parsed)) {
-        setAddedCalendarKeys(parsed.filter((item): item is string => typeof item === "string"));
-      }
-    } catch {
-      setAddedCalendarKeys([]);
-    }
-  }, []);
 
   useEffect(() => {
     setMemberPassword("");
@@ -474,30 +461,9 @@ export function PlayerApp() {
 
     return draftBreaks.some((item, index) => item.start !== savedBreaks[index].start || item.end !== savedBreaks[index].end);
   }
-  function getCalendarAddedKey(dayId: string) {
-    return selected ? `${selected.id}:${dayId}` : "";
-  }
-
-  function markCalendarAdded(dayId: string) {
-    const key = getCalendarAddedKey(dayId);
-    if (!key) return;
-
-    setAddedCalendarKeys((current) => {
-      if (current.includes(key)) return current;
-      const next = [...current, key];
-      try {
-        window.localStorage.setItem(CALENDAR_ADDED_STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        // The on-screen added state should still update even if browser storage is unavailable.
-      }
-      return next;
-    });
-  }
 
   function renderCalendarButtons(day: LocalPracticeDay) {
     const hasValidPracticeTime = toMinutes(day.startTime) < toMinutes(day.endTime);
-    const isCalendarAdded = addedCalendarKeys.includes(getCalendarAddedKey(day.id));
-
     return (
       <div className="calendar-add-row">
         <button
@@ -505,7 +471,6 @@ export function PlayerApp() {
           className="secondary"
           onClick={() => {
             downloadCalendarEvent(day);
-            markCalendarAdded(day.id);
           }}
           disabled={!hasValidPracticeTime}
         >
@@ -516,13 +481,11 @@ export function PlayerApp() {
           className="secondary"
           onClick={() => {
             openGoogleCalendarEvent(day);
-            markCalendarAdded(day.id);
           }}
           disabled={!hasValidPracticeTime}
         >
           {"Google\u30ab\u30ec\u30f3\u30c0\u30fc\u306b\u8ffd\u52a0"}
         </button>
-        {isCalendarAdded ? <span className="status-pill">{"\u8ffd\u52a0\u6e08\u307f"}</span> : null}
       </div>
     );
   }
