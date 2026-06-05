@@ -40,15 +40,6 @@ type SlotDragPayload = {
   slotId: string;
 };
 
-type SlackReminderResult = {
-  sentCount: number;
-  missingSlackUserIdCount: number;
-  failedCount: number;
-  skippedAnsweredCount: number;
-  totalUnansweredCount: number;
-  message?: string;
-};
-
 const DRAG_DATA_TYPE = "application/x-practice-plan-slot";
 const MINUTES_PER_PIXEL = 0.25;
 const RESIZE_STEP_MINUTES = 5;
@@ -112,9 +103,6 @@ export function AdminApp() {
   const [draggedSlotId, setDraggedSlotId] = useState<string | null>(null);
   const [activeDropMinutes, setActiveDropMinutes] = useState<number | null>(null);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
-  const [slackReminderStatus, setSlackReminderStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
-  const [slackReminderResult, setSlackReminderResult] = useState<SlackReminderResult | null>(null);
-  const [slackReminderMessage, setSlackReminderMessage] = useState("");
   const selectedDay = getSelectedPracticeDay(state);
   const sortedPracticeDays = getSortedPracticeDays(state.practiceDays);
   const pieceMap = usePieceMap(state.pieces);
@@ -436,32 +424,6 @@ export function AdminApp() {
     return `plan-tone-${Math.max(0, pieceIndex) % 6}`;
   }
 
-  async function sendSlackReminders() {
-    setSlackReminderStatus("sending");
-    setSlackReminderResult(null);
-    setSlackReminderMessage("");
-
-    try {
-      const response = await fetch(`/api/local-state/practice-days/${selectedDay.id}/slack-reminders`, {
-        method: "POST"
-      });
-      const payload = (await response.json().catch(() => null)) as (SlackReminderResult & { error?: string }) | null;
-
-      if (!response.ok) {
-        throw new Error(payload?.error ?? "Slack\u901a\u77e5\u3092\u9001\u4fe1\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002");
-      }
-
-      setSlackReminderResult(payload);
-      setSlackReminderStatus("sent");
-      setSlackReminderMessage(
-        `Slack\u901a\u77e5: \u9001\u4fe1 ${payload?.sentCount ?? 0}\u4eba / Slack ID\u672a\u767b\u9332 ${payload?.missingSlackUserIdCount ?? 0}\u4eba / \u5931\u6557 ${payload?.failedCount ?? 0}\u4eba`
-      );
-    } catch (error) {
-      setSlackReminderStatus("error");
-      setSlackReminderMessage(error instanceof Error ? error.message : "Slack\u901a\u77e5\u3092\u9001\u4fe1\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002");
-    }
-  }
-
   function handleGeneratePlan() {
     const generatedPlan = generatePracticePlan(state);
     updateSelectedDay({ plan: generatedPlan });
@@ -544,9 +506,6 @@ export function AdminApp() {
               ))}
             </select>
           </label>
-          <button className="secondary" type="button" onClick={sendSlackReminders} disabled={slackReminderStatus === "sending"}>
-            {slackReminderStatus === "sending" ? "Slack\u901a\u77e5\u4e2d" : "\u672a\u5165\u529b\u8005\u3078Slack\u901a\u77e5"}
-          </button>
           <label className="plan-publish-switch">
             <input
               type="checkbox"
@@ -559,16 +518,6 @@ export function AdminApp() {
             </span>
           </label>
         </div>
-        {slackReminderMessage ? (
-          <div className={slackReminderStatus === "error" ? "error" : "notice"}>
-            {slackReminderMessage}
-            {slackReminderResult ? (
-              <span className="muted">
-                {` \u672a\u5165\u529b\u8005 ${slackReminderResult.totalUnansweredCount}\u4eba\u3001\u5165\u529b\u6e08\u307f\u9664\u5916 ${slackReminderResult.skippedAnsweredCount}\u4eba`}
-              </span>
-            ) : null}
-          </div>
-        ) : null}
       </section>
 
       <section className="panel stack">
