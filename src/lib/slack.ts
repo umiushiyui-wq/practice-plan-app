@@ -44,6 +44,18 @@ type SlackOpenConversationResponse = {
   };
 };
 
+type SlackGetUploadUrlExternalResponse = {
+  ok: boolean;
+  error?: string;
+  upload_url?: string;
+  file_id?: string;
+};
+
+type SlackCompleteUploadExternalResponse = {
+  ok: boolean;
+  error?: string;
+};
+
 export function buildSlackAuthorizeUrl(state: string): string {
   const url = new URL("https://slack.com/oauth/v2/authorize");
   url.searchParams.set("client_id", config.slackClientId);
@@ -116,4 +128,69 @@ export async function openSlackConversation({
   });
 
   return response.json() as Promise<SlackOpenConversationResponse>;
+}
+
+export async function uploadSlackFile({
+  botToken,
+  channel,
+  filename,
+  title,
+  initialComment,
+  fileBuffer,
+  mimeType
+}: {
+  botToken: string;
+  channel: string;
+  filename: string;
+  title: string;
+  initialComment: string;
+  fileBuffer: Buffer;
+  mimeType: string;
+}): Promise<SlackCompleteUploadExternalResponse> {
+  const uploadUrlBody = new URLSearchParams({
+    filename,
+    length: fileBuffer.byteLength.toString()
+  });
+
+  const uploadUrlResponse = await fetch("https://slack.com/api/files.getUploadURLExternal", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${botToken}`,
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: uploadUrlBody
+  });
+  const uploadUrlPayload = (await uploadUrlResponse.json()) as SlackGetUploadUrlExternalResponse;
+
+  if (!uploadUrlPayload.ok || !uploadUrlPayload.upload_url || !uploadUrlPayload.file_id) {
+    return { ok: false, error: uploadUrlPayload.error ?? "upload_url_failed" };
+  }
+
+  const uploadResponse = await fetch(uploadUrlPayload.upload_url, {
+    method: "POST",
+    headers: {
+      "Content-Type": mimeType,
+      "Content-Length": fileBuffer.byteLength.toString()
+    },
+    body: new Uint8Array(fileBuffer)
+  });
+
+  if (!uploadResponse.ok) {
+    return { ok: false, error: `file_upload_failed_${uploadResponse.status}` };
+  }
+
+  const completeResponse = await fetch("https://slack.com/api/files.completeUploadExternal", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${botToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      channel_id: channel,
+      initial_comment: initialComment,
+      files: [{ id: uploadUrlPayload.file_id, title }]
+    })
+  });
+
+  return completeResponse.json() as Promise<SlackCompleteUploadExternalResponse>;
 }

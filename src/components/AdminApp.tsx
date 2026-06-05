@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type DragEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useState, type ChangeEvent, type DragEvent, type PointerEvent as ReactPointerEvent } from "react";
 import {
   findOverlappingPlanSlots,
   generatePracticePlan,
@@ -100,10 +100,15 @@ export function AdminApp() {
   const localState = useLocalPracticeState();
   const { state, updateState } = localState;
   const [planMessage, setPlanMessage] = useState("");
+  const [pendingAnnouncementDayId, setPendingAnnouncementDayId] = useState<string | null>(null);
+  const [isSendingAnnouncement, setIsSendingAnnouncement] = useState(false);
   const [draggedSlotId, setDraggedSlotId] = useState<string | null>(null);
   const [activeDropMinutes, setActiveDropMinutes] = useState<number | null>(null);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const selectedDay = getSelectedPracticeDay(state);
+  const pendingAnnouncementDay = pendingAnnouncementDayId
+    ? state.practiceDays.find((day) => day.id === pendingAnnouncementDayId) ?? null
+    : null;
   const sortedPracticeDays = getSortedPracticeDays(state.practiceDays);
   const pieceMap = usePieceMap(state.pieces);
 
@@ -131,6 +136,110 @@ export function AdminApp() {
     updateState({ practiceDays: updatePracticeDay(state, selectedDay.id, patch) });
   }
 
+  function createPlanAnnouncementImage(day: typeof selectedDay) {
+    const canvas = document.createElement("canvas");
+    const rows = sortPlanByTime(day.plan);
+    const width = 1200;
+    const rowHeight = 72;
+    const headerHeight = 170;
+    const height = Math.max(360, headerHeight + Math.max(1, rows.length) * rowHeight + 56);
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("\u004a\u0050\u0045\u0047\u753b\u50cf\u3092\u4f5c\u6210\u3067\u304d\u307e\u305b\u3093\u3002");
+
+    canvas.width = width;
+    canvas.height = height;
+    context.fillStyle = "#f8fafc";
+    context.fillRect(0, 0, width, height);
+    context.fillStyle = "#ffffff";
+    context.fillRect(48, 40, width - 96, height - 80);
+    context.strokeStyle = "#cbd5e1";
+    context.lineWidth = 2;
+    context.strokeRect(48, 40, width - 96, height - 80);
+
+    context.fillStyle = "#0f172a";
+    context.font = "700 40px system-ui, sans-serif";
+    context.fillText(`${formatPracticeDateLabel(day.practiceDate)} \u306e\u7df4\u7fd2\u5185\u5bb9`, 82, 98);
+    context.font = "24px system-ui, sans-serif";
+    context.fillStyle = "#475569";
+    context.fillText(formatPracticeTimeAndLocation(day), 82, 138);
+
+    const tableLeft = 82;
+    const tableTop = headerHeight;
+    const tableWidth = width - 164;
+    const startColumnWidth = 180;
+    const durationColumnWidth = 120;
+    const contentLeft = tableLeft + startColumnWidth + durationColumnWidth;
+
+    context.fillStyle = "#e2e8f0";
+    context.fillRect(tableLeft, tableTop - 44, tableWidth, 44);
+    context.fillStyle = "#334155";
+    context.font = "700 22px system-ui, sans-serif";
+    context.fillText("\u958b\u59cb\u6642\u9593", tableLeft + 24, tableTop - 16);
+    context.fillText("\u5206", tableLeft + startColumnWidth + 24, tableTop - 16);
+    context.fillText("\u66f2\u30fb\u4f11\u61a9\u30fb\u6e96\u5099\u30fb\u7247\u4ed8\u3051", contentLeft + 24, tableTop - 16);
+
+    if (rows.length === 0) {
+      context.fillStyle = "#64748b";
+      context.font = "24px system-ui, sans-serif";
+      context.fillText("\u307e\u3060\u7df4\u7fd2\u8a08\u753b\u304c\u3042\u308a\u307e\u305b\u3093\u3002", tableLeft + 24, tableTop + 48);
+    }
+
+    rows.forEach((slot, index) => {
+      const y = tableTop + index * rowHeight;
+      const piece = slot.pieceId ? pieceMap.get(slot.pieceId) : null;
+      const label = getPlanSlotLabel(slot, piece?.title).replace(/\s+/g, " ").trim();
+      context.fillStyle = index % 2 === 0 ? "#ffffff" : "#f8fafc";
+      context.fillRect(tableLeft, y, tableWidth, rowHeight);
+      context.strokeStyle = "#e2e8f0";
+      context.beginPath();
+      context.moveTo(tableLeft, y + rowHeight);
+      context.lineTo(tableLeft + tableWidth, y + rowHeight);
+      context.stroke();
+      context.fillStyle = "#0f172a";
+      context.font = "700 24px system-ui, sans-serif";
+      context.fillText(slot.start, tableLeft + 24, y + 44);
+      context.font = "24px system-ui, sans-serif";
+      context.fillText(String(slot.duration), tableLeft + startColumnWidth + 24, y + 44);
+      context.fillText(label.slice(0, 42), contentLeft + 24, y + 44);
+    });
+
+    return canvas.toDataURL("image/jpeg", 0.92).replace(/^data:image\/jpeg;base64,/, "");
+  }
+
+  function handlePublishToggle(event: ChangeEvent<HTMLInputElement>) {
+    const nextPublished = event.target.checked;
+    if (!nextPublished) {
+      if (pendingAnnouncementDayId === selectedDay.id) setPendingAnnouncementDayId(null);
+      updateSelectedDay({ isPlanPublished: false });
+      return;
+    }
+
+    updateSelectedDay({ isPlanPublished: true });
+    setPendingAnnouncementDayId(selectedDay.id);
+    setPlanMessage("");
+  }
+
+  async function sendPublishAnnouncement(day: typeof selectedDay) {
+    setIsSendingAnnouncement(true);
+    setPlanMessage("\u9001\u4fe1\u4e2d\u3067\u3059\u3002");
+
+    try {
+      const imageBase64 = createPlanAnnouncementImage(day);
+      const response = await fetch(`/api/local-state/practice-days/${day.id}/plan-announcement`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64 })
+      });
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "Slack\u30a2\u30ca\u30a6\u30f3\u30b9\u3092\u9001\u4fe1\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002");
+      setPendingAnnouncementDayId(null);
+      setPlanMessage("Slack\u306b\u7df4\u7fd2\u5185\u5bb9\u3092\u9001\u4fe1\u3057\u307e\u3057\u305f\u3002");
+    } catch (error) {
+      setPlanMessage(error instanceof Error ? error.message : "Slack\u30a2\u30ca\u30a6\u30f3\u30b9\u3092\u9001\u4fe1\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002");
+    } finally {
+      setIsSendingAnnouncement(false);
+    }
+  }
   function deletePracticeDay(dayId: string) {
     if (state.practiceDays.length <= 1) return;
 
@@ -510,15 +619,40 @@ export function AdminApp() {
             <input
               type="checkbox"
               checked={selectedDay.isPlanPublished}
-              onChange={(event) => updateSelectedDay({ isPlanPublished: event.target.checked })}
+              disabled={isSendingAnnouncement}
+              onChange={handlePublishToggle}
             />
             <span className="plan-publish-switch-control" aria-hidden="true" />
             <span>
               練習スケジュールを{selectedDay.isPlanPublished ? "公開中" : "非公開"}
             </span>
+            {isSendingAnnouncement ? <span className="muted">{"\u9001\u4fe1\u4e2d"}</span> : null}
           </label>
         </div>
       </section>
+
+      {pendingAnnouncementDay ? (
+        <section className="panel stack" role="dialog" aria-modal="true" aria-label="\u30b9\u30b1\u30b8\u30e5\u30fc\u30eb\u516c\u958b\u30a2\u30ca\u30a6\u30f3\u30b9">
+          <h2>{"\u30b9\u30b1\u30b8\u30e5\u30fc\u30eb\u516c\u958b\u3092\u30a2\u30ca\u30a6\u30f3\u30b9\u3057\u307e\u3059\u304b\uff1f"}</h2>
+          <p className="muted">{formatPracticeDateLabel(pendingAnnouncementDay.practiceDate)} {"\u306e\u7df4\u7fd2\u5185\u5bb9\u3092Slack\u306b\u9001\u4fe1\u3057\u307e\u3059\u3002"}</p>
+          <div className="row">
+            <button type="button" onClick={() => sendPublishAnnouncement(pendingAnnouncementDay)} disabled={isSendingAnnouncement}>
+              {isSendingAnnouncement ? "\u9001\u4fe1\u4e2d" : "\u306f\u3044"}
+            </button>
+            <button
+              className="secondary"
+              type="button"
+              onClick={() => {
+                setPendingAnnouncementDayId(null);
+                setPlanMessage("\u516c\u958b\u306e\u307f\u884c\u3044\u307e\u3057\u305f\u3002");
+              }}
+              disabled={isSendingAnnouncement}
+            >
+              {"\u3044\u3044\u3048"}
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       <section className="panel stack">
         <div className="row page-section-head">
