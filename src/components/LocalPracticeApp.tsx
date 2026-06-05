@@ -57,7 +57,8 @@ export type Member = {
   instrument: string;
   part: string;
   password?: string;
-};
+  slackUserId?: string;
+}
 
 export type Piece = {
   id: string;
@@ -223,7 +224,8 @@ function migrateState(value: unknown): AppState {
   const members = Array.isArray(saved.members)
     ? saved.members.map((member) => ({
         ...member,
-        password: typeof member.password === "string" ? member.password : ""
+        password: typeof member.password === "string" ? member.password : "",
+        slackUserId: typeof member.slackUserId === "string" ? member.slackUserId : ""
       }))
     : defaultState.members;
   const pieces = Array.isArray(saved.pieces) ? saved.pieces.map(normalizePiece) : defaultState.pieces;

@@ -36,6 +36,14 @@ type SlackPostMessageResponse = {
   ts?: string;
 };
 
+type SlackOpenConversationResponse = {
+  ok: boolean;
+  error?: string;
+  channel?: {
+    id?: string;
+  };
+};
+
 export function buildSlackAuthorizeUrl(state: string): string {
   const url = new URL("https://slack.com/oauth/v2/authorize");
   url.searchParams.set("client_id", config.slackClientId);
@@ -89,4 +97,23 @@ export async function postSlackMessage({
   });
 
   return response.json() as Promise<SlackPostMessageResponse>;
+}
+
+export async function openSlackConversation({
+  botToken,
+  userId
+}: {
+  botToken: string;
+  userId: string;
+}): Promise<SlackOpenConversationResponse> {
+  const response = await fetch("https://slack.com/api/conversations.open", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${botToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ users: userId })
+  });
+
+  return response.json() as Promise<SlackOpenConversationResponse>;
 }

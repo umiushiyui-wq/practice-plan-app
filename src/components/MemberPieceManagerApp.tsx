@@ -79,13 +79,15 @@ export function MemberPieceManagerApp() {
     const name = String(formData.get("name") ?? "").trim();
     if (!name) return;
     const password = String(formData.get("password") ?? "").trim();
+    const slackUserId = String(formData.get("slackUserId") ?? "").trim();
 
     const member = {
       id: makeId("m"),
       name,
       instrument: String(formData.get("instrument") ?? ""),
       part: "",
-      password
+      password,
+      slackUserId
     };
 
     updateState({
@@ -113,6 +115,13 @@ export function MemberPieceManagerApp() {
         conductorId: piece.conductorId === memberId ? "" : piece.conductorId,
         memberIds: piece.memberIds.filter((id) => id !== memberId)
       }))
+    });
+  }
+
+  function updateMemberSlackUserId(memberId: string, formData: FormData) {
+    const slackUserId = String(formData.get("slackUserId") ?? "").trim();
+    updateState({
+      members: state.members.map((item) => (item.id === memberId ? { ...item, slackUserId } : item))
     });
   }
 
@@ -361,6 +370,7 @@ export function MemberPieceManagerApp() {
                 </option>
               ))}
             </select>
+            <input name="slackUserId" placeholder={"Slack ID\uff08\u4f8b: U012ABCDEF\uff09"} />
             <input type="hidden" name="password" value="__unset__" />
             <button type="submit">奏者を追加</button>
           </form>
@@ -379,8 +389,21 @@ export function MemberPieceManagerApp() {
                       {getInstrumentLabel(member.instrument)}
                       {member.part ? ` / ${member.part}` : ""}
                     </div>
-                    <div className="muted">{member.password && member.password !== "__unset__" ? "パスワード設定済み" : "初回ログイン時に設定"}</div>
+                    <div className="muted">{member.password && member.password !== "__unset__" ? "\u30d1\u30b9\u30ef\u30fc\u30c9\u8a2d\u5b9a\u6e08\u307f" : "\u521d\u56de\u30ed\u30b0\u30a4\u30f3\u6642\u306b\u8a2d\u5b9a"}</div>
+                    <div className="muted">{member.slackUserId ? `Slack ID: ${member.slackUserId}` : "Slack ID\u672a\u767b\u9332"}</div>
                   </div>
+                  <form
+                    className="row member-slack-form"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      updateMemberSlackUserId(member.id, new FormData(event.currentTarget));
+                    }}
+                  >
+                    <input name="slackUserId" defaultValue={member.slackUserId ?? ""} placeholder="Slack ID" />
+                    <button className="secondary" type="submit">
+                      {"Slack ID\u4fdd\u5b58"}
+                    </button>
+                  </form>
                   <div className="row">
                     <button className="secondary" type="button" onClick={() => resetMemberPassword(member.id)}>
                       パスワードリセット
