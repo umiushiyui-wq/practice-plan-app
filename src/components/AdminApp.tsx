@@ -136,11 +136,56 @@ export function AdminApp() {
     const canvas = document.createElement("canvas");
     const rows = sortPlanByTime(day.plan);
     const width = 1200;
-    const rowHeight = 72;
     const headerHeight = 170;
-    const height = Math.max(360, headerHeight + Math.max(1, rows.length) * rowHeight + 56);
+    const tableHeaderHeight = 52;
+    const minRowHeight = 72;
+    const lineHeight = 30;
     const context = canvas.getContext("2d");
     if (!context) throw new Error("\u004a\u0050\u0045\u0047\u753b\u50cf\u3092\u4f5c\u6210\u3067\u304d\u307e\u305b\u3093\u3002");
+    const measureContext = context;
+
+    const tableLeft = 82;
+    const tableTop = headerHeight;
+    const tableWidth = width - 164;
+    const startColumnWidth = 180;
+    const durationColumnWidth = 120;
+    const contentLeft = tableLeft + startColumnWidth + durationColumnWidth;
+    const contentWidth = tableWidth - startColumnWidth - durationColumnWidth - 48;
+
+    function wrapText(value: string, maxWidth: number) {
+      measureContext.font = "24px system-ui, sans-serif";
+      const paragraphs = value.split(/\r?\n/);
+      const lines: string[] = [];
+
+      for (const paragraph of paragraphs) {
+        let line = "";
+        for (const character of Array.from(paragraph || " ")) {
+          const nextLine = line + character;
+          if (line && measureContext.measureText(nextLine).width > maxWidth) {
+            lines.push(line);
+            line = character;
+          } else {
+            line = nextLine;
+          }
+        }
+        lines.push(line);
+      }
+
+      return lines;
+    }
+
+    const printableRows = rows.map((slot) => {
+      const piece = slot.pieceId ? pieceMap.get(slot.pieceId) : null;
+      const label = getPlanSlotLabel(slot, piece?.title).trim();
+      const wrappedLines = wrapText(label, contentWidth);
+      return {
+        slot,
+        wrappedLines,
+        rowHeight: Math.max(minRowHeight, 30 + wrappedLines.length * lineHeight)
+      };
+    });
+    const bodyHeight = printableRows.reduce((total, row) => total + row.rowHeight, rows.length === 0 ? minRowHeight : 0);
+    const height = Math.max(360, tableTop + tableHeaderHeight + bodyHeight + 56);
 
     canvas.width = width;
     canvas.height = height;
@@ -159,44 +204,52 @@ export function AdminApp() {
     context.fillStyle = "#475569";
     context.fillText(formatPracticeTimeAndLocation(day), 82, 138);
 
-    const tableLeft = 82;
-    const tableTop = headerHeight;
-    const tableWidth = width - 164;
-    const startColumnWidth = 180;
-    const durationColumnWidth = 120;
-    const contentLeft = tableLeft + startColumnWidth + durationColumnWidth;
-
-    context.fillStyle = "#e2e8f0";
-    context.fillRect(tableLeft, tableTop - 44, tableWidth, 44);
+    context.fillStyle = "#dfe8ef";
+    context.fillRect(tableLeft, tableTop, tableWidth, tableHeaderHeight);
+    context.strokeStyle = "#aebdca";
+    context.strokeRect(tableLeft, tableTop, tableWidth, tableHeaderHeight);
     context.fillStyle = "#334155";
     context.font = "700 22px system-ui, sans-serif";
-    context.fillText("\u958b\u59cb\u6642\u9593", tableLeft + 24, tableTop - 16);
-    context.fillText("\u5206", tableLeft + startColumnWidth + 24, tableTop - 16);
-    context.fillText("\u66f2\u30fb\u4f11\u61a9\u30fb\u6e96\u5099\u30fb\u7247\u4ed8\u3051", contentLeft + 24, tableTop - 16);
+    context.fillText("\u958b\u59cb\u6642\u9593", tableLeft + 24, tableTop + 34);
+    context.fillText("\u5206", tableLeft + startColumnWidth + 24, tableTop + 34);
+    context.fillText("\u66f2 / \u4f11\u61a9", contentLeft + 24, tableTop + 34);
+
+    context.strokeStyle = "#aebdca";
+    context.beginPath();
+    context.moveTo(tableLeft + startColumnWidth, tableTop);
+    context.lineTo(tableLeft + startColumnWidth, height - 56);
+    context.moveTo(contentLeft, tableTop);
+    context.lineTo(contentLeft, height - 56);
+    context.stroke();
 
     if (rows.length === 0) {
       context.fillStyle = "#64748b";
       context.font = "24px system-ui, sans-serif";
-      context.fillText("\u307e\u3060\u7df4\u7fd2\u8a08\u753b\u304c\u3042\u308a\u307e\u305b\u3093\u3002", tableLeft + 24, tableTop + 48);
+      context.fillText("\u307e\u3060\u7df4\u7fd2\u8a08\u753b\u304c\u3042\u308a\u307e\u305b\u3093\u3002", tableLeft + 24, tableTop + tableHeaderHeight + 46);
     }
 
-    rows.forEach((slot, index) => {
-      const y = tableTop + index * rowHeight;
-      const piece = slot.pieceId ? pieceMap.get(slot.pieceId) : null;
-      const label = getPlanSlotLabel(slot, piece?.title).replace(/\s+/g, " ").trim();
-      context.fillStyle = index % 2 === 0 ? "#ffffff" : "#f8fafc";
-      context.fillRect(tableLeft, y, tableWidth, rowHeight);
-      context.strokeStyle = "#e2e8f0";
+    let rowTop = tableTop + tableHeaderHeight;
+    printableRows.forEach(({ slot, wrappedLines, rowHeight }, index) => {
+      context.fillStyle = index % 2 === 0 ? "#ffffff" : "#f7fafc";
+      context.fillRect(tableLeft, rowTop, tableWidth, rowHeight);
+      context.strokeStyle = "#c5d0da";
+      context.strokeRect(tableLeft, rowTop, tableWidth, rowHeight);
       context.beginPath();
-      context.moveTo(tableLeft, y + rowHeight);
-      context.lineTo(tableLeft + tableWidth, y + rowHeight);
+      context.moveTo(tableLeft + startColumnWidth, rowTop);
+      context.lineTo(tableLeft + startColumnWidth, rowTop + rowHeight);
+      context.moveTo(contentLeft, rowTop);
+      context.lineTo(contentLeft, rowTop + rowHeight);
       context.stroke();
+
       context.fillStyle = "#0f172a";
       context.font = "700 24px system-ui, sans-serif";
-      context.fillText(slot.start, tableLeft + 24, y + 44);
+      context.fillText(slot.start, tableLeft + 24, rowTop + 44);
       context.font = "24px system-ui, sans-serif";
-      context.fillText(String(slot.duration), tableLeft + startColumnWidth + 24, y + 44);
-      context.fillText(label.slice(0, 42), contentLeft + 24, y + 44);
+      context.fillText(String(slot.duration), tableLeft + startColumnWidth + 24, rowTop + 44);
+      wrappedLines.forEach((line, lineIndex) => {
+        context.fillText(line, contentLeft + 24, rowTop + 38 + lineIndex * lineHeight);
+      });
+      rowTop += rowHeight;
     });
 
     return canvas.toDataURL("image/jpeg", 0.92).replace(/^data:image\/jpeg;base64,/, "");
