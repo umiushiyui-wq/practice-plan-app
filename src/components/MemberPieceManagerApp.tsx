@@ -10,6 +10,7 @@ import {
   getPracticeDayLabel,
   getSortedPracticeDays,
   INSTRUMENT_OPTIONS,
+  ensureDefaultUtilitySlots,
   LocalStateStatusPanel,
   makeId,
   resolvePieceTargetRange,
@@ -164,7 +165,18 @@ export function MemberPieceManagerApp() {
           absentMemberIds: [],
           respondedMemberIds: [],
           isPlanPublished: false,
-          plan: []
+          plan: ensureDefaultUtilitySlots({
+            id,
+            practiceDate,
+            location,
+            startTime,
+            endTime,
+            availabilities: [],
+            absentMemberIds: [],
+            respondedMemberIds: [],
+            isPlanPublished: false,
+            plan: []
+          }).plan
         }
       ]
     });

@@ -159,10 +159,70 @@ function normalizeAvailability(value: Partial<Availability> & { memberId?: strin
 
 const STORAGE_KEY = "nagosui-local-practice-app-v3";
 const LEGACY_STORAGE_KEY = "nagosui-local-practice-app-v2";
+const SETUP_CLEANUP_MINUTES = 45;
+const SETUP_SLOT_TITLE = "\u5408\u594f\u6e96\u5099";
+const CLEANUP_SLOT_TITLE = "\u7247\u4ed8\u3051";
+const SETUP_SLOT_REASON = "\u5408\u594f\u6e96\u5099\u3068\u3057\u3066\u81ea\u52d5\u914d\u7f6e\u3057\u305f\u67a0\u3067\u3059\u3002";
+const CLEANUP_SLOT_REASON = "\u7247\u4ed8\u3051\u3068\u3057\u3066\u81ea\u52d5\u914d\u7f6e\u3057\u305f\u67a0\u3067\u3059\u3002";
+
+function isSetupUtilitySlot(slot: PlanSlot) {
+  if (slot.pieceId) return false;
+  const text = `${slot.customTitle ?? ""} ${slot.reason ?? ""}`;
+  return text.includes(SETUP_SLOT_TITLE) || text.includes("\u6e96\u5099");
+}
+
+function isCleanupUtilitySlot(slot: PlanSlot) {
+  if (slot.pieceId) return false;
+  const text = `${slot.customTitle ?? ""} ${slot.reason ?? ""}`;
+  return text.includes(CLEANUP_SLOT_TITLE) || text.includes("\u7247\u4ed8\u3051");
+}
+
+function makeUtilityPlanSlot(kind: "setup" | "cleanup", start: string, end: string, existing?: PlanSlot): PlanSlot {
+  const startMinutes = toMinutes(start);
+  const endMinutes = toMinutes(end);
+  return {
+    ...existing,
+    id: existing?.id ?? makeId("s"),
+    pieceId: null,
+    customTitle: kind === "setup" ? SETUP_SLOT_TITLE : CLEANUP_SLOT_TITLE,
+    start,
+    end,
+    duration: Math.max(0, endMinutes - startMinutes),
+    isLocked: true,
+    reason: kind === "setup" ? SETUP_SLOT_REASON : CLEANUP_SLOT_REASON
+  };
+}
+
+export function ensureDefaultUtilitySlots(day: LocalPracticeDay): LocalPracticeDay {
+  const plan = Array.isArray(day.plan) ? day.plan : [];
+  const practiceStart = toMinutes(day.startTime);
+  const practiceEnd = toMinutes(day.endTime);
+
+  if (!Number.isFinite(practiceStart) || !Number.isFinite(practiceEnd) || practiceEnd - practiceStart < SETUP_CLEANUP_MINUTES * 2) {
+    return { ...day, plan };
+  }
+
+  const setupStart = day.startTime;
+  const setupEnd = toTime(practiceStart + SETUP_CLEANUP_MINUTES);
+  const cleanupStart = toTime(practiceEnd - SETUP_CLEANUP_MINUTES);
+  const cleanupEnd = day.endTime;
+  const setupSlot = plan.find(isSetupUtilitySlot);
+  const cleanupSlot = plan.find(isCleanupUtilitySlot);
+  const restPlan = plan.filter((slot) => slot !== setupSlot && slot !== cleanupSlot);
+
+  return {
+    ...day,
+    plan: sortPlanByTime([
+      makeUtilityPlanSlot("setup", setupStart, setupEnd, setupSlot),
+      ...restPlan,
+      makeUtilityPlanSlot("cleanup", cleanupStart, cleanupEnd, cleanupSlot)
+    ])
+  };
+}
 const SAVE_ERROR_MESSAGE = "保存できていません。ネットワークまたはRedis/KV設定を確認してください。";
 
 function defaultPracticeDay(): LocalPracticeDay {
-  return {
+  return ensureDefaultUtilitySlots({
     id: "d1",
     practiceDate: new Date().toISOString().slice(0, 10),
     location: "",
@@ -173,7 +233,7 @@ function defaultPracticeDay(): LocalPracticeDay {
     respondedMemberIds: [],
     isPlanPublished: false,
     plan: []
-  };
+  });
 }
 
 const defaultDay = defaultPracticeDay();
@@ -217,6 +277,14 @@ function normalizePiece(piece: LegacyPiece): Piece {
   };
 }
 
+function didMigrateState(original: unknown, migrated: AppState) {
+  try {
+    return JSON.stringify(original) !== JSON.stringify(migrated);
+  } catch {
+    return true;
+  }
+}
+
 function migrateState(value: unknown): AppState {
   if (!value || typeof value !== "object") return defaultState;
 
@@ -236,14 +304,17 @@ function migrateState(value: unknown): AppState {
       members,
       pieces,
       recentMinutes,
-      practiceDays: saved.practiceDays.map((day) => ({
-        ...day,
-        location: typeof day.location === "string" ? day.location : "",
-        absentMemberIds: day.absentMemberIds ?? [],
-        respondedMemberIds: day.respondedMemberIds ?? [],
-        isPlanPublished: typeof day.isPlanPublished === "boolean" ? day.isPlanPublished : false,
-        availabilities: Array.isArray(day.availabilities) ? day.availabilities.map(normalizeAvailability) : []
-      })),
+      practiceDays: saved.practiceDays.map((day) =>
+        ensureDefaultUtilitySlots({
+          ...day,
+          location: typeof day.location === "string" ? day.location : "",
+          absentMemberIds: day.absentMemberIds ?? [],
+          respondedMemberIds: day.respondedMemberIds ?? [],
+          isPlanPublished: typeof day.isPlanPublished === "boolean" ? day.isPlanPublished : false,
+          availabilities: Array.isArray(day.availabilities) ? day.availabilities.map(normalizeAvailability) : [],
+          plan: Array.isArray(day.plan) ? day.plan : []
+        })
+      ),
       selectedPracticeDayId: saved.selectedPracticeDayId ?? saved.practiceDays[0].id
     };
   }
@@ -265,7 +336,7 @@ function migrateState(value: unknown): AppState {
     members,
     pieces,
     recentMinutes,
-    practiceDays: [migratedDay],
+    practiceDays: [ensureDefaultUtilitySlots(migratedDay)],
     selectedPracticeDayId: migratedDay.id
   };
 }
@@ -361,7 +432,7 @@ export function useLocalPracticeState() {
 
         if (payload.state) {
           const migrated = migrateState(payload.state);
-          shouldPersistRef.current = false;
+          shouldPersistRef.current = didMigrateState(payload.state, migrated);
           setState(migrated);
           cacheStateLocally(migrated);
           setHasLocalMigrationCandidate(false);
@@ -434,6 +505,7 @@ export function useLocalPracticeState() {
 
       if (payload.state) {
         const migrated = migrateState(payload.state);
+        shouldPersistRef.current = didMigrateState(payload.state, migrated);
         setState(migrated);
         cacheStateLocally(migrated);
         setHasLocalMigrationCandidate(false);
@@ -467,7 +539,7 @@ export function useLocalPracticeState() {
       const currentServer = await fetchServerState();
       if (currentServer.state) {
         const migratedServerState = migrateState(currentServer.state);
-        shouldPersistRef.current = false;
+        shouldPersistRef.current = didMigrateState(currentServer.state, migratedServerState);
         setState(migratedServerState);
         cacheStateLocally(migratedServerState);
         setServerUpdatedAt(currentServer.updatedAt ?? null);
