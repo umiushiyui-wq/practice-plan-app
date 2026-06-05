@@ -181,7 +181,7 @@ function TimePartSelect({
 
 export function PlayerApp() {
   const localState = useLocalPracticeState();
-  const { state, updateState } = localState;
+  const { state, updateState, ready } = localState;
   const sortedPracticeDays = useMemo(() => getSortedPracticeDays(state.practiceDays), [state.practiceDays]);
   const [selectedPart, setSelectedPart] = useState("");
   const [memberId, setMemberId] = useState("");
@@ -224,7 +224,7 @@ export function PlayerApp() {
   }, [activePart, selectedPart]);
 
   useEffect(() => {
-    if (restoredSelectionRef.current || state.members.length === 0) return;
+    if (!ready || restoredSelectionRef.current || state.members.length === 0) return;
     restoredSelectionRef.current = true;
 
     try {
@@ -248,7 +248,7 @@ export function PlayerApp() {
     } catch {
       window.localStorage.removeItem(PLAYER_SELECTION_STORAGE_KEY);
     }
-  }, [partOptions, sortedPracticeDays, state.members]);
+  }, [partOptions, ready, sortedPracticeDays, state.members]);
 
   useEffect(() => {
     if (!restoredSelectionRef.current) return;
