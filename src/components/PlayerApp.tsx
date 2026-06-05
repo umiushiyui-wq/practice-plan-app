@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   formatPracticeDateLabel,
   compareMembersByInstrument,
@@ -17,6 +17,7 @@ import {
 import type { LocalPracticeDay } from "@/components/LocalPracticeApp";
 
 const AVAILABILITY_SLOTS = Array.from({ length: ((22 - 8) * 60) / 10 + 1 }, (_, index) => 8 * 60 + index * 10);
+const PLAYER_SELECTION_STORAGE_KEY = "nagosui-player-selection-v1";
 
 type DraftByDay = Record<
   string,
@@ -191,6 +192,8 @@ export function PlayerApp() {
   const [draftsByDay, setDraftsByDay] = useState<DraftByDay>({});
   const [saveMessage, setSaveMessage] = useState("");
   const [authError, setAuthError] = useState("");
+  const restoredSelectionRef = useRef(false);
+  const skipNextSelectionPersistRef = useRef(false);
 
   const partOptions = getSortedInstrumentOptions(state.members.map((member) => member.instrument));
   const activePart = partOptions.includes(selectedPart) ? selectedPart : partOptions[0] ?? "";
@@ -219,6 +222,54 @@ export function PlayerApp() {
       setSelectedPart(activePart);
     }
   }, [activePart, selectedPart]);
+
+  useEffect(() => {
+    if (restoredSelectionRef.current || state.members.length === 0) return;
+    restoredSelectionRef.current = true;
+
+    try {
+      const saved = window.localStorage.getItem(PLAYER_SELECTION_STORAGE_KEY);
+      if (!saved) return;
+
+      const parsed = JSON.parse(saved) as { memberId?: unknown; selectedPart?: unknown; selectedInputDayId?: unknown };
+      const savedMemberId = typeof parsed.memberId === "string" ? parsed.memberId : "";
+      const savedMember = state.members.find((member) => member.id === savedMemberId);
+      if (!savedMember) return;
+
+      skipNextSelectionPersistRef.current = true;
+      const savedPart = typeof parsed.selectedPart === "string" ? parsed.selectedPart : "";
+      const memberPart = getInstrumentLabel(savedMember.instrument);
+      setSelectedPart(partOptions.includes(savedPart) ? savedPart : memberPart);
+      setMemberId(savedMember.id);
+
+      if (typeof parsed.selectedInputDayId === "string" && sortedPracticeDays.some((day) => day.id === parsed.selectedInputDayId)) {
+        setSelectedInputDayId(parsed.selectedInputDayId);
+      }
+    } catch {
+      window.localStorage.removeItem(PLAYER_SELECTION_STORAGE_KEY);
+    }
+  }, [partOptions, sortedPracticeDays, state.members]);
+
+  useEffect(() => {
+    if (!restoredSelectionRef.current) return;
+    if (skipNextSelectionPersistRef.current) {
+      skipNextSelectionPersistRef.current = false;
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(
+        PLAYER_SELECTION_STORAGE_KEY,
+        JSON.stringify({
+          memberId,
+          selectedPart: activePart,
+          selectedInputDayId
+        })
+      );
+    } catch {
+      // Selection persistence is only a browser convenience.
+    }
+  }, [activePart, memberId, selectedInputDayId]);
 
 
   useEffect(() => {
