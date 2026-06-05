@@ -22,6 +22,14 @@ const ALL_PIECES_FILTER = "__all__";
 const OTHER_PIECES_FILTER = "__other__";
 const ALL_PARTS_FILTER = "__all__";
 
+type SlackReminderResult = {
+  sentCount: number;
+  missingSlackUserIdCount: number;
+  failedCount: number;
+  skippedAnsweredCount: number;
+  totalUnansweredCount: number;
+};
+
 function formatPracticeTimeAndLocation(day: { startTime: string; endTime: string; location: string }) {
   const location = day.location.trim();
   return location ? `${day.startTime}-${day.endTime} ＠${location}` : `${day.startTime}-${day.endTime}`;
@@ -35,6 +43,9 @@ export function AvailabilityTableApp() {
   const [selectedPieceFilter, setSelectedPieceFilter] = useState(ALL_PIECES_FILTER);
   const [selectedPartFilter, setSelectedPartFilter] = useState(ALL_PARTS_FILTER);
   const [hoveredSlot, setHoveredSlot] = useState<number | null>(null);
+  const [slackReminderStatus, setSlackReminderStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [slackReminderResult, setSlackReminderResult] = useState<SlackReminderResult | null>(null);
+  const [slackReminderMessage, setSlackReminderMessage] = useState("");
 
   const partOptions = useMemo(
     () => getSortedInstrumentOptions(state.members.map((member) => member.instrument)),
@@ -77,6 +88,32 @@ export function AvailabilityTableApp() {
       ? null
       : visibleMembers.filter((member) => isMemberHighlighted(member.id) && isMemberAvailableAtSlot(member.id, hoveredSlot)).length;
 
+  async function sendSlackReminders() {
+    setSlackReminderStatus("sending");
+    setSlackReminderResult(null);
+    setSlackReminderMessage("");
+
+    try {
+      const response = await fetch(`/api/local-state/practice-days/${selectedDay.id}/slack-reminders`, {
+        method: "POST"
+      });
+      const payload = (await response.json().catch(() => null)) as (SlackReminderResult & { error?: string }) | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Slack\u901a\u77e5\u3092\u9001\u4fe1\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002");
+      }
+
+      setSlackReminderResult(payload);
+      setSlackReminderStatus("sent");
+      setSlackReminderMessage(
+        `Slack\u901a\u77e5: \u9001\u4fe1 ${payload?.sentCount ?? 0}\u4eba / Slack ID\u672a\u767b\u9332 ${payload?.missingSlackUserIdCount ?? 0}\u4eba / \u5931\u6557 ${payload?.failedCount ?? 0}\u4eba`
+      );
+    } catch (error) {
+      setSlackReminderStatus("error");
+      setSlackReminderMessage(error instanceof Error ? error.message : "Slack\u901a\u77e5\u3092\u9001\u4fe1\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002");
+    }
+  }
+
   return (
     <main className="stack">
       <section className="panel stack">
@@ -87,7 +124,12 @@ export function AvailabilityTableApp() {
             表示する練習日
             <select
               value={selectedDay.id}
-              onChange={(event) => updateState({ selectedPracticeDayId: event.target.value })}
+              onChange={(event) => {
+                updateState({ selectedPracticeDayId: event.target.value });
+                setSlackReminderStatus("idle");
+                setSlackReminderResult(null);
+                setSlackReminderMessage("");
+              }}
             >
               {sortedPracticeDays.map((day) => (
                 <option key={day.id} value={day.id}>
@@ -132,8 +174,11 @@ export function AvailabilityTableApp() {
             カラーマップへ
           </Link>
           <Link className="button secondary" href="/sheet">
-            表で見る
+            {"\u8868\u3067\u898b\u308b"}
           </Link>
+          <button className="secondary" type="button" onClick={sendSlackReminders} disabled={slackReminderStatus === "sending"}>
+            {slackReminderStatus === "sending" ? "\u9001\u4fe1\u4e2d" : "\u672a\u5165\u529b\u8005\u306b\u30e1\u30c3\u30bb\u30fc\u30b8\u3092\u9001\u308b"}
+          </button>
         </div>
       </section>
 
@@ -141,6 +186,16 @@ export function AvailabilityTableApp() {
 
       <section className="panel stack">
         <h2>{getPracticeDayLabel(selectedDay)} の参加可能時間</h2>
+        {slackReminderMessage ? (
+          <div className={slackReminderStatus === "error" ? "error" : "notice"}>
+            {slackReminderMessage}
+            {slackReminderResult ? (
+              <span className="muted">
+                {` \u672a\u5165\u529b\u8005 ${slackReminderResult.totalUnansweredCount}\u4eba\u3001\u5165\u529b\u6e08\u307f\u9664\u5916 ${slackReminderResult.skippedAnsweredCount}\u4eba`}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
         {hoveredSlot !== null ? (
           <div className="notice">
             {toTime(hoveredSlot)} 時点で参加可能: {hoveredAvailableCount}人
