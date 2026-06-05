@@ -89,6 +89,8 @@ export function AvailabilityTableApp() {
       : visibleMembers.filter((member) => isMemberHighlighted(member.id) && isMemberAvailableAtSlot(member.id, hoveredSlot)).length;
 
   async function sendSlackReminders() {
+    if (!confirm("\u672a\u5165\u529b\u8005\u306bSlack DM\u3092\u9001\u4fe1\u3057\u307e\u3059\u304b\uff1f")) return;
+
     setSlackReminderStatus("sending");
     setSlackReminderResult(null);
     setSlackReminderMessage("");
@@ -176,7 +178,7 @@ export function AvailabilityTableApp() {
           <Link className="button secondary" href="/sheet">
             {"\u8868\u3067\u898b\u308b"}
           </Link>
-          <button className="secondary" type="button" onClick={sendSlackReminders} disabled={slackReminderStatus === "sending"}>
+          <button className="slack-reminder-button" type="button" onClick={sendSlackReminders} disabled={slackReminderStatus === "sending"}>
             {slackReminderStatus === "sending" ? "\u9001\u4fe1\u4e2d" : "\u672a\u5165\u529b\u8005\u306b\u30e1\u30c3\u30bb\u30fc\u30b8\u3092\u9001\u308b"}
           </button>
         </div>

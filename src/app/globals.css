@@ -1487,3 +1487,12 @@ button:disabled:hover {
   min-width: 180px;
   max-width: 260px;
 }
+
+.slack-reminder-button {
+  background: #1f8f4d;
+  color: white;
+}
+
+.slack-reminder-button:hover {
+  background: #176f3b;
+}
