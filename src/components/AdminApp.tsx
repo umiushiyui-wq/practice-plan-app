@@ -100,15 +100,11 @@ export function AdminApp() {
   const localState = useLocalPracticeState();
   const { state, updateState } = localState;
   const [planMessage, setPlanMessage] = useState("");
-  const [pendingAnnouncementDayId, setPendingAnnouncementDayId] = useState<string | null>(null);
   const [isSendingAnnouncement, setIsSendingAnnouncement] = useState(false);
   const [draggedSlotId, setDraggedSlotId] = useState<string | null>(null);
   const [activeDropMinutes, setActiveDropMinutes] = useState<number | null>(null);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const selectedDay = getSelectedPracticeDay(state);
-  const pendingAnnouncementDay = pendingAnnouncementDayId
-    ? state.practiceDays.find((day) => day.id === pendingAnnouncementDayId) ?? null
-    : null;
   const sortedPracticeDays = getSortedPracticeDays(state.practiceDays);
   const pieceMap = usePieceMap(state.pieces);
 
@@ -209,14 +205,17 @@ export function AdminApp() {
   function handlePublishToggle(event: ChangeEvent<HTMLInputElement>) {
     const nextPublished = event.target.checked;
     if (!nextPublished) {
-      if (pendingAnnouncementDayId === selectedDay.id) setPendingAnnouncementDayId(null);
       updateSelectedDay({ isPlanPublished: false });
       return;
     }
 
     updateSelectedDay({ isPlanPublished: true });
-    setPendingAnnouncementDayId(selectedDay.id);
     setPlanMessage("");
+    if (confirm("\u30b9\u30b1\u30b8\u30e5\u30fc\u30eb\u516c\u958b\u3092\u30a2\u30ca\u30a6\u30f3\u30b9\u3057\u307e\u3059\u304b\uff1f")) {
+      void sendPublishAnnouncement(selectedDay);
+    } else {
+      setPlanMessage("\u516c\u958b\u306e\u307f\u884c\u3044\u307e\u3057\u305f\u3002");
+    }
   }
 
   async function sendPublishAnnouncement(day: typeof selectedDay) {
@@ -232,7 +231,6 @@ export function AdminApp() {
       });
       const payload = (await response.json().catch(() => null)) as { error?: string } | null;
       if (!response.ok) throw new Error(payload?.error ?? "Slack\u30a2\u30ca\u30a6\u30f3\u30b9\u3092\u9001\u4fe1\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002");
-      setPendingAnnouncementDayId(null);
       setPlanMessage("Slack\u306b\u7df4\u7fd2\u5185\u5bb9\u3092\u9001\u4fe1\u3057\u307e\u3057\u305f\u3002");
     } catch (error) {
       setPlanMessage(error instanceof Error ? error.message : "Slack\u30a2\u30ca\u30a6\u30f3\u30b9\u3092\u9001\u4fe1\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002");
@@ -630,29 +628,6 @@ export function AdminApp() {
           </label>
         </div>
       </section>
-
-      {pendingAnnouncementDay ? (
-        <section className="panel stack" role="dialog" aria-modal="true" aria-label="\u30b9\u30b1\u30b8\u30e5\u30fc\u30eb\u516c\u958b\u30a2\u30ca\u30a6\u30f3\u30b9">
-          <h2>{"\u30b9\u30b1\u30b8\u30e5\u30fc\u30eb\u516c\u958b\u3092\u30a2\u30ca\u30a6\u30f3\u30b9\u3057\u307e\u3059\u304b\uff1f"}</h2>
-          <p className="muted">{formatPracticeDateLabel(pendingAnnouncementDay.practiceDate)} {"\u306e\u7df4\u7fd2\u5185\u5bb9\u3092Slack\u306b\u9001\u4fe1\u3057\u307e\u3059\u3002"}</p>
-          <div className="row">
-            <button type="button" onClick={() => sendPublishAnnouncement(pendingAnnouncementDay)} disabled={isSendingAnnouncement}>
-              {isSendingAnnouncement ? "\u9001\u4fe1\u4e2d" : "\u306f\u3044"}
-            </button>
-            <button
-              className="secondary"
-              type="button"
-              onClick={() => {
-                setPendingAnnouncementDayId(null);
-                setPlanMessage("\u516c\u958b\u306e\u307f\u884c\u3044\u307e\u3057\u305f\u3002");
-              }}
-              disabled={isSendingAnnouncement}
-            >
-              {"\u3044\u3044\u3048"}
-            </button>
-          </div>
-        </section>
-      ) : null}
 
       <section className="panel stack">
         <div className="row page-section-head">
