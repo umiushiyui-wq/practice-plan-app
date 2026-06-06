@@ -234,7 +234,7 @@ export function PlayerApp() {
       if (!saved) return;
 
       const parsed = JSON.parse(saved) as { memberId?: unknown; selectedPart?: unknown; selectedInputDayId?: unknown };
-      const savedAuthMemberId = window.sessionStorage.getItem(PLAYER_AUTH_STORAGE_KEY);
+      const savedAuthMemberId = window.localStorage.getItem(PLAYER_AUTH_STORAGE_KEY);
       const savedMemberId = typeof parsed.memberId === "string" ? parsed.memberId : "";
       const savedMember = state.members.find((member) => member.id === savedMemberId);
       if (!savedMember) return;
@@ -291,7 +291,7 @@ export function PlayerApp() {
 
     setAuthenticatedMemberId("");
     try {
-      window.sessionStorage.removeItem(PLAYER_AUTH_STORAGE_KEY);
+      window.localStorage.removeItem(PLAYER_AUTH_STORAGE_KEY);
     } catch {
       // Authentication persistence is only a browser convenience.
     }
@@ -483,7 +483,7 @@ export function PlayerApp() {
 
     setAuthenticatedMemberId(selected.id);
     try {
-      window.sessionStorage.setItem(PLAYER_AUTH_STORAGE_KEY, selected.id);
+      window.localStorage.setItem(PLAYER_AUTH_STORAGE_KEY, selected.id);
     } catch {
       // Authentication persistence is only a browser convenience.
     }
