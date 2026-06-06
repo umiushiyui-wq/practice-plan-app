@@ -202,7 +202,7 @@ export function PlayerApp() {
   const filteredMembers = [...state.members]
     .sort(compareMembersByInstrument)
     .filter((member) => getInstrumentLabel(member.instrument) === activePart);
-  const selected = filteredMembers.find((member) => member.id === memberId) ?? null;
+  const selected = state.members.find((member) => member.id === memberId) ?? null;
   const selectedInputDay = selected
     ? sortedPracticeDays.find((day) => day.id === selectedInputDayId) ?? sortedPracticeDays[0] ?? null
     : null;
@@ -288,6 +288,16 @@ export function PlayerApp() {
       return;
     }
 
+    try {
+      if (memberId && window.localStorage.getItem(PLAYER_AUTH_STORAGE_KEY) === memberId) {
+        setAuthenticatedMemberId(memberId);
+        setAuthError("");
+        return;
+      }
+    } catch {
+      // Authentication persistence is only a browser convenience.
+    }
+
     setMemberPassword("");
     setMemberPasswordConfirmation("");
     setAuthError("");
@@ -298,6 +308,18 @@ export function PlayerApp() {
       // Authentication persistence is only a browser convenience.
     }
   }, [memberId, ready]);
+
+  useEffect(() => {
+    if (!ready || !selected) return;
+
+    try {
+      if (window.localStorage.getItem(PLAYER_AUTH_STORAGE_KEY) === selected.id) {
+        setAuthenticatedMemberId(selected.id);
+      }
+    } catch {
+      // Authentication persistence is only a browser convenience.
+    }
+  }, [ready, selected]);
 
   useEffect(() => {
     if (!selected) return;
