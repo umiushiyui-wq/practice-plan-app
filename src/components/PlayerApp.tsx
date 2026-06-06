@@ -18,6 +18,7 @@ import type { LocalPracticeDay } from "@/components/LocalPracticeApp";
 
 const AVAILABILITY_SLOTS = Array.from({ length: ((22 - 8) * 60) / 10 + 1 }, (_, index) => 8 * 60 + index * 10);
 const PLAYER_SELECTION_STORAGE_KEY = "nagosui-player-selection-v1";
+const PLAYER_AUTH_STORAGE_KEY = "nagosui-player-auth-v1";
 
 type DraftByDay = Record<
   string,
@@ -194,6 +195,7 @@ export function PlayerApp() {
   const [authError, setAuthError] = useState("");
   const restoredSelectionRef = useRef(false);
   const skipNextSelectionPersistRef = useRef(false);
+  const skipNextMemberAuthResetRef = useRef(false);
 
   const partOptions = getSortedInstrumentOptions(state.members.map((member) => member.instrument));
   const activePart = partOptions.includes(selectedPart) ? selectedPart : partOptions[0] ?? "";
@@ -232,6 +234,7 @@ export function PlayerApp() {
       if (!saved) return;
 
       const parsed = JSON.parse(saved) as { memberId?: unknown; selectedPart?: unknown; selectedInputDayId?: unknown };
+      const savedAuthMemberId = window.sessionStorage.getItem(PLAYER_AUTH_STORAGE_KEY);
       const savedMemberId = typeof parsed.memberId === "string" ? parsed.memberId : "";
       const savedMember = state.members.find((member) => member.id === savedMemberId);
       if (!savedMember) return;
@@ -240,6 +243,10 @@ export function PlayerApp() {
       const savedPart = typeof parsed.selectedPart === "string" ? parsed.selectedPart : "";
       const memberPart = getInstrumentLabel(savedMember.instrument);
       setSelectedPart(partOptions.includes(savedPart) ? savedPart : memberPart);
+      if (savedAuthMemberId === savedMember.id) {
+        skipNextMemberAuthResetRef.current = true;
+        setAuthenticatedMemberId(savedMember.id);
+      }
       setMemberId(savedMember.id);
 
       if (typeof parsed.selectedInputDayId === "string" && sortedPracticeDays.some((day) => day.id === parsed.selectedInputDayId)) {
@@ -275,8 +282,19 @@ export function PlayerApp() {
   useEffect(() => {
     setMemberPassword("");
     setMemberPasswordConfirmation("");
-    setAuthenticatedMemberId("");
     setAuthError("");
+
+    if (skipNextMemberAuthResetRef.current) {
+      skipNextMemberAuthResetRef.current = false;
+      return;
+    }
+
+    setAuthenticatedMemberId("");
+    try {
+      window.sessionStorage.removeItem(PLAYER_AUTH_STORAGE_KEY);
+    } catch {
+      // Authentication persistence is only a browser convenience.
+    }
   }, [memberId]);
 
   useEffect(() => {
@@ -464,6 +482,11 @@ export function PlayerApp() {
     }
 
     setAuthenticatedMemberId(selected.id);
+    try {
+      window.sessionStorage.setItem(PLAYER_AUTH_STORAGE_KEY, selected.id);
+    } catch {
+      // Authentication persistence is only a browser convenience.
+    }
     setAuthError("");
     setSaveMessage("");
   }
