@@ -195,7 +195,7 @@ export function PlayerApp() {
   const [authError, setAuthError] = useState("");
   const restoredSelectionRef = useRef(false);
   const skipNextSelectionPersistRef = useRef(false);
-  const skipNextMemberAuthResetRef = useRef(false);
+  const skipNextMemberStateResetRef = useRef(false);
 
   const partOptions = getSortedInstrumentOptions(state.members.map((member) => member.instrument));
   const activePart = partOptions.includes(selectedPart) ? selectedPart : partOptions[0] ?? "";
@@ -240,11 +240,11 @@ export function PlayerApp() {
       if (!savedMember) return;
 
       skipNextSelectionPersistRef.current = true;
+      skipNextMemberStateResetRef.current = true;
       const savedPart = typeof parsed.selectedPart === "string" ? parsed.selectedPart : "";
       const memberPart = getInstrumentLabel(savedMember.instrument);
       setSelectedPart(partOptions.includes(savedPart) ? savedPart : memberPart);
       if (savedAuthMemberId === savedMember.id) {
-        skipNextMemberAuthResetRef.current = true;
         setAuthenticatedMemberId(savedMember.id);
       }
       setMemberId(savedMember.id);
@@ -280,15 +280,15 @@ export function PlayerApp() {
 
 
   useEffect(() => {
-    setMemberPassword("");
-    setMemberPasswordConfirmation("");
-    setAuthError("");
-
-    if (skipNextMemberAuthResetRef.current) {
-      skipNextMemberAuthResetRef.current = false;
+    if (skipNextMemberStateResetRef.current) {
+      skipNextMemberStateResetRef.current = false;
+      setAuthError("");
       return;
     }
 
+    setMemberPassword("");
+    setMemberPasswordConfirmation("");
+    setAuthError("");
     setAuthenticatedMemberId("");
     try {
       window.localStorage.removeItem(PLAYER_AUTH_STORAGE_KEY);
