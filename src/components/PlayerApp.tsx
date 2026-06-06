@@ -280,6 +280,8 @@ export function PlayerApp() {
 
 
   useEffect(() => {
+    if (!ready || !restoredSelectionRef.current) return;
+
     if (skipNextMemberStateResetRef.current) {
       skipNextMemberStateResetRef.current = false;
       setAuthError("");
@@ -295,7 +297,7 @@ export function PlayerApp() {
     } catch {
       // Authentication persistence is only a browser convenience.
     }
-  }, [memberId]);
+  }, [memberId, ready]);
 
   useEffect(() => {
     if (!selected) return;
