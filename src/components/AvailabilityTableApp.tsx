@@ -83,6 +83,8 @@ export function AvailabilityTableApp() {
     return state.pieces.some((piece) => piece.id === selectedPieceFilter && piece.memberIds.includes(memberId));
   }
 
+  const reminderTargetMemberIds = visibleMembers.filter((member) => isMemberHighlighted(member.id)).map((member) => member.id);
+
   const hoveredAvailableCount =
     hoveredSlot === null
       ? null
@@ -97,7 +99,9 @@ export function AvailabilityTableApp() {
 
     try {
       const response = await fetch(`/api/local-state/practice-days/${selectedDay.id}/slack-reminders`, {
-        method: "POST"
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetMemberIds: reminderTargetMemberIds })
       });
       const payload = (await response.json().catch(() => null)) as (SlackReminderResult & { error?: string }) | null;
 

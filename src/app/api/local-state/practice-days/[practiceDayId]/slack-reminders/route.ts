@@ -133,13 +133,22 @@ function findPracticeDay(state: unknown, practiceDayId: string) {
   };
 }
 
-export async function POST(_request: Request, context: { params: Promise<{ practiceDayId: string }> }) {
+function getTargetMemberIdSet(value: unknown) {
+  if (!value || typeof value !== "object" || !("targetMemberIds" in value)) return null;
+  const targetMemberIds = (value as { targetMemberIds?: unknown }).targetMemberIds;
+  if (!Array.isArray(targetMemberIds)) return null;
+  return new Set(targetMemberIds.filter((id): id is string => typeof id === "string"));
+}
+
+export async function POST(request: Request, context: { params: Promise<{ practiceDayId: string }> }) {
   try {
     if (!config.slackBotToken) {
       return NextResponse.json({ error: "SLACK_BOT_TOKEN \u304c\u672a\u8a2d\u5b9a\u3067\u3059\u3002" }, { status: 500 });
     }
 
     const { practiceDayId } = await context.params;
+    const body = await request.json().catch(() => null);
+    const targetMemberIdSet = getTargetMemberIdSet(body);
     const current = await readCurrentState();
     const practiceDay = findPracticeDay(current.state, practiceDayId);
     if (!practiceDay) {
@@ -147,8 +156,9 @@ export async function POST(_request: Request, context: { params: Promise<{ pract
     }
 
     const members = getMembers(current.state);
+    const scopedMembers = targetMemberIdSet ? members.filter((member) => targetMemberIdSet.has(member.id)) : members;
     const respondedMemberIds = new Set(practiceDay.respondedMemberIds);
-    const unanswered = members.filter((member) => !respondedMemberIds.has(member.id));
+    const unanswered = scopedMembers.filter((member) => !respondedMemberIds.has(member.id));
     const targets = unanswered.filter((member) => member.slackUserId);
     const missingSlackUserIdCount = unanswered.length - targets.length;
     const failures: Array<{ memberId: string; name: string; error: string }> = [];
@@ -186,7 +196,7 @@ export async function POST(_request: Request, context: { params: Promise<{ pract
       sentCount,
       missingSlackUserIdCount,
       failedCount: failures.length,
-      skippedAnsweredCount: members.length - unanswered.length,
+      skippedAnsweredCount: scopedMembers.length - unanswered.length,
       totalUnansweredCount: unanswered.length,
       failures
     });
