@@ -22,6 +22,7 @@ type AvailabilityPatch = {
   end: string;
   breaks: AvailabilityBreak[];
   absent: boolean;
+  clear?: boolean;
 };
 
 type PracticeDayLike = {
@@ -153,11 +154,24 @@ function parsePatch(value: unknown): AvailabilityPatch | null {
   if (!patch || typeof patch !== "object") return null;
 
   const candidate = patch as Partial<AvailabilityPatch>;
-  if (
-    typeof candidate.practiceDayId !== "string" ||
-    typeof candidate.memberId !== "string" ||
-    typeof candidate.absent !== "boolean"
-  ) {
+  if (typeof candidate.practiceDayId !== "string" || typeof candidate.memberId !== "string") {
+    return null;
+  }
+
+  // 「未入力に戻す」操作: 入力内容を消して未回答状態に戻す
+  if (candidate.clear === true) {
+    return {
+      practiceDayId: candidate.practiceDayId,
+      memberId: candidate.memberId,
+      start: "",
+      end: "",
+      breaks: [],
+      absent: false,
+      clear: true
+    };
+  }
+
+  if (typeof candidate.absent !== "boolean") {
     return null;
   }
 
@@ -197,6 +211,15 @@ function patchAvailability(state: unknown, patch: AvailabilityPatch) {
     const respondedMemberIds = Array.isArray(day.respondedMemberIds)
       ? day.respondedMemberIds.filter((id): id is string => typeof id === "string")
       : [];
+
+    if (patch.clear) {
+      return {
+        ...day,
+        availabilities: availabilities.filter((item) => item.memberId !== patch.memberId),
+        absentMemberIds: absentMemberIds.filter((id) => id !== patch.memberId),
+        respondedMemberIds: respondedMemberIds.filter((id) => id !== patch.memberId)
+      };
+    }
 
     return {
       ...day,

@@ -124,6 +124,7 @@ export type AvailabilityPatch = {
   end: string;
   breaks: AvailabilityBreak[];
   absent: boolean;
+  clear?: boolean;
 };
 
 type LegacyPiece = Partial<Piece> & {

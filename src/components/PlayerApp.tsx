@@ -454,8 +454,34 @@ export function PlayerApp() {
     setSaveMessage(
       draft.absent
         ? `${getPracticeDayLabel(savedDay)} を欠席で保存しました。`
-        : `${getPracticeDayLabel(savedDay)} を ${draft.start}-${draft.end} で保存しました。`
+        : `${getPracticeDayLabel(savedDay)} を ${draft.start}〜${draft.end} で保存しました。`
     );
+  }
+
+  async function clearAvailability(dayId: string) {
+    if (!selected) return;
+
+    const day = state.practiceDays.find((item) => item.id === dayId);
+    if (!day) return;
+    if (!confirm(`${getPracticeDayLabel(day)} の入力を取り消して未入力に戻しますか？`)) return;
+
+    const savedState = await localState.saveAvailabilityPatch({
+      practiceDayId: dayId,
+      memberId: selected.id,
+      start: "",
+      end: "",
+      breaks: [],
+      absent: false,
+      clear: true
+    });
+
+    if (!savedState) {
+      setSaveMessage("取り消せませんでした。ネットワークまたはRedis/KV設定を確認してください。");
+      return;
+    }
+
+    const savedDay = savedState.practiceDays.find((item) => item.id === dayId) ?? day;
+    setSaveMessage(`${getPracticeDayLabel(savedDay)} の入力を未入力に戻しました。`);
   }
 
   function togglePiece(pieceId: string, checked: boolean) {
@@ -684,13 +710,25 @@ export function PlayerApp() {
                     </p>
                   </div>
                   {canEditSelectedDay ? (
-                    <button
-                      type="button"
-                      onClick={() => saveAvailability(selectedInputDay.id)}
-                      disabled={localState.saveStatus === "saving"}
-                    >
-                      {localState.saveStatus === "saving" ? "保存中" : "この日の入力を保存"}
-                    </button>
+                    <div className="row">
+                      <button
+                        type="button"
+                        onClick={() => saveAvailability(selectedInputDay.id)}
+                        disabled={localState.saveStatus === "saving"}
+                      >
+                        {localState.saveStatus === "saving" ? "保存中" : "この日の入力を保存"}
+                      </button>
+                      {selectedDayHasSavedInput ? (
+                        <button
+                          type="button"
+                          className="secondary"
+                          onClick={() => clearAvailability(selectedInputDay.id)}
+                          disabled={localState.saveStatus === "saving"}
+                        >
+                          入力を取り消す（未入力に戻す）
+                        </button>
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
 
