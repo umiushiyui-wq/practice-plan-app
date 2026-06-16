@@ -500,6 +500,8 @@ tbody tr:hover td {
 
 .table-wrap {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   overflow-x: auto;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -957,6 +959,8 @@ tbody tr:hover td {
 
 .sheet-wrap {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   overflow-x: auto;
 }
 
@@ -1022,6 +1026,8 @@ tbody tr:hover td {
 
 .availability-wrap {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   overflow-x: auto;
 }
 
