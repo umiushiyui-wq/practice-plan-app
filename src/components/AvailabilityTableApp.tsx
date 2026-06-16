@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
+  buildAvailabilitySlots,
   compareMembersByInstrument,
   formatPracticeDateLabel,
   getInstrumentLabel,
@@ -17,7 +18,6 @@ import {
   useLocalPracticeState
 } from "@/components/LocalPracticeApp";
 
-const AVAILABILITY_SLOTS = Array.from({ length: ((22 - 8) * 60) / 10 + 1 }, (_, index) => 8 * 60 + index * 10);
 const ALL_PIECES_FILTER = "__all__";
 const OTHER_PIECES_FILTER = "__other__";
 const ALL_PARTS_FILTER = "__all__";
@@ -32,7 +32,7 @@ type SlackReminderResult = {
 
 function formatPracticeTimeAndLocation(day: { startTime: string; endTime: string; location: string }) {
   const location = day.location.trim();
-  return location ? `${day.startTime}-${day.endTime} ＠${location}` : `${day.startTime}-${day.endTime}`;
+  return location ? `${day.startTime}〜${day.endTime} ＠${location}` : `${day.startTime}〜${day.endTime}`;
 }
 
 export function AvailabilityTableApp() {
@@ -40,6 +40,10 @@ export function AvailabilityTableApp() {
   const { state, updateState } = localState;
   const selectedDay = getSelectedPracticeDay(state);
   const sortedPracticeDays = useMemo(() => getSortedPracticeDays(state.practiceDays), [state.practiceDays]);
+  const AVAILABILITY_SLOTS = useMemo(
+    () => buildAvailabilitySlots(toMinutes(selectedDay.startTime), toMinutes(selectedDay.endTime)),
+    [selectedDay.startTime, selectedDay.endTime]
+  );
   const [selectedPieceFilter, setSelectedPieceFilter] = useState(ALL_PIECES_FILTER);
   const [selectedPartFilter, setSelectedPartFilter] = useState(ALL_PARTS_FILTER);
   const [hoveredSlot, setHoveredSlot] = useState<number | null>(null);
@@ -57,6 +61,21 @@ export function AvailabilityTableApp() {
     if (selectedPartFilter === ALL_PARTS_FILTER) return sortedMembers;
     return sortedMembers.filter((member) => getInstrumentLabel(member.instrument) === selectedPartFilter);
   }, [selectedPartFilter, state.members]);
+
+  // 管理画面だけに見せる出欠サマリー（奏者ページ・ホームには出さない）
+  const attendanceSummary = useMemo(() => {
+    const memberIds = new Set(state.members.map((member) => member.id));
+    const respondedSet = new Set(selectedDay.respondedMemberIds.filter((id) => memberIds.has(id)));
+    const absent = selectedDay.absentMemberIds.filter((id) => respondedSet.has(id)).length;
+    const total = state.members.length;
+    const responded = respondedSet.size;
+    return {
+      total,
+      responded,
+      attending: Math.max(0, responded - absent),
+      unanswered: Math.max(0, total - responded)
+    };
+  }, [state.members, selectedDay.respondedMemberIds, selectedDay.absentMemberIds]);
 
   function isPracticeSlot(slotStart: number) {
     const slotEnd = slotStart + 10;
@@ -192,6 +211,23 @@ export function AvailabilityTableApp() {
 
       <section className="panel stack">
         <h2>{getPracticeDayLabel(selectedDay)} の参加可能時間</h2>
+        <div className="summary-strip">
+          <div className="metric-card">
+            <span className="metric-label">回答</span>
+            <strong>
+              {attendanceSummary.responded}
+              <span className="metric-sub"> / {attendanceSummary.total}</span>
+            </strong>
+          </div>
+          <div className="metric-card">
+            <span className="metric-label">出席予定</span>
+            <strong>{attendanceSummary.attending}</strong>
+          </div>
+          <div className="metric-card">
+            <span className="metric-label">未回答</span>
+            <strong>{attendanceSummary.unanswered}</strong>
+          </div>
+        </div>
         {slackReminderMessage ? (
           <div className={slackReminderStatus === "error" ? "error" : "notice"}>
             {slackReminderMessage}

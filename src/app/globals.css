@@ -198,6 +198,41 @@ p:last-child {
   justify-content: flex-end;
 }
 
+.home-next {
+  display: grid;
+  gap: 2px;
+  align-content: center;
+  justify-items: start;
+  min-width: 220px;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--accent);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--accent-soft), #ffffff 85%);
+  padding: 16px 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.home-next-label {
+  color: var(--accent-dark);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.home-next-date {
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.home-next-time {
+  font-weight: 700;
+}
+
+.home-next-place {
+  color: var(--muted);
+  font-size: 14px;
+}
+
 .quick-actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -493,6 +528,12 @@ tbody tr:hover td {
 .metric-card strong {
   font-size: 32px;
   line-height: 1;
+}
+
+.metric-sub {
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 700;
 }
 
 .metric-label,

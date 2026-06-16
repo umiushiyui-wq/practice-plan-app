@@ -93,7 +93,7 @@ function clampNumber(value: number, min: number, max: number) {
 
 function formatPracticeTimeAndLocation(day: { startTime: string; endTime: string; location: string }) {
   const location = day.location.trim();
-  return location ? `${day.startTime}-${day.endTime} ＠${location}` : `${day.startTime}-${day.endTime}`;
+  return location ? `${day.startTime}〜${day.endTime} ＠${location}` : `${day.startTime}〜${day.endTime}`;
 }
 
 export function AdminApp() {

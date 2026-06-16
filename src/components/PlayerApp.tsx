@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  buildAvailabilitySlots,
   formatPracticeDateLabel,
   compareMembersByInstrument,
+  getAvailabilityRange,
   getAvailableSegments,
   getInstrumentLabel,
   getPracticeDayLabel,
@@ -15,8 +17,6 @@ import {
   useLocalPracticeState
 } from "@/components/LocalPracticeApp";
 import type { LocalPracticeDay } from "@/components/LocalPracticeApp";
-
-const AVAILABILITY_SLOTS = Array.from({ length: ((22 - 8) * 60) / 10 + 1 }, (_, index) => 8 * 60 + index * 10);
 const PLAYER_SELECTION_STORAGE_KEY = "nagosui-player-selection-v1";
 const PLAYER_AUTH_STORAGE_KEY = "nagosui-player-auth-v1";
 
@@ -54,7 +54,7 @@ function getClosestTime(value: string, options: string[]) {
 
 function formatPracticeTimeAndLocation(day: { startTime: string; endTime: string; location: string }) {
   const location = day.location.trim();
-  return location ? `${day.startTime}-${day.endTime} ＠${location}` : `${day.startTime}-${day.endTime}`;
+  return location ? `${day.startTime}〜${day.endTime} ＠${location}` : `${day.startTime}〜${day.endTime}`;
 }
 
 function escapeCalendarText(value: string) {
@@ -184,6 +184,10 @@ export function PlayerApp() {
   const localState = useLocalPracticeState();
   const { state, updateState, ready } = localState;
   const sortedPracticeDays = useMemo(() => getSortedPracticeDays(state.practiceDays), [state.practiceDays]);
+  const AVAILABILITY_SLOTS = useMemo(() => {
+    const range = getAvailabilityRange(sortedPracticeDays);
+    return buildAvailabilitySlots(range.startMin, range.endMin);
+  }, [sortedPracticeDays]);
   const [selectedPart, setSelectedPart] = useState("");
   const [memberId, setMemberId] = useState("");
   const [memberPassword, setMemberPassword] = useState("");

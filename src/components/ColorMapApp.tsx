@@ -133,7 +133,7 @@ export function ColorMapApp() {
             >
               {sortedPracticeDays.map((day) => (
                 <option key={day.id} value={day.id}>
-                  {getPracticeDayLabel(day)} {day.startTime}-{day.endTime}
+                  {getPracticeDayLabel(day)} {day.startTime}〜{day.endTime}
                 </option>
               ))}
             </select>

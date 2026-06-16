@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HomeSummary } from "@/components/HomeSummary";
 
 const actions = [
   {
@@ -23,6 +24,7 @@ export default function HomePage() {
           <p className="eyebrow">2027年　OB演奏会</p>
           <h1>練習出欠</h1>
         </div>
+        <HomeSummary />
       </section>
 
       <section className="quick-actions">

@@ -264,6 +264,39 @@ export function toTime(minutes: number) {
     .padStart(2, "0")}:${(minutes % 60).toString().padStart(2, "0")}`;
 }
 
+const DEFAULT_SLOT_RANGE = { startMin: 8 * 60, endMin: 22 * 60 };
+
+// 表示する練習日の和集合（最早start〜最遅end）を返す。妥当な範囲が無ければ既定の8:00-22:00。
+export function getAvailabilityRange(days: Array<{ startTime: string; endTime: string }>) {
+  let startMin = Number.POSITIVE_INFINITY;
+  let endMin = Number.NEGATIVE_INFINITY;
+
+  for (const day of days) {
+    const start = toMinutes(day.startTime);
+    const end = toMinutes(day.endTime);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start >= end) continue;
+    startMin = Math.min(startMin, start);
+    endMin = Math.max(endMin, end);
+  }
+
+  if (!Number.isFinite(startMin) || !Number.isFinite(endMin)) return { ...DEFAULT_SLOT_RANGE };
+  return { startMin, endMin };
+}
+
+// 練習時間帯の前後に余白(既定60分)を取り、時単位にスナップした step 刻みの分配列を返す。
+export function buildAvailabilitySlots(startMin: number, endMin: number, padMin = 60, step = 10) {
+  if (!Number.isFinite(startMin) || !Number.isFinite(endMin) || startMin >= endMin) {
+    startMin = DEFAULT_SLOT_RANGE.startMin;
+    endMin = DEFAULT_SLOT_RANGE.endMin;
+  }
+
+  const from = Math.max(0, Math.floor((startMin - padMin) / 60) * 60);
+  const to = Math.min(24 * 60, Math.ceil((endMin + padMin) / 60) * 60);
+  const length = Math.floor((to - from) / step) + 1;
+
+  return Array.from({ length: Math.max(1, length) }, (_, index) => from + index * step);
+}
+
 function normalizePiece(piece: LegacyPiece): Piece {
   return {
     id: piece.id ?? makeId("p"),
