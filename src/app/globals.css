@@ -434,6 +434,8 @@ input,
 select,
 textarea {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
   min-height: 42px;
@@ -441,6 +443,10 @@ textarea {
   font: inherit;
   background: white;
   transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+select {
+  text-overflow: ellipsis;
 }
 
 input:hover,
@@ -1290,6 +1296,7 @@ tbody tr:hover td {
   main {
     width: min(100% - 20px, 1120px);
     padding: 18px 0 40px;
+    overflow-x: clip;
   }
 
   .setup-page {
