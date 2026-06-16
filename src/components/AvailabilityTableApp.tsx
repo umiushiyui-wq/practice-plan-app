@@ -6,6 +6,7 @@ import {
   buildAvailabilitySlots,
   compareMembersByInstrument,
   formatPracticeDateLabel,
+  getAvailabilityRange,
   getInstrumentLabel,
   getPracticeDayLabel,
   getSelectedPracticeDay,
@@ -17,6 +18,7 @@ import {
   toTime,
   useLocalPracticeState
 } from "@/components/LocalPracticeApp";
+import type { LocalPracticeDay } from "@/components/LocalPracticeApp";
 
 const ALL_PIECES_FILTER = "__all__";
 const OTHER_PIECES_FILTER = "__other__";
@@ -47,6 +49,7 @@ export function AvailabilityTableApp() {
   const [selectedPieceFilter, setSelectedPieceFilter] = useState(ALL_PIECES_FILTER);
   const [selectedPartFilter, setSelectedPartFilter] = useState(ALL_PARTS_FILTER);
   const [hoveredSlot, setHoveredSlot] = useState<number | null>(null);
+  const [detailMemberId, setDetailMemberId] = useState<string | null>(null);
   const [slackReminderStatus, setSlackReminderStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [slackReminderResult, setSlackReminderResult] = useState<SlackReminderResult | null>(null);
   const [slackReminderMessage, setSlackReminderMessage] = useState("");
@@ -90,6 +93,26 @@ export function AvailabilityTableApp() {
     }
 
     return isAvailable(selectedDay.availabilities, memberId, slotStart, slotStart + 10);
+  }
+
+  // 奏者名クリックで開く「その奏者の参加可能時間表」（全練習日 × 時間帯）用
+  const detailMember = state.members.find((member) => member.id === detailMemberId) ?? null;
+  const detailSlots = useMemo(() => {
+    const range = getAvailabilityRange(sortedPracticeDays);
+    return buildAvailabilitySlots(range.startMin, range.endMin);
+  }, [sortedPracticeDays]);
+
+  function isPracticeSlotForDay(day: LocalPracticeDay, slotStart: number) {
+    const slotEnd = slotStart + 10;
+    return toMinutes(day.startTime) < slotEnd && slotStart < toMinutes(day.endTime);
+  }
+
+  function isMemberAvailableAtSlotForDay(day: LocalPracticeDay, memberId: string, slotStart: number) {
+    if (!day.respondedMemberIds.includes(memberId) || day.absentMemberIds.includes(memberId)) {
+      return false;
+    }
+
+    return isAvailable(day.availabilities, memberId, slotStart, slotStart + 10);
   }
 
   function isMemberHighlighted(memberId: string) {
@@ -271,8 +294,8 @@ export function AvailabilityTableApp() {
                   ? "欠席"
                   : availability
                     ? availability.breaks.length > 0
-                      ? `${availability.start}-${availability.end} / ${"\u4e2d\u629c\u3051"} ${availability.breaks.length}${"\u4ef6"}`
-                      : `${availability.start}-${availability.end}`
+                      ? `${availability.start}\u301c${availability.end} / ${"\u4e2d\u629c\u3051"} ${availability.breaks.length}${"\u4ef6"}`
+                      : `${availability.start}\u301c${availability.end}`
                     : hasSaved
                       ? "未入力"
                       : "未回答";
@@ -281,10 +304,17 @@ export function AvailabilityTableApp() {
                 return (
                   <tr key={member.id} className={isHighlighted ? "" : "member-row-dim"}>
                     <th>
-                      {member.name}
-                      <span className="muted">
-                        {getInstrumentLabel(member.instrument) + " / " + availabilityLabel}
-                      </span>
+                      <button
+                        type="button"
+                        className="availability-day-button"
+                        onClick={() => setDetailMemberId(member.id)}
+                        title={`${member.name} の参加可能時間表を見る`}
+                      >
+                        <span>{member.name}</span>
+                        <span className="muted">
+                          {getInstrumentLabel(member.instrument) + " / " + availabilityLabel}
+                        </span>
+                      </button>
                     </th>
                     {AVAILABILITY_SLOTS.map((minutes, index) => {
                       const previousMinutes = AVAILABILITY_SLOTS[index - 1];
@@ -323,6 +353,93 @@ export function AvailabilityTableApp() {
           <span className="legend-chip available">緑: 参加可能時間</span>
         </div>
       </section>
+
+      {detailMember ? (
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${detailMember.name} の参加可能時間表`}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setDetailMemberId(null);
+          }}
+        >
+          <div className="modal-card">
+            <div className="row page-section-head">
+              <div>
+                <p className="muted">奏者の参加可能時間表</p>
+                <h2>{detailMember.name}</h2>
+                <p className="muted">{getInstrumentLabel(detailMember.instrument)}</p>
+              </div>
+              <button type="button" className="secondary" onClick={() => setDetailMemberId(null)}>
+                閉じる
+              </button>
+            </div>
+
+            <div className="availability-wrap">
+              <table className="availability-table player-availability-table">
+                <thead>
+                  <tr>
+                    <th>練習日</th>
+                    {detailSlots.map((minutes) => (
+                      <th key={minutes}>{minutes % 60 === 0 ? toTime(minutes) : ""}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedPracticeDays.map((day) => {
+                    const savedAvailability = day.availabilities.find((item) => item.memberId === detailMember.id);
+                    const hasSaved = day.respondedMemberIds.includes(detailMember.id);
+                    const isAbsent = hasSaved && day.absentMemberIds.includes(detailMember.id);
+                    const label = hasSaved
+                      ? isAbsent
+                        ? "欠席"
+                        : savedAvailability
+                          ? savedAvailability.breaks.length > 0
+                            ? `${savedAvailability.start}〜${savedAvailability.end} / 中抜け ${savedAvailability.breaks.length}件`
+                            : `${savedAvailability.start}〜${savedAvailability.end}`
+                          : "未入力"
+                      : "未回答";
+
+                    return (
+                      <tr key={day.id}>
+                        <th>
+                          {formatPracticeDateLabel(day.practiceDate)}
+                          <span className="muted">入力状況 {label}</span>
+                        </th>
+                        {detailSlots.map((minutes, index) => {
+                          const previousMinutes = detailSlots[index - 1];
+                          const nextMinutes = detailSlots[index + 1];
+                          const isPractice = isPracticeSlotForDay(day, minutes);
+                          const isAvailableSlot = isMemberAvailableAtSlotForDay(day, detailMember.id, minutes);
+                          const isPreviousPractice = previousMinutes !== undefined && isPracticeSlotForDay(day, previousMinutes);
+                          const isNextPractice = nextMinutes !== undefined && isPracticeSlotForDay(day, nextMinutes);
+                          const classNames = [
+                            minutes % 60 === 0 ? "hour-divider-cell" : "",
+                            isPractice ? "practice-window-cell" : "",
+                            isPractice && !isPreviousPractice ? "practice-start-cell" : "",
+                            isPractice && !isNextPractice ? "practice-end-cell" : "",
+                            isPractice && isAbsent ? "absent-cell" : "",
+                            isAvailableSlot ? "available-cell" : ""
+                          ]
+                            .filter(Boolean)
+                            .join(" ");
+
+                          return <td key={`${day.id}-${minutes}`} className={classNames} />;
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="legend-row">
+              <span className="legend-chip practice">青枠: 練習時間</span>
+              <span className="legend-chip available">緑: 参加可能時間</span>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

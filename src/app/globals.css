@@ -536,6 +536,29 @@ tbody tr:hover td {
   font-weight: 700;
 }
 
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(15 42 66 / 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.modal-card {
+  display: grid;
+  gap: 14px;
+  width: min(960px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  background: var(--panel);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 22px;
+}
+
 .metric-label,
 .status-pill {
   color: var(--muted);
