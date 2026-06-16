@@ -19,7 +19,7 @@ button:disabled {
   gap: 14px;
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: #fbfdff;
   padding: 16px;
 }
@@ -68,7 +68,7 @@ button:disabled {
 }
 
 .plan-publish-switch input:checked + .plan-publish-switch-control {
-  background: #2563eb;
+  background: var(--accent);
 }
 
 .plan-publish-switch input:checked + .plan-publish-switch-control::after {
@@ -76,7 +76,7 @@ button:disabled {
 }
 
 .plan-publish-switch input:focus-visible + .plan-publish-switch-control {
-  outline: 3px solid color-mix(in srgb, #2563eb 30%, transparent);
+  outline: 3px solid color-mix(in srgb, var(--accent) 30%, transparent);
   outline-offset: 2px;
 }
 
@@ -209,8 +209,8 @@ button:disabled {
 
 .plan-drop-zone.is-active {
   min-height: 12px;
-  border-color: #517caa;
-  background: #edf5ff;
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .plan-drop-time-guide {
@@ -219,8 +219,8 @@ button:disabled {
   right: 0;
   z-index: 8;
   transform: translateY(-50%);
-  border-top: 2px solid #2563eb;
-  color: #1d4ed8;
+  border-top: 2px solid var(--accent);
+  color: var(--accent-dark);
   font-size: 12px;
   font-weight: 800;
   pointer-events: none;
@@ -234,7 +234,7 @@ button:disabled {
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  background: #2563eb;
+  background: var(--accent);
 }
 
 .plan-slot-card {
@@ -267,8 +267,8 @@ button:disabled {
 .plan-slot-card.is-selected {
   z-index: 7;
   box-shadow:
-    0 0 0 3px #2563eb,
-    0 12px 28px rgba(37, 99, 235, 0.18);
+    0 0 0 3px var(--accent),
+    0 12px 28px rgba(14, 116, 144, 0.2);
 }
 
 .plan-slot-piece,
@@ -540,9 +540,10 @@ button:disabled {
 .plan-detail-panel {
   display: grid;
   gap: 12px;
-  border: 1px solid #c6d3df;
-  border-radius: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
   background: #ffffff;
+  box-shadow: var(--shadow-sm);
   padding: 14px;
 }
 
@@ -563,10 +564,10 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   min-height: 30px;
-  border-radius: 8px;
-  background: #eef5ff;
-  color: #1d4ed8;
-  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  padding: 0 14px;
   font-size: 13px;
   font-weight: 800;
   white-space: nowrap;

@@ -1,17 +1,26 @@
 :root {
   color-scheme: light;
-  --bg: #f3f5f7;
+  --bg: #eef2f6;
+  --bg-accent: #e3edf4;
   --panel: #ffffff;
   --text: #16202a;
-  --muted: #617083;
-  --line: #d8e0e8;
-  --accent: #0f6f8f;
-  --accent-dark: #094b62;
-  --accent-soft: #e8f4f7;
+  --muted: #5e6e7e;
+  --line: #dde5ec;
+  --line-strong: #cdd9e3;
+  --accent: #0e7490;
+  --accent-dark: #0c5566;
+  --accent-bright: #38bdf8;
+  --accent-soft: #e6f3f8;
   --success: #2f8f46;
   --warning: #9b6a10;
   --danger: #b3261e;
-  --shadow: 0 10px 26px rgb(18 33 51 / 0.08);
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --shadow-sm: 0 1px 2px rgb(15 31 51 / 0.05), 0 1px 1px rgb(15 31 51 / 0.04);
+  --shadow: 0 6px 18px rgb(15 42 66 / 0.07);
+  --shadow-lg: 0 18px 40px rgb(15 42 66 / 0.12);
 }
 
 * {
@@ -20,10 +29,16 @@
 
 body {
   margin: 0;
-  background: var(--bg);
+  min-height: 100vh;
+  background:
+    radial-gradient(1200px 480px at 100% -10%, var(--bg-accent), transparent 60%),
+    var(--bg);
   color: var(--text);
-  font-family: Arial, "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
   line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 a {
@@ -51,17 +66,20 @@ p {
 h1,
 h2,
 h3 {
-  line-height: 1.25;
+  line-height: 1.22;
+  letter-spacing: 0.01em;
 }
 
 h1 {
   margin-bottom: 8px;
-  font-size: clamp(30px, 4vw, 44px);
+  font-size: clamp(28px, 3.4vw, 40px);
+  font-weight: 800;
 }
 
 h2 {
   margin-bottom: 4px;
-  font-size: 24px;
+  font-size: 23px;
+  font-weight: 700;
 }
 
 p:last-child {
@@ -82,9 +100,10 @@ p:last-child {
   position: sticky;
   top: 0;
   z-index: 20;
-  background: #102a35;
+  background: linear-gradient(180deg, #123442, #0f2a37);
   color: white;
-  border-bottom: 1px solid rgb(255 255 255 / 0.12);
+  border-bottom: 1px solid rgb(255 255 255 / 0.1);
+  box-shadow: 0 2px 14px rgb(8 24 34 / 0.18);
   padding: 12px 24px;
 }
 
@@ -104,6 +123,7 @@ p:last-child {
 .brand-link {
   flex: 0 0 auto;
   font-weight: 800;
+  letter-spacing: 0.02em;
 }
 
 .topnav {
@@ -136,17 +156,19 @@ p:last-child {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 24px;
-  align-items: end;
-  min-height: 260px;
-  border: 1px solid #cfdae2;
-  border-radius: 8px;
-  background: #ffffff;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(620px 200px at 0% 0%, var(--accent-soft), transparent 70%),
+    #ffffff;
   box-shadow: var(--shadow);
-  padding: clamp(22px, 5vw, 40px);
+  padding: clamp(26px, 4.5vw, 44px);
 }
 
 .dashboard-hero {
-  min-height: 220px;
+  min-height: 200px;
+  align-items: end;
 }
 
 .hero-copy {
@@ -185,24 +207,31 @@ p:last-child {
 .action-card {
   display: grid;
   gap: 8px;
-  min-height: 168px;
+  align-content: start;
+  min-height: 150px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--panel);
   color: var(--text);
   padding: 20px;
-  box-shadow: 0 1px 2px rgb(10 31 51 / 0.04);
+  box-shadow: var(--shadow-sm);
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
 }
 
 .action-card:hover {
-  border-color: #a7bfcc;
+  border-color: var(--line-strong);
   box-shadow: var(--shadow);
+  transform: translateY(-2px);
   text-decoration: none;
 }
 
 .action-card.is-primary {
-  border-color: #8db9c8;
-  background: var(--accent-soft);
+  border-color: #9cc6d4;
+  background:
+    linear-gradient(180deg, var(--accent-soft), #ffffff 80%);
 }
 
 .action-card strong {
@@ -215,12 +244,14 @@ p:last-child {
 
 .action-label {
   width: fit-content;
-  border-radius: 999px;
-  background: #ffffff;
+  border: 1px solid rgb(14 116 144 / 0.22);
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
   color: var(--accent-dark);
-  padding: 4px 10px;
+  padding: 3px 12px;
   font-size: 12px;
   font-weight: 800;
+  letter-spacing: 0.04em;
 }
 
 .grid {
@@ -244,9 +275,9 @@ p:last-child {
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 1px 2px rgb(10 31 51 / 0.05);
+  border-radius: var(--radius);
+  padding: 22px;
+  box-shadow: var(--shadow-sm);
 }
 
 .stack {
@@ -316,25 +347,29 @@ p:last-child {
 
 .button,
 button {
-  border: 0;
-  border-radius: 8px;
-  background: var(--accent);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(180deg, #1287a4, var(--accent));
   color: white;
   min-height: 42px;
-  padding: 10px 14px;
+  padding: 10px 16px;
   cursor: pointer;
   font-weight: 700;
   text-align: center;
+  box-shadow: var(--shadow-sm);
   transition:
     background-color 120ms ease,
     box-shadow 120ms ease,
-    transform 120ms ease;
+    transform 120ms ease,
+    border-color 120ms ease;
 }
 
 .button.secondary,
 button.secondary {
-  background: #dfe8ef;
-  color: #183241;
+  background: #e7eef4;
+  color: #163040;
+  border-color: var(--line-strong);
+  box-shadow: none;
 }
 
 .button.danger,
@@ -344,8 +379,15 @@ button.danger {
 
 .button:hover,
 button:hover {
-  box-shadow: 0 6px 16px rgb(15 31 51 / 0.14);
+  box-shadow: var(--shadow);
+  transform: translateY(-1px);
   text-decoration: none;
+}
+
+.button.secondary:hover,
+button.secondary:hover {
+  background: #dde7ef;
+  border-color: #b9c8d4;
 }
 
 button:active,
@@ -357,20 +399,32 @@ input,
 select,
 textarea {
   width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
   min-height: 42px;
   padding: 10px 12px;
   font: inherit;
   background: white;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: #b9c8d4;
 }
 
 input:focus,
 select:focus,
-textarea:focus,
+textarea:focus {
+  border-color: var(--accent);
+  outline: 3px solid rgb(14 116 144 / 0.18);
+  outline-offset: 1px;
+}
+
 button:focus-visible,
 a:focus-visible {
-  outline: 3px solid rgb(15 111 143 / 0.22);
+  outline: 3px solid rgb(14 116 144 / 0.35);
   outline-offset: 2px;
 }
 
@@ -399,20 +453,21 @@ td {
 }
 
 thead th {
-  background: #eef3f6;
+  background: #e8eef4;
   color: #243846;
   font-size: 13px;
+  letter-spacing: 0.02em;
 }
 
 tbody tr:hover td {
-  background: #f9fbfc;
+  background: #f4f8fb;
 }
 
 .table-wrap {
   width: 100%;
   overflow-x: auto;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 
 .table-wrap table {
@@ -429,9 +484,10 @@ tbody tr:hover td {
   display: grid;
   gap: 4px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: white;
   padding: 16px;
+  box-shadow: var(--shadow-sm);
 }
 
 .metric-card strong {
@@ -452,10 +508,10 @@ tbody tr:hover td {
   display: inline-flex;
   align-items: center;
   min-height: 28px;
-  border-radius: 999px;
-  background: #eef3f6;
-  color: #294556;
-  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: #0c566f;
+  padding: 0 12px;
   letter-spacing: 0;
   text-transform: none;
 }
@@ -491,8 +547,8 @@ tbody tr:hover td {
   border: 1px solid #a9d3e2;
   background: #eef8fb;
   color: #123f50;
-  border-radius: 8px;
-  padding: 12px;
+  border-radius: var(--radius);
+  padding: 12px 14px;
 }
 
 .local-state-panel {
@@ -515,8 +571,8 @@ tbody tr:hover td {
   border: 1px solid #efb4ae;
   background: #fff1f0;
   color: var(--danger);
-  border-radius: 8px;
-  padding: 12px;
+  border-radius: var(--radius);
+  padding: 12px 14px;
 }
 
 .overlap-slot {
@@ -542,9 +598,10 @@ tbody tr:hover td {
   gap: 8px;
   padding: 16px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
   background:
-    linear-gradient(180deg, rgb(15 111 143 / 0.05), transparent 70%),
+    linear-gradient(180deg, rgb(14 116 144 / 0.06), transparent 70%),
     #fdfefe;
 }
 
