@@ -199,26 +199,34 @@ export function ensureDefaultUtilitySlots(day: LocalPracticeDay): LocalPracticeD
   const practiceStart = toMinutes(day.startTime);
   const practiceEnd = toMinutes(day.endTime);
 
+  const setupSlot = plan.find(isSetupUtilitySlot);
+  const cleanupSlot = plan.find(isCleanupUtilitySlot);
+
+  // 既存の準備・片付け枠は編集された長さ・位置をそのまま尊重する。
+  // 初期値45分は、枠が無いとき（＝練習日を追加した直後の空の計画）だけ最初/最後に補う。
+  if (setupSlot && cleanupSlot) {
+    return { ...day, plan: sortPlanByTime(plan) };
+  }
+
   if (!Number.isFinite(practiceStart) || !Number.isFinite(practiceEnd) || practiceEnd - practiceStart < SETUP_CLEANUP_MINUTES * 2) {
     return { ...day, plan };
   }
 
-  const setupStart = day.startTime;
-  const setupEnd = toTime(practiceStart + SETUP_CLEANUP_MINUTES);
-  const cleanupStart = toTime(practiceEnd - SETUP_CLEANUP_MINUTES);
-  const cleanupEnd = day.endTime;
-  const setupSlot = plan.find(isSetupUtilitySlot);
-  const cleanupSlot = plan.find(isCleanupUtilitySlot);
-  const restPlan = plan.filter((slot) => slot !== setupSlot && slot !== cleanupSlot);
+  const nextPlan = [...plan];
 
-  return {
-    ...day,
-    plan: sortPlanByTime([
-      makeUtilityPlanSlot("setup", setupStart, setupEnd, setupSlot),
-      ...restPlan,
-      makeUtilityPlanSlot("cleanup", cleanupStart, cleanupEnd, cleanupSlot)
-    ])
-  };
+  if (!setupSlot) {
+    nextPlan.push(
+      makeUtilityPlanSlot("setup", day.startTime, toTime(practiceStart + SETUP_CLEANUP_MINUTES))
+    );
+  }
+
+  if (!cleanupSlot) {
+    nextPlan.push(
+      makeUtilityPlanSlot("cleanup", toTime(practiceEnd - SETUP_CLEANUP_MINUTES), day.endTime)
+    );
+  }
+
+  return { ...day, plan: sortPlanByTime(nextPlan) };
 }
 const SAVE_ERROR_MESSAGE = "保存できていません。ネットワークまたはRedis/KV設定を確認してください。";
 
