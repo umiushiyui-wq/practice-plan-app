@@ -596,6 +596,22 @@ export function AdminApp() {
     setPlanMessage("自動生成できませんでした。曲設定、回答状況、参加可能時間を確認してください。");
   }
 
+  function handleSavePlanImage() {
+    if (selectedDay.plan.length === 0) {
+      setPlanMessage("保存できる練習計画がありません。先に枠を追加してください。");
+      return;
+    }
+
+    const imageBase64 = createPlanAnnouncementImage(selectedDay);
+    const link = document.createElement("a");
+    link.href = `data:image/jpeg;base64,${imageBase64}`;
+    link.download = `練習計画_${selectedDay.practiceDate}.jpg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setPlanMessage("Slackに公開される練習計画の画像を保存しました。");
+  }
+
   function getSlotLabel(slot: (typeof selectedDay.plan)[number]) {
     return getPlanSlotLabel(slot, slot.pieceId ? pieceMap.get(slot.pieceId)?.title : undefined);
   }
@@ -694,6 +710,9 @@ export function AdminApp() {
             </span>
             <button type="button" onClick={handleGeneratePlan}>
               この練習日で自動生成
+            </button>
+            <button type="button" className="secondary" onClick={handleSavePlanImage}>
+              スクショ保存
             </button>
           </div>
         </div>
