@@ -474,7 +474,23 @@ export function AdminApp() {
     };
   }
 
-  function addSlotFromPalette(payload: PaletteDragPayload, startMinutes = toMinutes(selectedDay.startTime)) {
+  function isCleanupSlot(slot: (typeof selectedDay.plan)[number]) {
+    if (slot.pieceId) return false;
+    return Boolean(slot.reason?.includes("片付け") || slot.customTitle?.includes("片付け"));
+  }
+
+  // クリック追加時の既定位置。片付け枠を除いた「今ある枠」の最後尾の直後に置く。
+  function getAppendStartMinutes() {
+    const ends = sortedPlan
+      .filter((slot) => !isCleanupSlot(slot))
+      .map((slot) => toMinutes(slot.end))
+      .filter((minutes) => Number.isFinite(minutes));
+
+    if (ends.length === 0) return practiceStartMinutes;
+    return Math.max(practiceStartMinutes, ...ends);
+  }
+
+  function addSlotFromPalette(payload: PaletteDragPayload, startMinutes = getAppendStartMinutes()) {
     const nextSlot = makeSlotFromPalette(payload, startMinutes);
     if (!nextSlot) {
       setPlanMessage("追加できませんでした。曲の設定を確認してください。");
