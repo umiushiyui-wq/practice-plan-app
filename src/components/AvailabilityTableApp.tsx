@@ -19,6 +19,7 @@ import {
   useLocalPracticeState
 } from "@/components/LocalPracticeApp";
 import type { LocalPracticeDay } from "@/components/LocalPracticeApp";
+import { PartAttendanceSenderPanel } from "@/components/PartAttendanceSenderPanel";
 
 const ALL_PIECES_FILTER = "__all__";
 const OTHER_PIECES_FILTER = "__other__";
@@ -228,6 +229,7 @@ export function AvailabilityTableApp() {
             {slackReminderStatus === "sending" ? "\u9001\u4fe1\u4e2d" : "\u672a\u5165\u529b\u8005\u306b\u30e1\u30c3\u30bb\u30fc\u30b8\u3092\u9001\u308b"}
           </button>
         </div>
+        <PartAttendanceSenderPanel selectedDay={selectedDay} members={state.members} />
       </section>
 
       <LocalStateStatusPanel {...localState} />
