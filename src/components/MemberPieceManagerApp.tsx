@@ -589,6 +589,9 @@ export function MemberPieceManagerApp() {
                   <h3>{selectedPiece.title}</h3>
                 </div>
                 <div className="row">
+                  <Link className="button secondary" href={`/admin/pieces/${selectedPiece.id}`}>
+                    参加メンバーを選択（{selectedPiece.memberIds.length}人）
+                  </Link>
                   <button className="secondary" type="button" onClick={() => clearPieceSettings(selectedPiece.id)}>
                     練習時間などの項目を消去
                   </button>
@@ -721,10 +724,16 @@ export function MemberPieceManagerApp() {
                     <div className="muted">
                       期間目標 {piece.targetMinutes}分 / 現在 {plannedMinutes}分 / 残り {remainingMinutes}分
                     </div>
+                    <div className="muted">参加メンバー: {piece.memberIds.length}人</div>
                   </div>
-                  <button className="secondary setup-piece-edit-button" type="button" onClick={() => setSelectedPieceId(piece.id)}>
-                    この曲を編集
-                  </button>
+                  <div className="row">
+                    <button className="secondary setup-piece-edit-button" type="button" onClick={() => setSelectedPieceId(piece.id)}>
+                      この曲を編集
+                    </button>
+                    <Link className="button secondary setup-piece-edit-button" href={`/admin/pieces/${piece.id}`}>
+                      参加メンバー
+                    </Link>
+                  </div>
                 </div>
               );
             })}
