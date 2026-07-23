@@ -262,22 +262,27 @@ button:disabled {
   --plan-bg: #e4e8ec;
 }
 
-.plan-entry-field input {
+.plan-entry-field textarea {
   flex: 1;
   min-width: 0;
-  min-height: 38px;
+  min-height: 52px;
+  max-height: 180px;
   border: 0;
   border-radius: 0;
   background: transparent;
   color: color-mix(in srgb, var(--plan-color) 85%, #111827);
   box-shadow: none;
-  padding: 6px 46px 6px 14px;
+  padding: 8px 46px 8px 14px;
+  font-family: inherit;
   font-size: 18px;
   font-weight: 800;
+  line-height: 1.35;
+  resize: vertical;
+  white-space: pre-wrap;
 }
 
-.plan-entry-field input:hover,
-.plan-entry-field input:focus {
+.plan-entry-field textarea:hover,
+.plan-entry-field textarea:focus {
   border: 0;
   background: color-mix(in srgb, var(--plan-bg) 70%, #ffffff);
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--plan-color) 38%, transparent);
@@ -286,7 +291,7 @@ button:disabled {
 .plan-entry-field::after {
   content: "";
   position: absolute;
-  top: 50%;
+  top: 22px;
   right: 17px;
   z-index: 3;
   width: 8px;
@@ -294,7 +299,7 @@ button:disabled {
   border: solid color-mix(in srgb, var(--plan-color) 82%, #0f172a);
   border-width: 0 2px 2px 0;
   pointer-events: none;
-  transform: translateY(-70%) rotate(45deg);
+  transform: translateY(-50%) rotate(45deg);
 }
 
 .plan-entry-field select {
@@ -305,8 +310,8 @@ button:disabled {
   right: 0;
   z-index: 2;
   width: 44px;
-  height: 100%;
-  min-height: 38px;
+  height: 44px;
+  min-height: 44px;
   border: 0;
   border-left: 1px solid color-mix(in srgb, var(--plan-color) 24%, transparent);
   border-radius: 0;

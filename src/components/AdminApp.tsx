@@ -675,10 +675,10 @@ export function AdminApp() {
                           <div
                             className={`plan-entry-field plan-slot-${slotVariant} ${getPieceToneClass(slot.pieceId)}`}
                           >
-                            <input
-                              type="text"
+                            <textarea
                               aria-label={`${slot.start}の曲名・内容`}
                               placeholder="曲名・内容を入力"
+                              rows={2}
                               value={slot.customTitle ?? slotLabel}
                               onChange={(event) => updateSlot(slot.id, { customTitle: event.target.value })}
                             />
