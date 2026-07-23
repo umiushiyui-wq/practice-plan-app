@@ -44,6 +44,26 @@ type SlackOpenConversationResponse = {
   };
 };
 
+type SlackConversationMembersResponse = {
+  ok: boolean;
+  error?: string;
+  members?: string[];
+  response_metadata?: {
+    next_cursor?: string;
+  };
+};
+
+type SlackConversationInviteResponse = {
+  ok: boolean;
+  error?: string;
+  errors?: Array<{ ok: boolean; error?: string; user?: string }>;
+};
+
+type SlackConversationJoinResponse = {
+  ok: boolean;
+  error?: string;
+};
+
 type SlackGetUploadUrlExternalResponse = {
   ok: boolean;
   error?: string;
@@ -128,6 +148,78 @@ export async function openSlackConversation({
   });
 
   return response.json() as Promise<SlackOpenConversationResponse>;
+}
+
+export async function listConversationMembers({
+  botToken,
+  channel
+}: {
+  botToken: string;
+  channel: string;
+}): Promise<{ ok: boolean; error?: string; members: string[] }> {
+  const members: string[] = [];
+  let cursor = "";
+
+  do {
+    const url = new URL("https://slack.com/api/conversations.members");
+    url.searchParams.set("channel", channel);
+    url.searchParams.set("limit", "200");
+    if (cursor) url.searchParams.set("cursor", cursor);
+
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${botToken}` }
+    });
+    const payload = (await response.json()) as SlackConversationMembersResponse;
+
+    if (!payload.ok) {
+      return { ok: false, error: payload.error ?? "conversations_members_failed", members: [] };
+    }
+
+    members.push(...(payload.members ?? []));
+    cursor = payload.response_metadata?.next_cursor ?? "";
+  } while (cursor);
+
+  return { ok: true, members };
+}
+
+export async function joinConversation({
+  botToken,
+  channel
+}: {
+  botToken: string;
+  channel: string;
+}): Promise<SlackConversationJoinResponse> {
+  const response = await fetch("https://slack.com/api/conversations.join", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${botToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ channel })
+  });
+
+  return response.json() as Promise<SlackConversationJoinResponse>;
+}
+
+export async function inviteToConversation({
+  botToken,
+  channel,
+  userIds
+}: {
+  botToken: string;
+  channel: string;
+  userIds: string[];
+}): Promise<SlackConversationInviteResponse> {
+  const response = await fetch("https://slack.com/api/conversations.invite", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${botToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ channel, users: userIds.join(",") })
+  });
+
+  return response.json() as Promise<SlackConversationInviteResponse>;
 }
 
 export async function uploadSlackFile({

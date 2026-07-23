@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import {
   compareMembersByInstrument,
   getInstrumentLabel,
@@ -8,12 +9,52 @@ import {
   useLocalPracticeState
 } from "@/components/LocalPracticeApp";
 
+type InviteStatus = "idle" | "sending" | "done" | "error";
+
 export function PieceMembersApp({ pieceId }: { pieceId: string }) {
   const localState = useLocalPracticeState();
   const { state, updateState, ready } = localState;
   const piece = state.pieces.find((item) => item.id === pieceId);
   const conductor = piece ? state.members.find((member) => member.id === piece.conductorId) : undefined;
   const sortedMembers = [...state.members].sort(compareMembersByInstrument);
+
+  const [channelId, setChannelId] = useState("");
+  const [inviteStatus, setInviteStatus] = useState<InviteStatus>("idle");
+  const [inviteMessage, setInviteMessage] = useState("");
+
+  async function inviteMembersToChannel() {
+    const trimmedChannelId = channelId.trim();
+    if (!trimmedChannelId) return;
+
+    setInviteStatus("sending");
+    setInviteMessage("");
+
+    try {
+      const response = await fetch(`/api/local-state/pieces/${pieceId}/slack-invite`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channelId: trimmedChannelId })
+      });
+      const payload = await response.json();
+
+      if (!response.ok || !payload.ok) {
+        setInviteStatus("error");
+        setInviteMessage(payload.error ?? "招待に失敗しました。");
+        return;
+      }
+
+      setInviteStatus("done");
+      const parts = [`招待 ${payload.invitedCount}人`, `既に参加済み ${payload.alreadyMemberCount}人`];
+      if (payload.missingSlackUserIdCount > 0) parts.push(`Slack ID未登録 ${payload.missingSlackUserIdCount}人`);
+      if (payload.failures?.length > 0) {
+        parts.push(`失敗 ${payload.failures.length}人（${payload.failures.map((item: { name: string }) => item.name).join("、")}）`);
+      }
+      setInviteMessage(parts.join(" / "));
+    } catch {
+      setInviteStatus("error");
+      setInviteMessage("招待に失敗しました。");
+    }
+  }
 
   function toggleMember(memberId: string, checked: boolean) {
     updateState({
@@ -51,6 +92,28 @@ export function PieceMembersApp({ pieceId }: { pieceId: string }) {
       </section>
 
       <LocalStateStatusPanel {...localState} />
+
+      {piece ? (
+        <section className="panel stack">
+          <div className="section-title">
+            <h2>Slackチャンネルに招待</h2>
+          </div>
+          <p className="muted">
+            この曲に乗るメンバーのうち、まだ参加していない人をパブリックチャンネルに招待します。
+          </p>
+          <div className="row">
+            <input
+              value={channelId}
+              onChange={(event) => setChannelId(event.target.value)}
+              placeholder={"チャンネルID（例: C0123456789）"}
+            />
+            <button type="button" onClick={inviteMembersToChannel} disabled={inviteStatus === "sending" || !channelId.trim()}>
+              {inviteStatus === "sending" ? "招待中..." : "招待する"}
+            </button>
+          </div>
+          {inviteMessage ? <p className={inviteStatus === "error" ? "error" : "notice"}>{inviteMessage}</p> : null}
+        </section>
+      ) : null}
 
       {piece ? (
         <section className="panel stack">
