@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ChangeEvent, type DragEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useState, type ChangeEvent } from "react";
 import {
-  findOverlappingPlanSlots,
   generatePracticePlan,
   getPlanSlotLabel,
   formatPracticeDateLabel,
@@ -18,32 +17,14 @@ import {
   toTime,
   updatePracticeDay,
   useLocalPracticeState,
-  usePieceMap
+  usePieceMap,
+  type PlanSlot
 } from "@/components/LocalPracticeApp";
 
 type UtilitySlotKind = "break" | "setup" | "cleanup";
 
-type PaletteDragPayload =
-  | {
-      type: "palette";
-      slotType: "piece";
-      pieceId: string;
-    }
-  | {
-      type: "palette";
-      slotType: "utility";
-      utilityKind: UtilitySlotKind;
-    };
-
-type SlotDragPayload = {
-  type: "slot";
-  slotId: string;
-};
-
-const DRAG_DATA_TYPE = "application/x-practice-plan-slot";
-const MINUTES_PER_PIXEL = 0.25;
-const RESIZE_STEP_MINUTES = 5;
-const MIN_SLOT_MINUTES = 5;
+const MIN_SLOT_MINUTES = 1;
+const DEFAULT_PIECE_MINUTES = 30;
 
 const UTILITY_SLOT_TEMPLATES: Array<{
   kind: UtilitySlotKind;
@@ -52,7 +33,7 @@ const UTILITY_SLOT_TEMPLATES: Array<{
   reason: string;
 }> = [
   { kind: "setup", label: "合奏準備", defaultMinutes: 45, reason: "合奏準備として手動追加した枠です。" },
-  { kind: "break", label: "休憩", defaultMinutes: 5, reason: "休憩として手動追加した枠です。" },
+  { kind: "break", label: "休憩", defaultMinutes: 10, reason: "休憩として手動追加した枠です。" },
   { kind: "cleanup", label: "片付け", defaultMinutes: 45, reason: "片付けとして手動追加した枠です。" }
 ];
 
@@ -66,29 +47,13 @@ function formatMinutesLabel(minutes: number) {
   return `${hours}時間${rest}分`;
 }
 
-function getSlotVariant(slot: { pieceId: string | null; reason?: string }) {
-  if (slot.pieceId) return "piece";
-
-  const utilityKind = UTILITY_SLOT_TEMPLATES.find((template) => template.reason === slot.reason)?.kind;
-  if (utilityKind === "setup") return "setup";
-  if (utilityKind === "cleanup") return "cleanup";
-  return "break";
+function formatDurationClock(minutes: number) {
+  const safeMinutes = Math.max(0, Math.floor(minutes));
+  return `${Math.floor(safeMinutes / 60)}:${String(safeMinutes % 60).padStart(2, "0")}`;
 }
 
-function getUtilityTemplate(kind: UtilitySlotKind) {
-  return UTILITY_SLOT_TEMPLATES.find((template) => template.kind === kind) ?? UTILITY_SLOT_TEMPLATES[0];
-}
-
-function normalizeDuration(value: number, fallback = 1) {
-  return Number.isFinite(value) ? Math.max(1, Math.floor(value)) : fallback;
-}
-
-function snapMinutes(minutes: number) {
-  return Math.round(minutes / RESIZE_STEP_MINUTES) * RESIZE_STEP_MINUTES;
-}
-
-function clampNumber(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
+function normalizeDuration(value: number, fallback = MIN_SLOT_MINUTES) {
+  return Number.isFinite(value) ? Math.max(MIN_SLOT_MINUTES, Math.floor(value)) : fallback;
 }
 
 function formatPracticeTimeAndLocation(day: { startTime: string; endTime: string; location: string }) {
@@ -96,61 +61,221 @@ function formatPracticeTimeAndLocation(day: { startTime: string; endTime: string
   return location ? `${day.startTime}〜${day.endTime} ＠${location}` : `${day.startTime}〜${day.endTime}`;
 }
 
+function getUtilityTemplate(kind: UtilitySlotKind) {
+  return UTILITY_SLOT_TEMPLATES.find((template) => template.kind === kind) ?? UTILITY_SLOT_TEMPLATES[0];
+}
+
+function isCleanupSlot(slot: PlanSlot) {
+  if (slot.pieceId) return false;
+  return Boolean(slot.reason?.includes("片付け") || slot.customTitle?.includes("片付け"));
+}
+
+function getSlotVariant(slot: Pick<PlanSlot, "pieceId" | "customTitle" | "reason">) {
+  if (slot.pieceId) return "piece";
+  const text = `${slot.customTitle ?? ""} ${slot.reason ?? ""}`;
+  if (text.includes("準備")) return "setup";
+  if (text.includes("片付け")) return "cleanup";
+  if (text.includes("休憩")) return "break";
+  return "custom";
+}
+
+function reflowPlanSlots(plan: PlanSlot[], startTime: string) {
+  let cursor = toMinutes(startTime);
+
+  return plan.map((slot) => {
+    const duration = normalizeDuration(slot.duration);
+    const start = cursor;
+    const end = start + duration;
+    cursor = end;
+
+    return {
+      ...slot,
+      start: toTime(start),
+      end: toTime(end),
+      duration
+    };
+  });
+}
+
 export function AdminApp() {
   const localState = useLocalPracticeState();
   const { state, updateState } = localState;
   const [planMessage, setPlanMessage] = useState("");
   const [isSendingAnnouncement, setIsSendingAnnouncement] = useState(false);
-  const [draggedSlotId, setDraggedSlotId] = useState<string | null>(null);
-  const [activeDropMinutes, setActiveDropMinutes] = useState<number | null>(null);
-  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const selectedDay = getSelectedPracticeDay(state);
   const sortedPracticeDays = getSortedPracticeDays(state.practiceDays);
   const pieceMap = usePieceMap(state.pieces);
 
-  const practiceMinutes = toMinutes(selectedDay.endTime) - toMinutes(selectedDay.startTime);
-  const sortedPlan = sortPlanByTime(selectedDay.plan);
-  const selectedSlot = sortedPlan.find((slot) => slot.id === selectedSlotId) ?? null;
-  const plannedMinutes = sortedPlan.reduce((total, slot) => total + slot.duration, 0);
-  const freeMinutes = Math.max(0, practiceMinutes - plannedMinutes);
-  const overlappingSlotIds = findOverlappingPlanSlots(selectedDay.plan);
-  const coverageRatio = practiceMinutes > 0 ? Math.min(1, plannedMinutes / practiceMinutes) : 0;
   const practiceStartMinutes = toMinutes(selectedDay.startTime);
   const practiceEndMinutes = toMinutes(selectedDay.endTime);
-  const timelineHeight = Math.max(1, practiceMinutes / MINUTES_PER_PIXEL);
-  const lastSlotStartMinutes = Math.max(practiceStartMinutes, practiceEndMinutes - MIN_SLOT_MINUTES);
-  const timeAxisMarks =
-    practiceMinutes > 0
-      ? Array.from({ length: Math.floor(practiceMinutes / 30) + 1 }, (_, index) => practiceStartMinutes + index * 30)
-      : [practiceStartMinutes];
-
-  if (timeAxisMarks[timeAxisMarks.length - 1] !== practiceEndMinutes) {
-    timeAxisMarks.push(practiceEndMinutes);
-  }
+  const practiceMinutes = Math.max(0, practiceEndMinutes - practiceStartMinutes);
+  const tablePlan = reflowPlanSlots(sortPlanByTime(selectedDay.plan), selectedDay.startTime);
+  const plannedMinutes = tablePlan.reduce((total, slot) => total + slot.duration, 0);
+  const remainingMinutes = Math.max(0, practiceMinutes - plannedMinutes);
+  const overflowMinutes = Math.max(0, plannedMinutes - practiceMinutes);
+  const calculatedEndMinutes = practiceStartMinutes + plannedMinutes;
+  const coverageRatio = practiceMinutes > 0 ? Math.min(1, plannedMinutes / practiceMinutes) : 0;
 
   function updateSelectedDay(patch: Partial<typeof selectedDay>) {
     updateState({ practiceDays: updatePracticeDay(state, selectedDay.id, patch) });
   }
 
+  function updatePlan(plan: PlanSlot[]) {
+    updateSelectedDay({ plan: reflowPlanSlots(plan, selectedDay.startTime) });
+  }
+
+  function updateSlot(
+    slotId: string,
+    patch: Partial<Pick<PlanSlot, "pieceId" | "customTitle" | "reason" | "isLocked" | "duration">>
+  ) {
+    updatePlan(
+      tablePlan.map((slot) =>
+        slot.id === slotId
+          ? {
+              ...slot,
+              ...patch,
+              reason: patch.reason ?? slot.reason
+            }
+          : slot
+      )
+    );
+  }
+
+  function getSlotLabel(slot: PlanSlot) {
+    return getPlanSlotLabel(slot, slot.pieceId ? pieceMap.get(slot.pieceId)?.title : undefined);
+  }
+
+  function getSlotContentValue(slot: PlanSlot) {
+    if (slot.pieceId) return `piece:${slot.pieceId}`;
+    const text = `${slot.customTitle ?? ""} ${slot.reason ?? ""}`;
+    if (text.includes("準備")) return "utility:setup";
+    if (text.includes("片付け")) return "utility:cleanup";
+    if (text.includes("休憩")) return "utility:break";
+    return "custom";
+  }
+
+  function updateSlotContent(slotId: string, value: string) {
+    if (value.startsWith("piece:")) {
+      const pieceId = value.replace("piece:", "");
+      const piece = pieceMap.get(pieceId);
+      updateSlot(slotId, {
+        pieceId,
+        customTitle: piece?.title ?? "",
+        reason: piece ? `${piece.title} を手動選択した行です。` : ""
+      });
+      return;
+    }
+
+    if (value.startsWith("utility:")) {
+      const utilityKind = value.replace("utility:", "") as UtilitySlotKind;
+      const template = getUtilityTemplate(utilityKind);
+      updateSlot(slotId, {
+        pieceId: null,
+        customTitle: template.label,
+        reason: template.reason,
+        duration: template.defaultMinutes
+      });
+      return;
+    }
+
+    updateSlot(slotId, {
+      pieceId: null,
+      reason: "自由入力した練習内容です。"
+    });
+  }
+
+  function updateSlotDuration(slotId: string, rawValue: string) {
+    if (!rawValue.trim()) return;
+    const nextDuration = Number(rawValue);
+    if (!Number.isFinite(nextDuration) || nextDuration < MIN_SLOT_MINUTES) return;
+    updateSlot(slotId, { duration: normalizeDuration(nextDuration) });
+  }
+
+  function deleteSlot(slotId: string) {
+    updatePlan(tablePlan.filter((slot) => slot.id !== slotId));
+  }
+
+  function moveSlot(slotId: string, direction: -1 | 1) {
+    const currentIndex = tablePlan.findIndex((slot) => slot.id === slotId);
+    const nextIndex = currentIndex + direction;
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= tablePlan.length) return;
+
+    const nextPlan = [...tablePlan];
+    [nextPlan[currentIndex], nextPlan[nextIndex]] = [nextPlan[nextIndex], nextPlan[currentIndex]];
+    updatePlan(nextPlan);
+  }
+
+  function insertBeforeCleanup(slot: PlanSlot) {
+    const nextPlan = [...tablePlan];
+    const cleanupIndex = nextPlan.findIndex(isCleanupSlot);
+    nextPlan.splice(cleanupIndex >= 0 ? cleanupIndex : nextPlan.length, 0, slot);
+    updatePlan(nextPlan);
+  }
+
+  function addPieceRow() {
+    const firstPiece = state.pieces[0] ?? null;
+    const availableMinutes = Math.max(MIN_SLOT_MINUTES, practiceMinutes - plannedMinutes);
+    const duration = Math.min(DEFAULT_PIECE_MINUTES, availableMinutes);
+    const nextSlot: PlanSlot = {
+      id: makeId("s"),
+      pieceId: firstPiece?.id ?? null,
+      customTitle: firstPiece?.title ?? "",
+      start: selectedDay.startTime,
+      end: selectedDay.startTime,
+      duration,
+      reason: firstPiece ? `${firstPiece.title} を手動追加した行です。` : "自由入力した練習内容です。"
+    };
+
+    insertBeforeCleanup(nextSlot);
+    setPlanMessage("練習内容の行を追加しました。曲名は選択または自由入力できます。");
+  }
+
+  function addBreakRow() {
+    const template = getUtilityTemplate("break");
+    insertBeforeCleanup({
+      id: makeId("s"),
+      pieceId: null,
+      customTitle: template.label,
+      start: selectedDay.startTime,
+      end: selectedDay.startTime,
+      duration: template.defaultMinutes,
+      reason: template.reason
+    });
+    setPlanMessage("休憩の行を追加しました。");
+  }
+
+  function handleGeneratePlan() {
+    const generatedPlan = generatePracticePlan(state);
+    updateSelectedDay({ plan: reflowPlanSlots(generatedPlan, selectedDay.startTime) });
+
+    if (generatedPlan.length > 0) {
+      setPlanMessage(`${generatedPlan.length} 行の計画を自動生成しました。表の練習時間から調整できます。`);
+      return;
+    }
+
+    setPlanMessage("自動生成できませんでした。曲設定、回答状況、参加可能時間を確認してください。");
+  }
+
   function createPlanAnnouncementImage(day: typeof selectedDay) {
     const canvas = document.createElement("canvas");
-    const rows = sortPlanByTime(day.plan);
+    const rows = reflowPlanSlots(sortPlanByTime(day.plan), day.startTime);
     const width = 1200;
     const headerHeight = 170;
     const tableHeaderHeight = 52;
     const minRowHeight = 72;
     const lineHeight = 30;
     const context = canvas.getContext("2d");
-    if (!context) throw new Error("\u004a\u0050\u0045\u0047\u753b\u50cf\u3092\u4f5c\u6210\u3067\u304d\u307e\u305b\u3093\u3002");
+    if (!context) throw new Error("JPEG画像を作成できません。");
     const measureContext = context;
 
     const tableLeft = 82;
     const tableTop = headerHeight;
     const tableWidth = width - 164;
     const startColumnWidth = 180;
-    const durationColumnWidth = 120;
-    const contentLeft = tableLeft + startColumnWidth + durationColumnWidth;
-    const contentWidth = tableWidth - startColumnWidth - durationColumnWidth - 48;
+    const durationColumnWidth = 160;
+    const contentLeft = tableLeft + startColumnWidth;
+    const durationLeft = tableLeft + tableWidth - durationColumnWidth;
+    const contentWidth = durationLeft - contentLeft - 48;
 
     function wrapText(value: string, maxWidth: number) {
       measureContext.font = "24px system-ui, sans-serif";
@@ -199,7 +324,7 @@ export function AdminApp() {
 
     context.fillStyle = "#0f172a";
     context.font = "700 40px system-ui, sans-serif";
-    context.fillText(`${formatPracticeDateLabel(day.practiceDate)} \u306e\u7df4\u7fd2\u5185\u5bb9`, 82, 98);
+    context.fillText(`${formatPracticeDateLabel(day.practiceDate)} の練習内容`, 82, 98);
     context.font = "24px system-ui, sans-serif";
     context.fillStyle = "#475569";
     context.fillText(formatPracticeTimeAndLocation(day), 82, 138);
@@ -210,22 +335,22 @@ export function AdminApp() {
     context.strokeRect(tableLeft, tableTop, tableWidth, tableHeaderHeight);
     context.fillStyle = "#334155";
     context.font = "700 22px system-ui, sans-serif";
-    context.fillText("\u958b\u59cb\u6642\u9593", tableLeft + 24, tableTop + 34);
-    context.fillText("\u5206", tableLeft + startColumnWidth + 24, tableTop + 34);
-    context.fillText("\u66f2 / \u4f11\u61a9", contentLeft + 24, tableTop + 34);
+    context.fillText("開始時刻", tableLeft + 24, tableTop + 34);
+    context.fillText("曲・内容", contentLeft + 24, tableTop + 34);
+    context.fillText("練習時間", durationLeft + 24, tableTop + 34);
 
     context.strokeStyle = "#aebdca";
     context.beginPath();
-    context.moveTo(tableLeft + startColumnWidth, tableTop);
-    context.lineTo(tableLeft + startColumnWidth, height - 56);
     context.moveTo(contentLeft, tableTop);
     context.lineTo(contentLeft, height - 56);
+    context.moveTo(durationLeft, tableTop);
+    context.lineTo(durationLeft, height - 56);
     context.stroke();
 
     if (rows.length === 0) {
       context.fillStyle = "#64748b";
       context.font = "24px system-ui, sans-serif";
-      context.fillText("\u307e\u3060\u7df4\u7fd2\u8a08\u753b\u304c\u3042\u308a\u307e\u305b\u3093\u3002", tableLeft + 24, tableTop + tableHeaderHeight + 46);
+      context.fillText("まだ練習計画がありません。", tableLeft + 24, tableTop + tableHeaderHeight + 46);
     }
 
     let rowTop = tableTop + tableHeaderHeight;
@@ -235,45 +360,30 @@ export function AdminApp() {
       context.strokeStyle = "#c5d0da";
       context.strokeRect(tableLeft, rowTop, tableWidth, rowHeight);
       context.beginPath();
-      context.moveTo(tableLeft + startColumnWidth, rowTop);
-      context.lineTo(tableLeft + startColumnWidth, rowTop + rowHeight);
       context.moveTo(contentLeft, rowTop);
       context.lineTo(contentLeft, rowTop + rowHeight);
+      context.moveTo(durationLeft, rowTop);
+      context.lineTo(durationLeft, rowTop + rowHeight);
       context.stroke();
 
       context.fillStyle = "#0f172a";
       context.font = "700 24px system-ui, sans-serif";
       context.fillText(slot.start, tableLeft + 24, rowTop + 44);
       context.font = "24px system-ui, sans-serif";
-      context.fillText(String(slot.duration), tableLeft + startColumnWidth + 24, rowTop + 44);
       wrappedLines.forEach((line, lineIndex) => {
         context.fillText(line, contentLeft + 24, rowTop + 38 + lineIndex * lineHeight);
       });
+      context.font = "700 24px system-ui, sans-serif";
+      context.fillText(formatDurationClock(slot.duration), durationLeft + 24, rowTop + 44);
       rowTop += rowHeight;
     });
 
     return canvas.toDataURL("image/jpeg", 0.92).replace(/^data:image\/jpeg;base64,/, "");
   }
 
-  function handlePublishToggle(event: ChangeEvent<HTMLInputElement>) {
-    const nextPublished = event.target.checked;
-    if (!nextPublished) {
-      updateSelectedDay({ isPlanPublished: false });
-      return;
-    }
-
-    updateSelectedDay({ isPlanPublished: true });
-    setPlanMessage("");
-    if (confirm("\u30b9\u30b1\u30b8\u30e5\u30fc\u30eb\u516c\u958b\u3092\u30a2\u30ca\u30a6\u30f3\u30b9\u3057\u307e\u3059\u304b\uff1f")) {
-      void sendPublishAnnouncement(selectedDay);
-    } else {
-      setPlanMessage("\u516c\u958b\u306e\u307f\u884c\u3044\u307e\u3057\u305f\u3002");
-    }
-  }
-
   async function sendPublishAnnouncement(day: typeof selectedDay) {
     setIsSendingAnnouncement(true);
-    setPlanMessage("\u9001\u4fe1\u4e2d\u3067\u3059\u3002");
+    setPlanMessage("送信中です。");
 
     try {
       const imageBase64 = createPlanAnnouncementImage(day);
@@ -283,342 +393,37 @@ export function AdminApp() {
         body: JSON.stringify({ imageBase64 })
       });
       const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-      if (!response.ok) throw new Error(payload?.error ?? "Slack\u30a2\u30ca\u30a6\u30f3\u30b9\u3092\u9001\u4fe1\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002");
-      setPlanMessage("Slack\u306b\u7df4\u7fd2\u5185\u5bb9\u3092\u9001\u4fe1\u3057\u307e\u3057\u305f\u3002");
+      if (!response.ok) throw new Error(payload?.error ?? "Slackアナウンスを送信できませんでした。");
+      setPlanMessage("Slackに練習内容を送信しました。");
     } catch (error) {
-      setPlanMessage(error instanceof Error ? error.message : "Slack\u30a2\u30ca\u30a6\u30f3\u30b9\u3092\u9001\u4fe1\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002");
+      setPlanMessage(error instanceof Error ? error.message : "Slackアナウンスを送信できませんでした。");
     } finally {
       setIsSendingAnnouncement(false);
     }
   }
-  function deletePracticeDay(dayId: string) {
-    if (state.practiceDays.length <= 1) return;
 
-    const currentDay = state.practiceDays.find((day) => day.id === dayId);
-    if (!currentDay || !confirm(`${formatPracticeDateLabel(currentDay.practiceDate)} の練習日を削除しますか？`)) return;
+  function handlePublishToggle(event: ChangeEvent<HTMLInputElement>) {
+    const nextPublished = event.target.checked;
+    const normalizedDay = { ...selectedDay, plan: tablePlan, isPlanPublished: nextPublished };
+    updateSelectedDay({ isPlanPublished: nextPublished, plan: tablePlan });
 
-    const nextDays = state.practiceDays.filter((day) => day.id !== dayId);
-    updateState({
-      practiceDays: nextDays,
-      selectedPracticeDayId: state.selectedPracticeDayId === dayId ? nextDays[0].id : state.selectedPracticeDayId
-    });
-  }
+    if (!nextPublished) return;
 
-  function normalizeSlotTiming(slot: (typeof selectedDay.plan)[number], nextStart: number, nextEnd: number) {
-    const dayStart = toMinutes(selectedDay.startTime);
-    const dayEnd = toMinutes(selectedDay.endTime);
-    const latestStart = Math.max(dayStart, dayEnd - MIN_SLOT_MINUTES);
-    const clampedStart = clampNumber(snapMinutes(nextStart), dayStart, latestStart);
-    const clampedEnd = clampNumber(snapMinutes(nextEnd), clampedStart + MIN_SLOT_MINUTES, dayEnd);
-
-    return {
-      ...slot,
-      start: toTime(clampedStart),
-      end: toTime(clampedEnd),
-      duration: clampedEnd - clampedStart
-    };
-  }
-
-  function updatePlan(plan: typeof selectedDay.plan) {
-    updateSelectedDay({ plan: sortPlanByTime(plan) });
-  }
-
-  function updateSlot(
-    slotId: string,
-    patch: { pieceId?: string | null; customTitle?: string; reason?: string; isLocked?: boolean }
-  ) {
-    const nextPlan = sortedPlan.map((slot) =>
-      slot.id === slotId
-        ? {
-            ...slot,
-            ...patch,
-            reason: patch.reason ?? slot.reason
-          }
-        : slot
-    );
-    updatePlan(nextPlan);
-  }
-
-  function updateSlotTitle(slotId: string, customTitle: string) {
-    updateSlot(slotId, { customTitle });
-  }
-
-  function toggleSlotLock(slotId: string) {
-    const slot = sortedPlan.find((item) => item.id === slotId);
-    if (!slot) return;
-    updateSlot(slotId, { isLocked: !slot.isLocked });
-  }
-
-  function deleteSlot(slotId: string) {
-    updatePlan(sortedPlan.filter((item) => item.id !== slotId));
-    setSelectedSlotId((currentSlotId) => (currentSlotId === slotId ? null : currentSlotId));
-  }
-
-  function getSlotContentValue(slot: (typeof selectedDay.plan)[number]) {
-    if (slot.pieceId) return `piece:${slot.pieceId}`;
-    if (slot.reason?.includes("準備")) return "utility:setup";
-    if (slot.reason?.includes("片付け")) return "utility:cleanup";
-    return "utility:break";
-  }
-
-  function updateSlotContent(slotId: string, value: string) {
-    if (value.startsWith("piece:")) {
-      const pieceId = value.replace("piece:", "");
-      const piece = pieceMap.get(pieceId);
-      updateSlot(slotId, { pieceId, customTitle: piece?.title ?? "" });
-      return;
+    setPlanMessage("");
+    if (confirm("スケジュール公開をアナウンスしますか？")) {
+      void sendPublishAnnouncement(normalizedDay);
+    } else {
+      setPlanMessage("公開のみ行いました。");
     }
-
-    if (!value.startsWith("utility:")) return;
-
-    const utilityKind = value.replace("utility:", "") as UtilitySlotKind;
-    const template = getUtilityTemplate(utilityKind);
-    updateSlot(slotId, { pieceId: null, customTitle: template.label, reason: template.reason });
-  }
-
-  function updateSlotTimeInput(slotId: string, boundary: "start" | "end", value: string) {
-    if (!value) return;
-    updateSlotBoundary(slotId, boundary, toMinutes(value));
-  }
-
-  function adjustSlotEnd(slotId: string, deltaMinutes: number) {
-    const slot = sortedPlan.find((item) => item.id === slotId);
-    if (!slot) return;
-    updateSlotBoundary(slotId, "end", toMinutes(slot.end) + deltaMinutes);
-  }
-
-  function moveSlotToStart(slotId: string, nextStart: number) {
-    const nextPlan = sortedPlan.map((slot) => {
-      if (slot.id !== slotId) return slot;
-      const duration = normalizeDuration(slot.duration, MIN_SLOT_MINUTES);
-      return normalizeSlotTiming(slot, nextStart, nextStart + duration);
-    });
-    updatePlan(nextPlan);
-    setSelectedSlotId(slotId);
-  }
-
-  function updateSlotBoundary(slotId: string, boundary: "start" | "end", minutes: number) {
-    const nextPlan = sortedPlan.map((slot) => {
-      if (slot.id !== slotId) return slot;
-
-      const currentStart = toMinutes(slot.start);
-      const currentEnd = toMinutes(slot.end);
-      return boundary === "start"
-        ? normalizeSlotTiming(slot, minutes, currentEnd)
-        : normalizeSlotTiming(slot, currentStart, minutes);
-    });
-    updatePlan(nextPlan);
-  }
-
-  function handleResizeStart(
-    event: ReactPointerEvent<HTMLButtonElement>,
-    slotId: string,
-    boundary: "start" | "end"
-  ) {
-    event.preventDefault();
-    event.stopPropagation();
-    setSelectedSlotId(slotId);
-
-    const startY = event.clientY;
-    const slot = sortedPlan.find((item) => item.id === slotId);
-    if (!slot) return;
-
-    const startBoundaryMinutes = boundary === "start" ? toMinutes(slot.start) : toMinutes(slot.end);
-
-    function handlePointerMove(moveEvent: PointerEvent) {
-      const deltaMinutes = (moveEvent.clientY - startY) * MINUTES_PER_PIXEL;
-      updateSlotBoundary(slotId, boundary, startBoundaryMinutes + deltaMinutes);
-    }
-
-    function handlePointerUp() {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerUp);
-    }
-
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", handlePointerUp, { once: true });
-  }
-
-  function makeSlotFromPalette(payload: PaletteDragPayload, startMinutes = toMinutes(selectedDay.startTime)): (typeof selectedDay.plan)[number] | null {
-    if (payload.slotType === "piece") {
-      const piece = pieceMap.get(payload.pieceId);
-      if (!piece) return null;
-
-      const defaultDuration = Math.max(MIN_SLOT_MINUTES, Math.min(piece.dailyMaxMinutes || 30, 60, Math.max(practiceMinutes, 1)));
-      const start = clampNumber(snapMinutes(startMinutes), practiceStartMinutes, lastSlotStartMinutes);
-      const end = Math.min(practiceEndMinutes, start + defaultDuration);
-
-      return {
-        id: makeId("s"),
-        pieceId: piece.id,
-        customTitle: piece.title,
-        start: toTime(start),
-        end: toTime(end),
-        duration: end - start,
-        reason: `${piece.title} を手動追加した枠です。`
-      };
-    }
-
-    const template = getUtilityTemplate(payload.utilityKind);
-    const start = clampNumber(snapMinutes(startMinutes), practiceStartMinutes, lastSlotStartMinutes);
-    const end = Math.min(practiceEndMinutes, start + template.defaultMinutes);
-
-    return {
-      id: makeId("s"),
-      pieceId: null,
-      customTitle: template.label,
-      start: toTime(start),
-      end: toTime(end),
-      duration: end - start,
-      reason: template.reason
-    };
-  }
-
-  function isCleanupSlot(slot: (typeof selectedDay.plan)[number]) {
-    if (slot.pieceId) return false;
-    return Boolean(slot.reason?.includes("片付け") || slot.customTitle?.includes("片付け"));
-  }
-
-  // クリック追加時の既定位置。片付け枠を除いた「今ある枠」の最後尾の直後に置く。
-  function getAppendStartMinutes() {
-    const ends = sortedPlan
-      .filter((slot) => !isCleanupSlot(slot))
-      .map((slot) => toMinutes(slot.end))
-      .filter((minutes) => Number.isFinite(minutes));
-
-    if (ends.length === 0) return practiceStartMinutes;
-    return Math.max(practiceStartMinutes, ...ends);
-  }
-
-  function addSlotFromPalette(payload: PaletteDragPayload, startMinutes = getAppendStartMinutes()) {
-    const nextSlot = makeSlotFromPalette(payload, startMinutes);
-    if (!nextSlot) {
-      setPlanMessage("追加できませんでした。曲の設定を確認してください。");
-      return;
-    }
-
-    updatePlan([...sortedPlan, nextSlot]);
-    setSelectedSlotId(nextSlot.id);
-    setPlanMessage(`${getSlotLabel(nextSlot)} を ${nextSlot.start} から追加しました。`);
-  }
-
-  function insertBreaksIntoOpenTimes() {
-    const template = getUtilityTemplate("break");
-    const occupiedRanges = sortPlanByTime(sortedPlan)
-      .map((slot) => ({
-        start: clampNumber(toMinutes(slot.start), practiceStartMinutes, practiceEndMinutes),
-        end: clampNumber(toMinutes(slot.end), practiceStartMinutes, practiceEndMinutes)
-      }))
-      .filter((range) => range.end > range.start);
-
-    const mergedRanges: Array<{ start: number; end: number }> = [];
-    for (const range of occupiedRanges) {
-      const previousRange = mergedRanges[mergedRanges.length - 1];
-      if (!previousRange || range.start > previousRange.end) {
-        mergedRanges.push({ ...range });
-      } else {
-        previousRange.end = Math.max(previousRange.end, range.end);
-      }
-    }
-
-    const gaps: Array<{ start: number; end: number }> = [];
-    for (let index = 1; index < mergedRanges.length; index += 1) {
-      const previousRange = mergedRanges[index - 1];
-      const currentRange = mergedRanges[index];
-      if (currentRange.start - previousRange.end >= MIN_SLOT_MINUTES) {
-        gaps.push({ start: previousRange.end, end: currentRange.start });
-      }
-    }
-
-    if (gaps.length === 0) {
-      setPlanMessage("休憩を入れられる空き時間はありません。");
-      return;
-    }
-
-    const breakSlots = gaps.map((gap) => ({
-      id: makeId("s"),
-      pieceId: null,
-      customTitle: template.label,
-      start: toTime(gap.start),
-      end: toTime(gap.end),
-      duration: gap.end - gap.start,
-      reason: template.reason
-    }));
-
-    updatePlan([...sortedPlan, ...breakSlots]);
-    setSelectedSlotId(breakSlots[0]?.id ?? null);
-    setPlanMessage(`休憩を${breakSlots.length}件追加しました。`);
-  }
-
-  function writeDragPayload(event: DragEvent, payload: PaletteDragPayload | SlotDragPayload) {
-    event.dataTransfer.effectAllowed = payload.type === "slot" ? "move" : "copy";
-    event.dataTransfer.setData(DRAG_DATA_TYPE, JSON.stringify(payload));
-  }
-
-  function readDragPayload(event: DragEvent): PaletteDragPayload | SlotDragPayload | null {
-    const rawPayload = event.dataTransfer.getData(DRAG_DATA_TYPE);
-    if (!rawPayload) return null;
-
-    try {
-      return JSON.parse(rawPayload) as PaletteDragPayload | SlotDragPayload;
-    } catch {
-      return null;
-    }
-  }
-
-  function getTimelineDropMinutes(event: DragEvent<HTMLElement>) {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const rawOffset = (event.clientY - rect.top) * MINUTES_PER_PIXEL;
-    return clampNumber(snapMinutes(practiceStartMinutes + rawOffset), practiceStartMinutes, lastSlotStartMinutes);
-  }
-
-  function handleTimelineDragOver(event: DragEvent<HTMLElement>) {
-    event.preventDefault();
-    setActiveDropMinutes(getTimelineDropMinutes(event));
-  }
-
-  function handleTimelineDrop(event: DragEvent<HTMLElement>) {
-    event.preventDefault();
-    const payload = readDragPayload(event);
-    setDraggedSlotId(null);
-    setActiveDropMinutes(null);
-
-    if (!payload) return;
-    const dropMinutes = getTimelineDropMinutes(event);
-
-    if (payload.type === "slot") {
-      moveSlotToStart(payload.slotId, dropMinutes);
-      return;
-    }
-
-    addSlotFromPalette(payload, dropMinutes);
-  }
-
-  function getPieceToneClass(pieceId: string | null) {
-    if (!pieceId) return "";
-    const pieceIndex = state.pieces.findIndex((piece) => piece.id === pieceId);
-    return `plan-tone-${Math.max(0, pieceIndex) % 6}`;
-  }
-
-  function handleGeneratePlan() {
-    const generatedPlan = generatePracticePlan(state);
-    updateSelectedDay({ plan: generatedPlan });
-
-    if (generatedPlan.length > 0) {
-      setPlanMessage(`${generatedPlan.length} 件の枠を自動生成しました。必要ならこの下で手動調整できます。`);
-      return;
-    }
-
-    setPlanMessage("自動生成できませんでした。曲設定、回答状況、参加可能時間を確認してください。");
   }
 
   function handleSavePlanImage() {
-    if (selectedDay.plan.length === 0) {
-      setPlanMessage("保存できる練習計画がありません。先に枠を追加してください。");
+    if (tablePlan.length === 0) {
+      setPlanMessage("保存できる練習計画がありません。先に行を追加してください。");
       return;
     }
 
-    const imageBase64 = createPlanAnnouncementImage(selectedDay);
+    const imageBase64 = createPlanAnnouncementImage({ ...selectedDay, plan: tablePlan });
     const link = document.createElement("a");
     link.href = `data:image/jpeg;base64,${imageBase64}`;
     link.download = `練習計画_${selectedDay.practiceDate}.jpg`;
@@ -628,11 +433,13 @@ export function AdminApp() {
     setPlanMessage("Slackに公開される練習計画の画像を保存しました。");
   }
 
-  function getSlotLabel(slot: (typeof selectedDay.plan)[number]) {
-    return getPlanSlotLabel(slot, slot.pieceId ? pieceMap.get(slot.pieceId)?.title : undefined);
+  function getPieceToneClass(pieceId: string | null) {
+    if (!pieceId) return "";
+    const pieceIndex = state.pieces.findIndex((piece) => piece.id === pieceId);
+    return `plan-tone-${Math.max(0, pieceIndex) % 6}`;
   }
 
-  function getSlotAttendanceCount(slot: (typeof selectedDay.plan)[number]) {
+  function getSlotAttendanceCount(slot: PlanSlot) {
     if (!slot.pieceId) return null;
     const piece = pieceMap.get(slot.pieceId);
     if (!piece) return null;
@@ -650,7 +457,7 @@ export function AdminApp() {
       <section className="panel stack">
         <p className="muted">練習計画ページ</p>
         <h1>練習計画の編集</h1>
-        <p>このページでは、選んだ練習日の計画を作って整えます。準備がまだなら、先に追加ページでメンバー・練習日・曲を登録してください。</p>
+        <p>開始時刻は練習時間から自動計算されます。右側の分数を入力し、上から順番に計画を組み立ててください。</p>
         <div className="row">
           <Link className="button" href="/admin/setup">
             準備ページへ
@@ -706,10 +513,8 @@ export function AdminApp() {
               onChange={handlePublishToggle}
             />
             <span className="plan-publish-switch-control" aria-hidden="true" />
-            <span>
-              練習スケジュールを{selectedDay.isPlanPublished ? "公開中" : "非公開"}
-            </span>
-            {isSendingAnnouncement ? <span className="muted">{"\u9001\u4fe1\u4e2d"}</span> : null}
+            <span>練習スケジュールを{selectedDay.isPlanPublished ? "公開中" : "非公開"}</span>
+            {isSendingAnnouncement ? <span className="muted">送信中</span> : null}
           </label>
         </div>
       </section>
@@ -721,7 +526,7 @@ export function AdminApp() {
             <h2>{getPracticeDayLabel(selectedDay)} の練習計画を作る</h2>
           </div>
           <div className="row">
-            <span className="muted">
+            <span className="plan-day-range">
               {selectedDay.startTime} - {selectedDay.endTime}
             </span>
             <button type="button" onClick={handleGeneratePlan}>
@@ -733,336 +538,191 @@ export function AdminApp() {
           </div>
         </div>
 
-        <div className="plan-progress-card">
+        <div className={`plan-progress-card${overflowMinutes > 0 ? " is-overflow" : ""}`}>
           <div className="plan-progress-header">
             <strong>練習時間の配分</strong>
-            <span className="muted">{overlappingSlotIds.size > 0 ? "重なっている枠があります" : "重なりはありません"}</span>
+            <span className={overflowMinutes > 0 ? "plan-overflow-text" : "muted"}>
+              {overflowMinutes > 0
+                ? `${formatMinutesLabel(overflowMinutes)}オーバー`
+                : remainingMinutes > 0
+                  ? `あと${formatMinutesLabel(remainingMinutes)}`
+                  : "終了時刻にぴったりです"}
+            </span>
           </div>
           <div className="plan-progress-track" aria-hidden="true">
             <div className="plan-progress-fill" style={{ width: `${coverageRatio * 100}%` }} />
           </div>
           <div className="plan-progress-meta muted">
-            入っている時間 {formatMinutesLabel(plannedMinutes)} / 空き {formatMinutesLabel(freeMinutes)}
+            計画 {formatMinutesLabel(plannedMinutes)} / 練習可能 {formatMinutesLabel(practiceMinutes)} / 終了予定{" "}
+            {toTime(calculatedEndMinutes)}
           </div>
         </div>
 
-        {overlappingSlotIds.size > 0 ? (
-          <div className="error">時間が重なっている枠があります。開始時刻と終了時刻を調整してください。</div>
+        {overflowMinutes > 0 ? (
+          <div className="plan-time-warning" role="alert">
+            <strong>練習時間を超えています。</strong>
+            <span>
+              終了予定は {toTime(calculatedEndMinutes)} です。設定された終了時刻 {selectedDay.endTime} より{" "}
+              {formatMinutesLabel(overflowMinutes)}短くなるよう、右側の練習時間を調整してください。
+            </span>
+          </div>
         ) : null}
 
-        <div className="plan-builder">
-          <aside className="plan-palette">
-            <div className="plan-toolbar-head">
-              <strong>追加するボックス</strong>
-              <span className="muted">左のボックスを下の計画エリアへドラッグ、またはクリックで開始時刻へ追加できます。</span>
+        <div className="plan-schedule-card">
+          <div className="plan-schedule-head">
+            <div>
+              <strong>時刻表</strong>
+              <p className="muted">曲名欄はリストから選択でき、そのまま自由な文字にも書き換えられます。</p>
             </div>
-
-            <div className="plan-palette-section">
-              <span className="plan-stat-label">曲</span>
-              {state.pieces.length === 0 ? (
-                <div className="notice">曲がありません。準備ページで曲を追加してください。</div>
-              ) : (
-                <div className="plan-palette-grid">
-                  {state.pieces.map((piece) => (
-                    <button
-                      className={`plan-palette-card plan-slot-piece ${getPieceToneClass(piece.id)}`}
-                      draggable
-                      key={piece.id}
-                      type="button"
-                      onClick={() => addSlotFromPalette({ type: "palette", slotType: "piece", pieceId: piece.id })}
-                      onDragStart={(event) => writeDragPayload(event, { type: "palette", slotType: "piece", pieceId: piece.id })}
-                    >
-                      <strong>{piece.title}</strong>
-                      <span>{piece.dailyMaxMinutes}分まで</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="plan-palette-section">
-              <span className="plan-stat-label">休憩・準備</span>
-              <div className="plan-palette-grid">
-                {UTILITY_SLOT_TEMPLATES.map((template) => (
-                  <button
-                    className={`plan-palette-card plan-slot-${template.kind}`}
-                    draggable
-                    key={template.kind}
-                    type="button"
-                    onClick={() => addSlotFromPalette({ type: "palette", slotType: "utility", utilityKind: template.kind })}
-                    onDragStart={(event) =>
-                      writeDragPayload(event, { type: "palette", slotType: "utility", utilityKind: template.kind })
-                    }
-                  >
-                    <strong>{template.label}</strong>
-                    <span>{template.defaultMinutes}分</span>
-                  </button>
-                ))}
-              </div>
-              <button className="secondary plan-bulk-break-button" type="button" onClick={insertBreaksIntoOpenTimes}>
-                間に休憩を一括挿入
+            <div className="row plan-row-add-actions">
+              <button type="button" onClick={addPieceRow}>
+                ＋ 練習内容を追加
+              </button>
+              <button type="button" className="secondary" onClick={addBreakRow}>
+                ＋ 休憩を追加
               </button>
             </div>
-          </aside>
+          </div>
 
-          <div className="plan-canvas">
-            <div className="plan-canvas-head">
-              <strong>練習計画</strong>
-              <span className="muted">箱を上下にドラッグして時刻を移動できます。上下の端をドラッグすると開始・終了を変更できます。</span>
-            </div>
+          <div className="plan-schedule-table-shell">
+            <table className="plan-schedule-table">
+              <thead>
+                <tr>
+                  <th scope="col">開始時刻</th>
+                  <th scope="col">曲・内容</th>
+                  <th scope="col">練習時間</th>
+                  <th scope="col" aria-label="操作" />
+                </tr>
+              </thead>
+              <tbody>
+                {tablePlan.length === 0 ? (
+                  <tr>
+                    <td className="plan-table-empty" colSpan={4}>
+                      まだ計画がありません。「練習内容を追加」または「自動生成」から始めてください。
+                    </td>
+                  </tr>
+                ) : (
+                  tablePlan.map((slot, index) => {
+                    const slotLabel = getSlotLabel(slot);
+                    const slotVariant = getSlotVariant(slot);
+                    const attendanceCount = getSlotAttendanceCount(slot);
+                    const rowOverflows = toMinutes(slot.end) > practiceEndMinutes;
 
-            <div className="plan-timeline-shell" style={{ height: `${timelineHeight}px` }}>
-              <div className="plan-time-axis" aria-hidden="true">
-                {timeAxisMarks.map((minutes) => (
-                  <span
-                    className="plan-time-mark"
-                    key={minutes}
-                    style={{ top: `${Math.max(0, (minutes - practiceStartMinutes) / MINUTES_PER_PIXEL)}px` }}
-                  >
-                    {toTime(minutes)}
-                  </span>
-                ))}
-              </div>
-
-              <div
-                className="plan-timeline-track"
-                onDragLeave={() => setActiveDropMinutes(null)}
-                onDragOver={handleTimelineDragOver}
-                onDrop={handleTimelineDrop}
-              >
-            {activeDropMinutes !== null ? (
-              <div
-                className="plan-drop-time-guide"
-                style={{ top: `${(activeDropMinutes - practiceStartMinutes) / MINUTES_PER_PIXEL}px` }}
-              >
-                {toTime(activeDropMinutes)}
-              </div>
-            ) : null}
-
-            {sortedPlan.length === 0 ? (
-              <div className="plan-empty-state">
-                <strong>まだ計画がありません。</strong>
-                <p className="muted">左のボックスをここに入れるか、自動生成してください。</p>
-              </div>
-            ) : (
-              <div className="plan-timeline">
-                {sortedPlan.map((slot) => {
-                  const slotLabel = getSlotLabel(slot);
-                  const slotVariant = getSlotVariant(slot);
-                  const attendanceCount = getSlotAttendanceCount(slot);
-
-                  return (
-                    <div className="plan-slot-row" key={slot.id}>
-                      <article
-                        className={`plan-slot-card plan-slot-${slotVariant} ${getPieceToneClass(slot.pieceId)}${
-                          overlappingSlotIds.has(slot.id) ? " overlap-slot" : ""
-                        }${draggedSlotId === slot.id ? " is-dragging" : ""}${
-                          selectedSlotId === slot.id ? " is-selected" : ""
-                        }`}
-                        draggable
-                        style={{
-                          height: `${Math.max(1, slot.duration / MINUTES_PER_PIXEL)}px`,
-                          top: `${(toMinutes(slot.start) - practiceStartMinutes) / MINUTES_PER_PIXEL}px`
-                        }}
-                        onClick={() => setSelectedSlotId(slot.id)}
-                        onDragEnd={() => {
-                          setDraggedSlotId(null);
-                          setActiveDropMinutes(null);
-                        }}
-                        onDragStart={(event) => {
-                          setDraggedSlotId(slot.id);
-                          setSelectedSlotId(slot.id);
-                          writeDragPayload(event, { type: "slot", slotId: slot.id });
-                        }}
-                      >
-                        <div className="plan-slot-main">
-                          <button
-                            className="plan-resize-handle plan-resize-handle-top"
-                            type="button"
-                            aria-label={`${slotLabel}の開始時刻を変更`}
-                            onPointerDown={(event) => handleResizeStart(event, slot.id, "start")}
-                          >
-                            ↕
-                          </button>
-                          <div className="plan-slot-top">
-                            <div className="plan-slot-heading">
-                              <span className="plan-slot-time">
-                                {slot.start} - {slot.end}
-                              </span>
-                              <div
-                                className="plan-slot-content-controls"
-                                onPointerDown={(event) => event.stopPropagation()}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setSelectedSlotId(slot.id);
-                                }}
-                              >
-                                <textarea
-                                  className="plan-slot-title-input"
-                                  aria-label="表示文字を編集"
-                                  title="表示文字を編集"
-                                  rows={2}
-                                  value={slot.customTitle ?? slotLabel}
-                                  onChange={(event) => updateSlotTitle(slot.id, event.target.value)}
-                                  onFocus={() => setSelectedSlotId(slot.id)}
-                                />
-                                <select
-                                  className="plan-slot-content-select"
-                                  aria-label="曲・内容を選択"
-                                  title="曲・内容を選択"
-                                  value={getSlotContentValue(slot)}
-                                  onChange={(event) => {
-                                    updateSlotContent(slot.id, event.target.value);
-                                    setSelectedSlotId(slot.id);
-                                  }}
-                                >
-                                  {UTILITY_SLOT_TEMPLATES.map((template) => (
-                                    <option key={template.kind} value={`utility:${template.kind}`}>
-                                      {template.label}
-                                    </option>
-                                  ))}
-                                  {state.pieces.map((piece) => (
-                                    <option key={piece.id} value={`piece:${piece.id}`}>
-                                      {piece.title}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              {attendanceCount !== null ? <span className="plan-slot-attendance">{attendanceCount}人</span> : null}
-                            </div>
-                            <div className="plan-slot-badges">
-                              <span className="plan-badge">{formatMinutesLabel(slot.duration)}</span>
-                              {slot.isLocked ? <span className="plan-badge accent">固定</span> : null}
-                              {overlappingSlotIds.has(slot.id) ? <span className="plan-badge danger">重なり</span> : null}
-                            </div>
-                          </div>
-                          <label
-                            className="plan-slot-lock-switch"
-                            title="固定"
-                            onPointerDown={(event) => event.stopPropagation()}
-                            onClick={(event) => event.stopPropagation()}
+                    return (
+                      <tr className={rowOverflows ? "plan-row-overflow" : ""} key={slot.id}>
+                        <td className="plan-start-time-cell">
+                          <strong>{slot.start}</strong>
+                          <span>{rowOverflows ? "時間外" : `〜 ${slot.end}`}</span>
+                        </td>
+                        <td>
+                          <div
+                            className={`plan-entry-field plan-slot-${slotVariant} ${getPieceToneClass(slot.pieceId)}`}
                           >
                             <input
-                              type="checkbox"
-                              checked={!!slot.isLocked}
-                              aria-label={`${slotLabel}を固定`}
-                              onChange={() => toggleSlotLock(slot.id)}
+                              type="text"
+                              aria-label={`${slot.start}の曲名・内容`}
+                              placeholder="曲名・内容を入力"
+                              value={slot.customTitle ?? slotLabel}
+                              onChange={(event) => updateSlot(slot.id, { customTitle: event.target.value })}
                             />
-                            <span aria-hidden="true" />
-                          </label>
-                          <button
-                            className="plan-slot-delete-button"
-                            type="button"
-                            aria-label={`${slotLabel}を削除`}
-                            title="削除"
-                            onPointerDown={(event) => event.stopPropagation()}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              deleteSlot(slot.id);
-                            }}
-                          >
-                            ×
-                          </button>
-                          <button
-                            className="plan-resize-handle plan-resize-handle-bottom"
-                            type="button"
-                            aria-label={`${slotLabel}の終了時刻を変更`}
-                            onPointerDown={(event) => handleResizeStart(event, slot.id, "end")}
-                          >
-                            ↕
-                          </button>
-                        </div>
-                      </article>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-              </div>
-            </div>
-            <div className="plan-detail-panel">
-              {selectedSlot ? (
-                <>
-                  <div className="plan-detail-head">
-                    <div>
-                      <span className="plan-stat-label">選択中のボックス</span>
-                      <strong>{getSlotLabel(selectedSlot)}</strong>
-                    </div>
-                    <span className="plan-detail-chip">
-                      {selectedSlot.start} - {selectedSlot.end} / {formatMinutesLabel(selectedSlot.duration)}
-                    </span>
-                  </div>
-                  <div className="plan-detail-grid">
-                    <label>
-                      表示文字
-                      <textarea
-                        rows={3}
-                        value={selectedSlot.customTitle ?? getSlotLabel(selectedSlot)}
-                        onChange={(event) => updateSlotTitle(selectedSlot.id, event.target.value)}
-                      />
-                    </label>
-                    <label>
-                      内容・曲
-                      <select
-                        value={getSlotContentValue(selectedSlot)}
-                        onChange={(event) => updateSlotContent(selectedSlot.id, event.target.value)}
-                      >
-                        {UTILITY_SLOT_TEMPLATES.map((template) => (
-                          <option key={template.kind} value={`utility:${template.kind}`}>
-                            {template.label}
-                          </option>
-                        ))}
-                        {state.pieces.map((piece) => (
-                          <option key={piece.id} value={`piece:${piece.id}`}>
-                            {piece.title}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      開始
-                      <input
-                        type="time"
-                        step="300"
-                        value={selectedSlot.start}
-                        onChange={(event) => updateSlotTimeInput(selectedSlot.id, "start", event.target.value)}
-                      />
-                    </label>
-                    <label>
-                      終了
-                      <input
-                        type="time"
-                        step="300"
-                        value={selectedSlot.end}
-                        onChange={(event) => updateSlotTimeInput(selectedSlot.id, "end", event.target.value)}
-                      />
-                    </label>
-                  </div>
-                  <div className="plan-detail-actions">
-                    <button type="button" className="secondary" onClick={() => adjustSlotEnd(selectedSlot.id, -5)}>
-                      -5分
-                    </button>
-                    <button type="button" className="secondary" onClick={() => adjustSlotEnd(selectedSlot.id, 5)}>
-                      +5分
-                    </button>
-                    <button type="button" className="secondary" onClick={() => setSelectedSlotId(null)}>
-                      選択解除
-                    </button>
-                    <button type="button" className="secondary" onClick={() => toggleSlotLock(selectedSlot.id)}>
-                      {selectedSlot.isLocked ? "固定解除" : "固定"}
-                    </button>
-                    <button type="button" className="danger" onClick={() => deleteSlot(selectedSlot.id)}>
-                      削除
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <div className="plan-detail-empty">
-                  <strong>編集するボックスを選択</strong>
-                  <span className="muted">5分の短い枠も、選択後にここで曲・内容・時刻を変更できます。削除はボックス内からも操作できます。</span>
-                </div>
-              )}
-            </div>
+                            <select
+                              aria-label={`${slot.start}の曲・内容をリストから選択`}
+                              title="曲・内容を選択"
+                              value={getSlotContentValue(slot)}
+                              onChange={(event) => updateSlotContent(slot.id, event.target.value)}
+                            >
+                              <option value="custom">自由入力</option>
+                              {UTILITY_SLOT_TEMPLATES.map((template) => (
+                                <option key={template.kind} value={`utility:${template.kind}`}>
+                                  {template.label}
+                                </option>
+                              ))}
+                              {state.pieces.map((piece) => (
+                                <option key={piece.id} value={`piece:${piece.id}`}>
+                                  {piece.title}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="plan-row-meta">
+                            {attendanceCount !== null ? <span>参加可能 {attendanceCount}人</span> : <span>自由入力・休憩</span>}
+                            <label>
+                              <input
+                                type="checkbox"
+                                checked={!!slot.isLocked}
+                                onChange={() => updateSlot(slot.id, { isLocked: !slot.isLocked })}
+                              />
+                              固定
+                            </label>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="plan-duration-control">
+                            <input
+                              type="number"
+                              min={MIN_SLOT_MINUTES}
+                              step={5}
+                              inputMode="numeric"
+                              aria-label={`${slotLabel}の練習時間（分）`}
+                              value={slot.duration}
+                              onChange={(event) => updateSlotDuration(slot.id, event.target.value)}
+                            />
+                            <span>分</span>
+                            <small>{formatDurationClock(slot.duration)}</small>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="plan-row-actions">
+                            <button
+                              type="button"
+                              className="secondary"
+                              aria-label={`${slotLabel}を上へ移動`}
+                              title="上へ"
+                              disabled={index === 0}
+                              onClick={() => moveSlot(slot.id, -1)}
+                            >
+                              ↑
+                            </button>
+                            <button
+                              type="button"
+                              className="secondary"
+                              aria-label={`${slotLabel}を下へ移動`}
+                              title="下へ"
+                              disabled={index === tablePlan.length - 1}
+                              onClick={() => moveSlot(slot.id, 1)}
+                            >
+                              ↓
+                            </button>
+                            <button
+                              type="button"
+                              className="danger"
+                              aria-label={`${slotLabel}を削除`}
+                              title="削除"
+                              onClick={() => deleteSlot(slot.id)}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+              <tfoot>
+                <tr className={overflowMinutes > 0 ? "plan-row-overflow" : ""}>
+                  <th scope="row">{toTime(calculatedEndMinutes)}</th>
+                  <td>
+                    <strong>終了予定</strong>
+                    <span className="muted">設定上の終了 {selectedDay.endTime}</span>
+                  </td>
+                  <td>
+                    <strong>{formatDurationClock(plannedMinutes)}</strong>
+                  </td>
+                  <td />
+                </tr>
+              </tfoot>
+            </table>
           </div>
         </div>
       </section>
