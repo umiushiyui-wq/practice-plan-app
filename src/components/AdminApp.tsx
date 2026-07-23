@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import {
   generatePracticePlan,
   getPlanSlotLabel,
@@ -25,6 +25,7 @@ type UtilitySlotKind = "break" | "setup" | "cleanup";
 
 const MIN_SLOT_MINUTES = 1;
 const DEFAULT_PIECE_MINUTES = 30;
+const MAX_PLAN_TITLE_HEIGHT = 180;
 
 const UTILITY_SLOT_TEMPLATES: Array<{
   kind: UtilitySlotKind;
@@ -151,6 +152,41 @@ function PlanDurationInput({
       }}
       onKeyDown={(event) => {
         if (event.key === "Enter") event.currentTarget.blur();
+      }}
+    />
+  );
+}
+
+function PlanTitleTextarea({
+  label,
+  value,
+  onChange
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  function resizeTextarea(textarea: HTMLTextAreaElement) {
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, MAX_PLAN_TITLE_HEIGHT)}px`;
+  }
+
+  useEffect(() => {
+    if (textareaRef.current) resizeTextarea(textareaRef.current);
+  }, [value]);
+
+  return (
+    <textarea
+      ref={textareaRef}
+      aria-label={label}
+      placeholder="曲名・内容を入力"
+      rows={1}
+      value={value}
+      onChange={(event) => {
+        resizeTextarea(event.currentTarget);
+        onChange(event.target.value);
       }}
     />
   );
@@ -675,12 +711,10 @@ export function AdminApp() {
                           <div
                             className={`plan-entry-field plan-slot-${slotVariant} ${getPieceToneClass(slot.pieceId)}`}
                           >
-                            <textarea
-                              aria-label={`${slot.start}の曲名・内容`}
-                              placeholder="曲名・内容を入力"
-                              rows={2}
+                            <PlanTitleTextarea
+                              label={`${slot.start}の曲名・内容`}
                               value={slot.customTitle ?? slotLabel}
-                              onChange={(event) => updateSlot(slot.id, { customTitle: event.target.value })}
+                              onChange={(value) => updateSlot(slot.id, { customTitle: value })}
                             />
                             <select
                               aria-label={`${slot.start}の曲・内容をリストから選択`}
