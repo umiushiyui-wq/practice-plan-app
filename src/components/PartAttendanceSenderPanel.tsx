@@ -150,11 +150,15 @@ export function PartAttendanceSenderPanel({ selectedDay, members }: PartAttendan
   }
 
   return (
-    <div className="stack">
+    <>
       <button className="slack-reminder-button" type="button" onClick={sendPartAttendanceImages} disabled={status === "sending"}>
         {status === "sending" ? "送信中" : "パート別に出欠画像を送る"}
       </button>
-      {message ? <div className={status === "error" ? "error" : "notice"}>{message}</div> : null}
-    </div>
+      {message ? (
+        <div className={status === "error" ? "error" : "notice"} style={{ flexBasis: "100%" }}>
+          {message}
+        </div>
+      ) : null}
+    </>
   );
 }

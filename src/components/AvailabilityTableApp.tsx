@@ -228,8 +228,8 @@ export function AvailabilityTableApp() {
           <button className="slack-reminder-button" type="button" onClick={sendSlackReminders} disabled={slackReminderStatus === "sending"}>
             {slackReminderStatus === "sending" ? "\u9001\u4fe1\u4e2d" : "\u672a\u5165\u529b\u8005\u306b\u30e1\u30c3\u30bb\u30fc\u30b8\u3092\u9001\u308b"}
           </button>
+          <PartAttendanceSenderPanel selectedDay={selectedDay} members={state.members} />
         </div>
-        <PartAttendanceSenderPanel selectedDay={selectedDay} members={state.members} />
       </section>
 
       <LocalStateStatusPanel {...localState} />
