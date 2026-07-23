@@ -352,6 +352,12 @@ button:disabled {
   font-weight: 900;
 }
 
+.plan-duration-control input[aria-invalid="true"] {
+  border-color: #dc2626;
+  background: #fff7f7;
+  color: #b91c1c;
+}
+
 .plan-duration-control > span {
   font-size: 13px;
   font-weight: 800;

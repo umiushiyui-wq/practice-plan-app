@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ChangeEvent } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import {
   generatePracticePlan,
   getPlanSlotLabel,
@@ -97,6 +97,65 @@ function reflowPlanSlots(plan: PlanSlot[], startTime: string) {
   });
 }
 
+function PlanDurationInput({
+  duration,
+  label,
+  onValidDuration
+}: {
+  duration: number;
+  label: string;
+  onValidDuration: (minutes: number) => void;
+}) {
+  const [draft, setDraft] = useState(String(duration));
+  const [isEditing, setIsEditing] = useState(false);
+
+  useEffect(() => {
+    if (!isEditing) setDraft(String(duration));
+  }, [duration, isEditing]);
+
+  function handleChange(value: string) {
+    if (!/^\d*$/.test(value)) return;
+    setDraft(value);
+
+    if (!value) return;
+    const minutes = Number(value);
+    if (Number.isSafeInteger(minutes) && minutes >= MIN_SLOT_MINUTES) {
+      onValidDuration(minutes);
+    }
+  }
+
+  function handleBlur() {
+    const minutes = Number(draft);
+    if (draft && Number.isSafeInteger(minutes) && minutes >= MIN_SLOT_MINUTES) {
+      onValidDuration(minutes);
+      setDraft(String(minutes));
+    } else {
+      setDraft(String(duration));
+    }
+    setIsEditing(false);
+  }
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      aria-label={`${label}の練習時間（分）`}
+      aria-invalid={draft !== "" && Number(draft) < MIN_SLOT_MINUTES}
+      value={draft}
+      onBlur={handleBlur}
+      onChange={(event) => handleChange(event.target.value)}
+      onFocus={(event) => {
+        setIsEditing(true);
+        event.currentTarget.select();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") event.currentTarget.blur();
+      }}
+    />
+  );
+}
+
 export function AdminApp() {
   const localState = useLocalPracticeState();
   const { state, updateState } = localState;
@@ -184,10 +243,8 @@ export function AdminApp() {
     });
   }
 
-  function updateSlotDuration(slotId: string, rawValue: string) {
-    if (!rawValue.trim()) return;
-    const nextDuration = Number(rawValue);
-    if (!Number.isFinite(nextDuration) || nextDuration < MIN_SLOT_MINUTES) return;
+  function updateSlotDuration(slotId: string, nextDuration: number) {
+    if (!Number.isSafeInteger(nextDuration) || nextDuration < MIN_SLOT_MINUTES) return;
     updateSlot(slotId, { duration: normalizeDuration(nextDuration) });
   }
 
@@ -658,14 +715,10 @@ export function AdminApp() {
                         </td>
                         <td>
                           <div className="plan-duration-control">
-                            <input
-                              type="number"
-                              min={MIN_SLOT_MINUTES}
-                              step={5}
-                              inputMode="numeric"
-                              aria-label={`${slotLabel}の練習時間（分）`}
-                              value={slot.duration}
-                              onChange={(event) => updateSlotDuration(slot.id, event.target.value)}
+                            <PlanDurationInput
+                              duration={slot.duration}
+                              label={slotLabel}
+                              onValidDuration={(minutes) => updateSlotDuration(slot.id, minutes)}
                             />
                             <span>分</span>
                             <small>{formatDurationClock(slot.duration)}</small>
