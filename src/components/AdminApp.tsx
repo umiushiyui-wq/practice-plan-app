@@ -197,6 +197,7 @@ export function AdminApp() {
   const { state, updateState } = localState;
   const [planMessage, setPlanMessage] = useState("");
   const [isSendingAnnouncement, setIsSendingAnnouncement] = useState(false);
+  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const selectedDay = getSelectedPracticeDay(state);
   const sortedPracticeDays = getSortedPracticeDays(state.practiceDays);
   const pieceMap = usePieceMap(state.pieces);
@@ -210,6 +211,10 @@ export function AdminApp() {
   const overflowMinutes = Math.max(0, plannedMinutes - practiceMinutes);
   const calculatedEndMinutes = practiceStartMinutes + plannedMinutes;
   const coverageRatio = practiceMinutes > 0 ? Math.min(1, plannedMinutes / practiceMinutes) : 0;
+
+  useEffect(() => {
+    setSelectedSlotId(null);
+  }, [selectedDay.id]);
 
   function updateSelectedDay(patch: Partial<typeof selectedDay>) {
     updateState({ practiceDays: updatePracticeDay(state, selectedDay.id, patch) });
@@ -286,6 +291,7 @@ export function AdminApp() {
 
   function deleteSlot(slotId: string) {
     updatePlan(tablePlan.filter((slot) => slot.id !== slotId));
+    setSelectedSlotId((current) => (current === slotId ? null : current));
   }
 
   function moveSlot(slotId: string, direction: -1 | 1) {
@@ -305,6 +311,19 @@ export function AdminApp() {
     updatePlan(nextPlan);
   }
 
+  function insertAfterSelectedSlot(slot: PlanSlot) {
+    const selectedIndex = tablePlan.findIndex((item) => item.id === selectedSlotId);
+    if (selectedIndex < 0) {
+      insertBeforeCleanup(slot);
+      return false;
+    }
+
+    const nextPlan = [...tablePlan];
+    nextPlan.splice(selectedIndex + 1, 0, slot);
+    updatePlan(nextPlan);
+    return true;
+  }
+
   function addPieceRow() {
     const firstPiece = state.pieces[0] ?? null;
     const availableMinutes = Math.max(MIN_SLOT_MINUTES, practiceMinutes - plannedMinutes);
@@ -319,13 +338,18 @@ export function AdminApp() {
       reason: firstPiece ? `${firstPiece.title} を手動追加した行です。` : "自由入力した練習内容です。"
     };
 
-    insertBeforeCleanup(nextSlot);
-    setPlanMessage("練習内容の行を追加しました。曲名は選択または自由入力できます。");
+    const insertedAfterSelection = insertAfterSelectedSlot(nextSlot);
+    setSelectedSlotId(nextSlot.id);
+    setPlanMessage(
+      insertedAfterSelection
+        ? "選択した行の直後に練習内容を追加しました。"
+        : "練習内容の行を追加しました。曲名は選択または自由入力できます。"
+    );
   }
 
   function addBreakRow() {
     const template = getUtilityTemplate("break");
-    insertBeforeCleanup({
+    const nextSlot: PlanSlot = {
       id: makeId("s"),
       pieceId: null,
       customTitle: template.label,
@@ -333,13 +357,16 @@ export function AdminApp() {
       end: selectedDay.startTime,
       duration: template.defaultMinutes,
       reason: template.reason
-    });
+    };
+    insertBeforeCleanup(nextSlot);
+    setSelectedSlotId(nextSlot.id);
     setPlanMessage("休憩の行を追加しました。");
   }
 
   function handleGeneratePlan() {
     const generatedPlan = generatePracticePlan(state);
     updateSelectedDay({ plan: reflowPlanSlots(generatedPlan, selectedDay.startTime) });
+    setSelectedSlotId(null);
 
     if (generatedPlan.length > 0) {
       setPlanMessage(`${generatedPlan.length} 行の計画を自動生成しました。表の練習時間から調整できます。`);
@@ -689,7 +716,9 @@ export function AdminApp() {
           <div className="plan-schedule-head">
             <div>
               <strong>時刻表</strong>
-              <p className="muted">曲名欄はリストから選択でき、そのまま自由な文字にも書き換えられます。</p>
+              <p className="muted">
+                曲名欄はリストから選択できます。行を選択して練習内容を追加すると、その直後に挿入されます。
+              </p>
             </div>
             <div className="row plan-row-add-actions">
               <button type="button" onClick={addPieceRow}>
@@ -725,12 +754,26 @@ export function AdminApp() {
                     const attendanceCount = getSlotAttendanceCount(slot);
                     const conductorWarning = getConductorWarning(slot);
                     const rowOverflows = toMinutes(slot.end) > practiceEndMinutes;
+                    const isSelected = selectedSlotId === slot.id;
+                    const rowClassName = [
+                      rowOverflows ? "plan-row-overflow" : "",
+                      isSelected ? "plan-row-selected" : ""
+                    ]
+                      .filter(Boolean)
+                      .join(" ");
 
                     return (
-                      <tr className={rowOverflows ? "plan-row-overflow" : ""} key={slot.id}>
+                      <tr className={rowClassName} key={slot.id} onClick={() => setSelectedSlotId(slot.id)}>
                         <td className="plan-start-time-cell">
-                          <strong>{slot.start}</strong>
-                          <span>{rowOverflows ? "時間外" : `〜 ${slot.end}`}</span>
+                          <button
+                            type="button"
+                            className="plan-slot-select-button"
+                            aria-label={`${slot.start}の${slotLabel}を選択`}
+                            aria-pressed={isSelected}
+                          >
+                            <strong>{slot.start}</strong>
+                            <span>{rowOverflows ? "時間外" : `〜 ${slot.end}`}</span>
+                          </button>
                         </td>
                         <td>
                           <div
@@ -797,7 +840,10 @@ export function AdminApp() {
                               aria-label={`${slotLabel}を上へ移動`}
                               title="上へ"
                               disabled={index === 0}
-                              onClick={() => moveSlot(slot.id, -1)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                moveSlot(slot.id, -1);
+                              }}
                             >
                               ↑
                             </button>
@@ -807,7 +853,10 @@ export function AdminApp() {
                               aria-label={`${slotLabel}を下へ移動`}
                               title="下へ"
                               disabled={index === tablePlan.length - 1}
-                              onClick={() => moveSlot(slot.id, 1)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                moveSlot(slot.id, 1);
+                              }}
                             >
                               ↓
                             </button>
@@ -816,7 +865,10 @@ export function AdminApp() {
                               className="danger"
                               aria-label={`${slotLabel}を削除`}
                               title="削除"
-                              onClick={() => deleteSlot(slot.id)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                deleteSlot(slot.id);
+                              }}
                             >
                               ×
                             </button>

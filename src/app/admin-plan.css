@@ -184,8 +184,43 @@ button:disabled {
   background: #f5f9fc;
 }
 
+.plan-schedule-table tbody tr {
+  cursor: pointer;
+  transition: background-color 120ms ease, outline-color 120ms ease;
+}
+
+.plan-schedule-table tbody tr.plan-row-selected {
+  background: #e8f6f8;
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
+}
+
+.plan-schedule-table tbody tr.plan-row-overflow.plan-row-selected {
+  background: #fff1f1 !important;
+}
+
 .plan-start-time-cell {
   text-align: right;
+}
+
+.plan-slot-select-button,
+.plan-slot-select-button:hover,
+.plan-slot-select-button:active {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  box-shadow: none;
+  padding: 4px 2px;
+  text-align: inherit;
+  transform: none;
+}
+
+.plan-row-selected .plan-slot-select-button {
+  color: var(--accent-dark);
 }
 
 .plan-start-time-cell strong {
@@ -515,6 +550,12 @@ button:disabled {
 
   .plan-start-time-cell {
     text-align: center;
+  }
+
+  .plan-slot-select-button,
+  .plan-slot-select-button:hover,
+  .plan-slot-select-button:active {
+    padding: 2px 0;
   }
 
   .plan-start-time-cell strong {
