@@ -10,21 +10,30 @@ import {
 } from "@/components/LocalPracticeApp";
 
 type InviteStatus = "idle" | "sending" | "done" | "error";
+type ChannelSaveStatus = "idle" | "saving" | "saved" | "error";
 
 export function PieceMembersApp({ pieceId }: { pieceId: string }) {
   const localState = useLocalPracticeState();
-  const { state, updateState, ready } = localState;
+  const { state, updateState, flushSave, ready } = localState;
   const piece = state.pieces.find((item) => item.id === pieceId);
   const conductor = piece ? state.members.find((member) => member.id === piece.conductorId) : undefined;
   const sortedMembers = [...state.members].sort(compareMembersByInstrument);
 
   const [inviteStatus, setInviteStatus] = useState<InviteStatus>("idle");
   const [inviteMessage, setInviteMessage] = useState("");
+  const [channelSaveStatus, setChannelSaveStatus] = useState<ChannelSaveStatus>("idle");
 
   function updateChannelId(channelId: string) {
+    setChannelSaveStatus("idle");
     updateState({
       pieces: state.pieces.map((item) => (item.id === pieceId ? { ...item, slackChannelId: channelId } : item))
     });
+  }
+
+  async function saveChannelIdNow() {
+    setChannelSaveStatus("saving");
+    const ok = await flushSave();
+    setChannelSaveStatus(ok ? "saved" : "error");
   }
 
   async function inviteMembersToChannel() {
@@ -112,6 +121,9 @@ export function PieceMembersApp({ pieceId }: { pieceId: string }) {
               onChange={(event) => updateChannelId(event.target.value)}
               placeholder={"チャンネルID（例: C0123456789）"}
             />
+            <button className="secondary" type="button" onClick={saveChannelIdNow} disabled={channelSaveStatus === "saving"}>
+              {channelSaveStatus === "saving" ? "保存中..." : "チャンネルIDを保存"}
+            </button>
             <button
               type="button"
               onClick={inviteMembersToChannel}
@@ -120,6 +132,8 @@ export function PieceMembersApp({ pieceId }: { pieceId: string }) {
               {inviteStatus === "sending" ? "招待中..." : "招待する"}
             </button>
           </div>
+          {channelSaveStatus === "saved" ? <p className="notice">チャンネルIDを保存しました。リロードしても消えません。</p> : null}
+          {channelSaveStatus === "error" ? <p className="error">チャンネルIDの保存に失敗しました。もう一度お試しください。</p> : null}
           {inviteMessage ? <p className={inviteStatus === "error" ? "error" : "notice"}>{inviteMessage}</p> : null}
         </section>
       ) : null}

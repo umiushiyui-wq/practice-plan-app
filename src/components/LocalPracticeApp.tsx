@@ -541,6 +541,25 @@ export function useLocalPracticeState() {
     setState((current) => ({ ...current, ...patch }));
   }
 
+  async function flushSave() {
+    saveSequenceRef.current += 1;
+    setSaveStatus("saving");
+    setSaveError("");
+
+    try {
+      const payload = await putServerState(state);
+      shouldPersistRef.current = false;
+      setSaveStatus("saved");
+      setServerUpdatedAt(payload.updatedAt ?? null);
+      cacheStateLocally(state);
+      return true;
+    } catch {
+      setSaveStatus("error");
+      setSaveError(SAVE_ERROR_MESSAGE);
+      return false;
+    }
+  }
+
   async function reloadServerState() {
     setIsReloading(true);
     try {
@@ -631,6 +650,7 @@ export function useLocalPracticeState() {
     state,
     setState: updateFullState,
     updateState,
+    flushSave,
     ready,
     saveStatus,
     saveError,
