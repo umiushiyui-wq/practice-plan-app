@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   compareMembersByInstrument,
   getInstrumentLabel,
@@ -10,32 +10,26 @@ import {
 } from "@/components/LocalPracticeApp";
 
 type InviteStatus = "idle" | "sending" | "done" | "error";
-type ChannelSaveStatus = "idle" | "saving" | "saved" | "error";
 
 export function PieceMembersApp({ pieceId }: { pieceId: string }) {
   const localState = useLocalPracticeState();
-  const { state, updateState, savePieceSlackChannelId, ready } = localState;
+  const { state, updateState, ready } = localState;
   const piece = state.pieces.find((item) => item.id === pieceId);
   const conductor = piece ? state.members.find((member) => member.id === piece.conductorId) : undefined;
   const sortedMembers = [...state.members].sort(compareMembersByInstrument);
 
   const [inviteStatus, setInviteStatus] = useState<InviteStatus>("idle");
   const [inviteMessage, setInviteMessage] = useState("");
-  const [channelIdDraft, setChannelIdDraft] = useState("");
-  const [channelSaveStatus, setChannelSaveStatus] = useState<ChannelSaveStatus>("idle");
 
-  useEffect(() => {
-    if (piece) setChannelIdDraft(piece.slackChannelId ?? "");
-  }, [piece?.slackChannelId]);
-
-  async function saveChannelIdNow() {
-    setChannelSaveStatus("saving");
-    const saved = await savePieceSlackChannelId(pieceId, channelIdDraft.trim());
-    setChannelSaveStatus(saved ? "saved" : "error");
+  function updateChannelId(formData: FormData) {
+    const slackChannelId = String(formData.get("slackChannelId") ?? "").trim();
+    updateState({
+      pieces: state.pieces.map((item) => (item.id === pieceId ? { ...item, slackChannelId } : item))
+    });
   }
 
   async function inviteMembersToChannel() {
-    const trimmedChannelId = channelIdDraft.trim();
+    const trimmedChannelId = (piece?.slackChannelId ?? "").trim();
     if (!trimmedChannelId) return;
 
     setInviteStatus("sending");
@@ -113,28 +107,27 @@ export function PieceMembersApp({ pieceId }: { pieceId: string }) {
           <p className="muted">
             この曲に乗るメンバーのうち、まだ参加していない人をパブリックチャンネルに招待します。
           </p>
-          <div className="row">
-            <input
-              value={channelIdDraft}
-              onChange={(event) => {
-                setChannelIdDraft(event.target.value);
-                setChannelSaveStatus("idle");
-              }}
-              placeholder={"チャンネルID（例: C0123456789）"}
-            />
-            <button className="secondary" type="button" onClick={saveChannelIdNow} disabled={channelSaveStatus === "saving"}>
-              {channelSaveStatus === "saving" ? "保存中..." : "チャンネルIDを保存"}
+          <form
+            className="row"
+            onSubmit={(event) => {
+              event.preventDefault();
+              updateChannelId(new FormData(event.currentTarget));
+            }}
+          >
+            <input name="slackChannelId" defaultValue={piece.slackChannelId ?? ""} placeholder={"チャンネルID（例: C0123456789）"} />
+            <button className="secondary" type="submit">
+              チャンネルID保存
             </button>
+          </form>
+          <div className="row">
             <button
               type="button"
               onClick={inviteMembersToChannel}
-              disabled={inviteStatus === "sending" || !channelIdDraft.trim()}
+              disabled={inviteStatus === "sending" || !(piece.slackChannelId ?? "").trim()}
             >
               {inviteStatus === "sending" ? "招待中..." : "招待する"}
             </button>
           </div>
-          {channelSaveStatus === "saved" ? <p className="notice">チャンネルIDを保存しました。リロードしても消えません。</p> : null}
-          {channelSaveStatus === "error" ? <p className="error">チャンネルIDの保存に失敗しました。もう一度お試しください。</p> : null}
           {inviteMessage ? <p className={inviteStatus === "error" ? "error" : "notice"}>{inviteMessage}</p> : null}
         </section>
       ) : null}
