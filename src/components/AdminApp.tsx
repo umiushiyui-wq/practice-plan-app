@@ -545,6 +545,30 @@ export function AdminApp() {
     ).length;
   }
 
+  function getConductorWarning(slot: PlanSlot) {
+    if (!slot.pieceId) return null;
+    const piece = pieceMap.get(slot.pieceId);
+    if (!piece) return null;
+    if (!piece.conductorId) return "指揮者が設定されていません。";
+
+    const conductorName = state.members.find((member) => member.id === piece.conductorId)?.name;
+    const conductorLabel = conductorName ? `指揮者 ${conductorName}` : "指揮者";
+
+    if (!selectedDay.respondedMemberIds.includes(piece.conductorId)) {
+      return `${conductorLabel}は出欠未入力です。`;
+    }
+    if (selectedDay.absentMemberIds.includes(piece.conductorId)) {
+      return `${conductorLabel}は欠席です。`;
+    }
+
+    const start = toMinutes(slot.start);
+    if (!isAvailable(selectedDay.availabilities, piece.conductorId, start, start + 1)) {
+      return `${conductorLabel}は開始時刻 ${slot.start} に参加できません。`;
+    }
+
+    return null;
+  }
+
   return (
     <main className="stack">
       <section className="panel stack">
@@ -699,6 +723,7 @@ export function AdminApp() {
                     const slotLabel = getSlotLabel(slot);
                     const slotVariant = getSlotVariant(slot);
                     const attendanceCount = getSlotAttendanceCount(slot);
+                    const conductorWarning = getConductorWarning(slot);
                     const rowOverflows = toMinutes(slot.end) > practiceEndMinutes;
 
                     return (
@@ -746,6 +771,12 @@ export function AdminApp() {
                               固定
                             </label>
                           </div>
+                          {conductorWarning ? (
+                            <div className="plan-conductor-warning" role="alert">
+                              <span aria-hidden="true">⚠</span>
+                              <span>{conductorWarning}</span>
+                            </div>
+                          ) : null}
                         </td>
                         <td>
                           <div className="plan-duration-control">
