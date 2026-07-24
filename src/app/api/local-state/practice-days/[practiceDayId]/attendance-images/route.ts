@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { config } from "@/lib/config";
+import { config, TIME_ZONE } from "@/lib/config";
 import { uploadSlackFile } from "@/lib/slack";
 import { PART_SLACK_CHANNELS, TEST_SLACK_CHANNEL_ID } from "@/lib/partSlackChannels";
 
@@ -96,6 +96,18 @@ function formatAttendanceDate(date: string) {
   return `${parsed.getMonth() + 1}月${parsed.getDate()}日`;
 }
 
+function formatSendTimeLabel() {
+  const parts = new Intl.DateTimeFormat("ja-JP", {
+    timeZone: TIME_ZONE,
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: false
+  }).formatToParts(new Date());
+  const hour = parts.find((part) => part.type === "hour")?.value ?? "0";
+  const minute = parts.find((part) => part.type === "minute")?.value ?? "00";
+  return `${hour}時${minute}分`;
+}
+
 function findPracticeDay(state: unknown, practiceDayId: string) {
   if (!state || typeof state !== "object") return null;
   const practiceDays = (state as AppStateLike).practiceDays;
@@ -148,7 +160,10 @@ export async function POST(request: Request, context: { params: Promise<{ practi
     }
 
     const dateLabel = formatAttendanceDate(practiceDay.practiceDate);
-    const text = isTest ? `【テスト送信】${dateLabel}の${part}の出欠情報です` : `${dateLabel}の${part}の出欠情報です`;
+    const sentAtLabel = formatSendTimeLabel();
+    const text = isTest
+      ? `【テスト送信】${dateLabel}の${part}の出欠情報です（${sentAtLabel}現在）`
+      : `${dateLabel}の${part}の出欠情報です（${sentAtLabel}現在）`;
     const uploaded = await uploadSlackFile({
       botToken: config.slackBotToken,
       channel,
