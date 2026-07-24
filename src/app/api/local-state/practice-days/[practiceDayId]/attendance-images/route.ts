@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { config } from "@/lib/config";
 import { uploadSlackFile } from "@/lib/slack";
-import { PART_SLACK_CHANNELS } from "@/lib/partSlackChannels";
+import { PART_SLACK_CHANNELS, TEST_SLACK_CHANNEL_ID } from "@/lib/partSlackChannels";
 
 export const runtime = "nodejs";
 
@@ -130,9 +130,12 @@ export async function POST(request: Request, context: { params: Promise<{ practi
     }
 
     const { practiceDayId } = await context.params;
-    const body = (await request.json().catch(() => null)) as { part?: unknown; imageBase64?: unknown } | null;
+    const body = (await request.json().catch(() => null)) as
+      | { part?: unknown; imageBase64?: unknown; isTest?: unknown }
+      | null;
     const part = typeof body?.part === "string" ? body.part : "";
-    const channel = PART_SLACK_CHANNELS[part];
+    const isTest = body?.isTest === true;
+    const channel = isTest ? TEST_SLACK_CHANNEL_ID : PART_SLACK_CHANNELS[part];
     if (!channel) {
       return NextResponse.json({ error: `送信先チャンネル未設定のパートです: ${part}` }, { status: 400 });
     }
@@ -145,12 +148,12 @@ export async function POST(request: Request, context: { params: Promise<{ practi
     }
 
     const dateLabel = formatAttendanceDate(practiceDay.practiceDate);
-    const text = `${dateLabel}の${part}の出欠情報です`;
+    const text = isTest ? `【テスト送信】${dateLabel}の${part}の出欠情報です` : `${dateLabel}の${part}の出欠情報です`;
     const uploaded = await uploadSlackFile({
       botToken: config.slackBotToken,
       channel,
       filename: `attendance-${practiceDay.practiceDate}.jpg`,
-      title: `${dateLabel} ${part} の出欠`,
+      title: `${dateLabel} ${part} の出欠${isTest ? "（テスト）" : ""}`,
       initialComment: text,
       fileBuffer: imageBuffer,
       mimeType: "image/jpeg"
