@@ -31,6 +31,7 @@ export function PieceMembersApp({ pieceId }: { pieceId: string }) {
   async function inviteMembersToChannel() {
     const trimmedChannelId = (piece?.slackChannelId ?? "").trim();
     if (!trimmedChannelId) return;
+    if (!confirm(`チャンネル（${trimmedChannelId}）にこの曲のメンバーを招待しますか？`)) return;
 
     setInviteStatus("sending");
     setInviteMessage("");
