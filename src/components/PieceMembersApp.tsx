@@ -18,12 +18,17 @@ export function PieceMembersApp({ pieceId }: { pieceId: string }) {
   const conductor = piece ? state.members.find((member) => member.id === piece.conductorId) : undefined;
   const sortedMembers = [...state.members].sort(compareMembersByInstrument);
 
-  const [channelId, setChannelId] = useState("");
   const [inviteStatus, setInviteStatus] = useState<InviteStatus>("idle");
   const [inviteMessage, setInviteMessage] = useState("");
 
+  function updateChannelId(channelId: string) {
+    updateState({
+      pieces: state.pieces.map((item) => (item.id === pieceId ? { ...item, slackChannelId: channelId } : item))
+    });
+  }
+
   async function inviteMembersToChannel() {
-    const trimmedChannelId = channelId.trim();
+    const trimmedChannelId = (piece?.slackChannelId ?? "").trim();
     if (!trimmedChannelId) return;
 
     setInviteStatus("sending");
@@ -103,11 +108,15 @@ export function PieceMembersApp({ pieceId }: { pieceId: string }) {
           </p>
           <div className="row">
             <input
-              value={channelId}
-              onChange={(event) => setChannelId(event.target.value)}
+              value={piece.slackChannelId ?? ""}
+              onChange={(event) => updateChannelId(event.target.value)}
               placeholder={"チャンネルID（例: C0123456789）"}
             />
-            <button type="button" onClick={inviteMembersToChannel} disabled={inviteStatus === "sending" || !channelId.trim()}>
+            <button
+              type="button"
+              onClick={inviteMembersToChannel}
+              disabled={inviteStatus === "sending" || !(piece.slackChannelId ?? "").trim()}
+            >
               {inviteStatus === "sending" ? "招待中..." : "招待する"}
             </button>
           </div>
