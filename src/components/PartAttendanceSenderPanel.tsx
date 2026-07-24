@@ -5,7 +5,10 @@ import {
   INSTRUMENT_OPTIONS,
   compareMembersByInstrument,
   formatPracticeDateLabel,
-  getInstrumentLabel
+  getAvailableSegments,
+  getInstrumentLabel,
+  toMinutes,
+  toTime
 } from "@/components/LocalPracticeApp";
 import type { LocalPracticeDay, Member } from "@/components/LocalPracticeApp";
 
@@ -21,21 +24,37 @@ function formatDayTimeAndLocation(day: LocalPracticeDay) {
   return location ? `${day.startTime}〜${day.endTime} ＠${location}` : `${day.startTime}〜${day.endTime}`;
 }
 
+type AttendanceTone = "absent" | "partial" | "available" | "unanswered";
+
+const TONE_STYLES: Record<AttendanceTone, { chip: string; text: string }> = {
+  absent: { chip: "#ffe8e4", text: "#b3261e" },
+  partial: { chip: "#fef3c7", text: "#92400e" },
+  available: { chip: "#dcf5e3", text: "#1f7a33" },
+  unanswered: { chip: "#e2e8f0", text: "#64748b" }
+};
+
 function getMemberAttendanceStatus(day: LocalPracticeDay, memberId: string) {
   const availability = day.availabilities.find((item) => item.memberId === memberId);
   const hasSaved = day.respondedMemberIds.includes(memberId);
   const isAbsent = hasSaved && day.absentMemberIds.includes(memberId);
+  const segments = availability ? getAvailableSegments(availability) : [];
+  const isLate = !!availability && toMinutes(availability.start) > toMinutes(day.startTime);
+  const isEarlyLeave = !!availability && toMinutes(availability.end) < toMinutes(day.endTime);
+  const hasBreak = segments.length > 1;
+  const isPartial = !isAbsent && !!availability && (isLate || isEarlyLeave || hasBreak);
+
+  const tone: AttendanceTone = isAbsent ? "absent" : isPartial ? "partial" : hasSaved ? "available" : "unanswered";
   const label = isAbsent
     ? "欠席"
     : availability
-      ? availability.breaks.length > 0
-        ? `${availability.start}〜${availability.end} / 中抜け ${availability.breaks.length}件`
+      ? segments.length > 0
+        ? segments.map((segment) => `${toTime(segment.start)}〜${toTime(segment.end)}`).join("、")
         : `${availability.start}〜${availability.end}`
       : hasSaved
         ? "未入力"
         : "未回答";
 
-  return { hasSaved, isAbsent, label };
+  return { tone, label };
 }
 
 function createPartAttendanceImage(day: LocalPracticeDay, part: string, members: Member[]) {
@@ -75,10 +94,8 @@ function createPartAttendanceImage(day: LocalPracticeDay, part: string, members:
 
   let rowTop = headerHeight;
   members.forEach((member, index) => {
-    const { label, isAbsent, hasSaved } = getMemberAttendanceStatus(day, member.id);
-    const textColor = isAbsent ? "#b3261e" : hasSaved ? "#0f172a" : "#64748b";
-    const chipColor = isAbsent ? "#ffe8e4" : hasSaved ? "#58b86b" : "#e2e8f0";
-    const chipTextColor = hasSaved && !isAbsent ? "#ffffff" : textColor;
+    const { label, tone } = getMemberAttendanceStatus(day, member.id);
+    const { chip: chipColor, text: chipTextColor } = TONE_STYLES[tone];
 
     context.fillStyle = index % 2 === 0 ? "#ffffff" : "#f7fafc";
     context.fillRect(56, rowTop, width - 112, rowHeight);
