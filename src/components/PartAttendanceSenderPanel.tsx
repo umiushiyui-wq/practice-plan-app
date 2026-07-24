@@ -107,10 +107,10 @@ function createPartAttendanceImage(day: LocalPracticeDay, part: string, members:
 export function PartAttendanceSenderPanel({ selectedDay, members }: PartAttendanceSenderPanelProps) {
   const [status, setStatus] = useState<SendStatus>("idle");
   const [message, setMessage] = useState("");
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
-  async function sendPartAttendanceImages() {
-    if (!confirm("各パートのSlackチャンネルに出欠画像を送信しますか？")) return;
-
+  async function runSend(isTest: boolean) {
+    setIsConfirmOpen(false);
     setStatus("sending");
     setMessage("");
 
@@ -127,7 +127,7 @@ export function PartAttendanceSenderPanel({ selectedDay, members }: PartAttendan
         const response = await fetch(`/api/local-state/practice-days/${selectedDay.id}/attendance-images`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ part, imageBase64 })
+          body: JSON.stringify({ part, imageBase64, isTest })
         });
 
         if (response.ok) {
@@ -140,23 +140,62 @@ export function PartAttendanceSenderPanel({ selectedDay, members }: PartAttendan
       }
     }
 
+    const prefix = isTest ? "テスト送信: " : "";
+
     if (failedParts.length > 0) {
       setStatus("error");
-      setMessage(`送信 ${sentParts.length}パート / 失敗 ${failedParts.length}パート（${failedParts.join("、")}）`);
+      setMessage(`${prefix}送信 ${sentParts.length}パート / 失敗 ${failedParts.length}パート（${failedParts.join("、")}）`);
     } else {
       setStatus("sent");
-      setMessage(sentParts.length > 0 ? `送信しました: ${sentParts.join("、")}` : "対象の奏者がいるパートがありません。");
+      setMessage(
+        sentParts.length > 0 ? `${prefix}送信しました: ${sentParts.join("、")}` : "対象の奏者がいるパートがありません。"
+      );
     }
   }
 
   return (
     <>
-      <button className="slack-reminder-button" type="button" onClick={sendPartAttendanceImages} disabled={status === "sending"}>
+      <button
+        className="slack-reminder-button"
+        type="button"
+        onClick={() => setIsConfirmOpen(true)}
+        disabled={status === "sending"}
+      >
         {status === "sending" ? "送信中" : "パート別に出欠画像を送る"}
       </button>
       {message ? (
         <div className={status === "error" ? "error" : "notice"} style={{ flexBasis: "100%" }}>
           {message}
+        </div>
+      ) : null}
+
+      {isConfirmOpen ? (
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="出欠画像の送信確認"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setIsConfirmOpen(false);
+          }}
+        >
+          <div className="modal-card stack">
+            <h2>出欠画像を送信しますか？</h2>
+            <p className="muted">
+              各パートのSlackチャンネルに出欠画像を送信します。テスト送信を選ぶと、全パートの画像をテスト用チャンネルにまとめて送ります。
+            </p>
+            <div className="row">
+              <button type="button" onClick={() => runSend(false)}>
+                OK（各パートに送信）
+              </button>
+              <button type="button" className="secondary" onClick={() => runSend(true)}>
+                テスト送信
+              </button>
+              <button type="button" className="secondary" onClick={() => setIsConfirmOpen(false)}>
+                キャンセル
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
     </>
