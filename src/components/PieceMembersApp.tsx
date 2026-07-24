@@ -21,15 +21,17 @@ export function PieceMembersApp({ pieceId }: { pieceId: string }) {
   const [inviteStatus, setInviteStatus] = useState<InviteStatus>("idle");
   const [inviteMessage, setInviteMessage] = useState("");
 
-  function updateChannelId(channelId: string) {
+  function updateChannelId(formData: FormData) {
+    const slackChannelId = String(formData.get("slackChannelId") ?? "").trim();
     updateState({
-      pieces: state.pieces.map((item) => (item.id === pieceId ? { ...item, slackChannelId: channelId } : item))
+      pieces: state.pieces.map((item) => (item.id === pieceId ? { ...item, slackChannelId } : item))
     });
   }
 
   async function inviteMembersToChannel() {
     const trimmedChannelId = (piece?.slackChannelId ?? "").trim();
     if (!trimmedChannelId) return;
+    if (!confirm(`チャンネル（${trimmedChannelId}）にこの曲のメンバーを招待しますか？`)) return;
 
     setInviteStatus("sending");
     setInviteMessage("");
@@ -106,12 +108,19 @@ export function PieceMembersApp({ pieceId }: { pieceId: string }) {
           <p className="muted">
             この曲に乗るメンバーのうち、まだ参加していない人をパブリックチャンネルに招待します。
           </p>
+          <form
+            className="row"
+            onSubmit={(event) => {
+              event.preventDefault();
+              updateChannelId(new FormData(event.currentTarget));
+            }}
+          >
+            <input name="slackChannelId" defaultValue={piece.slackChannelId ?? ""} placeholder={"チャンネルID（例: C0123456789）"} />
+            <button className="secondary" type="submit">
+              チャンネルID保存
+            </button>
+          </form>
           <div className="row">
-            <input
-              value={piece.slackChannelId ?? ""}
-              onChange={(event) => updateChannelId(event.target.value)}
-              placeholder={"チャンネルID（例: C0123456789）"}
-            />
             <button
               type="button"
               onClick={inviteMembersToChannel}
