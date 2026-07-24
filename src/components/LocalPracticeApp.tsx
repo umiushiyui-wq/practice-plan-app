@@ -455,6 +455,21 @@ async function putAvailabilityPatch(patch: AvailabilityPatch) {
   return (await response.json()) as { ok: true; state: unknown; updatedAt?: string | null };
 }
 
+async function putPieceSlackChannelId(pieceId: string, channelId: string) {
+  const response = await fetch(`/api/local-state/pieces/${pieceId}/slack-channel`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ channelId })
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(payload?.error ?? SAVE_ERROR_MESSAGE);
+  }
+
+  return (await response.json()) as { ok: true; state: unknown; updatedAt?: string | null };
+}
+
 export function useLocalPracticeState() {
   const [state, setState] = useState<AppState>(defaultState);
   const [ready, setReady] = useState(false);
@@ -539,25 +554,6 @@ export function useLocalPracticeState() {
   function updateState(patch: Partial<AppState>) {
     shouldPersistRef.current = true;
     setState((current) => ({ ...current, ...patch }));
-  }
-
-  async function flushSave() {
-    saveSequenceRef.current += 1;
-    setSaveStatus("saving");
-    setSaveError("");
-
-    try {
-      const payload = await putServerState(state);
-      shouldPersistRef.current = false;
-      setSaveStatus("saved");
-      setServerUpdatedAt(payload.updatedAt ?? null);
-      cacheStateLocally(state);
-      return true;
-    } catch {
-      setSaveStatus("error");
-      setSaveError(SAVE_ERROR_MESSAGE);
-      return false;
-    }
   }
 
   async function reloadServerState() {
@@ -646,11 +642,31 @@ export function useLocalPracticeState() {
     }
   }
 
+  async function savePieceSlackChannelId(pieceId: string, channelId: string) {
+    setSaveStatus("saving");
+    setSaveError("");
+
+    try {
+      const saved = await putPieceSlackChannelId(pieceId, channelId);
+      const nextState = saved.state ? migrateState(saved.state) : state;
+      shouldPersistRef.current = false;
+      setState(nextState);
+      cacheStateLocally(nextState);
+      setServerUpdatedAt(saved.updatedAt ?? null);
+      setHasLocalMigrationCandidate(false);
+      setSaveStatus("saved");
+      return nextState;
+    } catch {
+      setSaveStatus("error");
+      setSaveError(SAVE_ERROR_MESSAGE);
+      return null;
+    }
+  }
+
   return {
     state,
     setState: updateFullState,
     updateState,
-    flushSave,
     ready,
     saveStatus,
     saveError,
@@ -659,7 +675,8 @@ export function useLocalPracticeState() {
     isReloading,
     reloadServerState,
     migrateLocalStateToServer,
-    saveAvailabilityPatch
+    saveAvailabilityPatch,
+    savePieceSlackChannelId
   };
 }
 

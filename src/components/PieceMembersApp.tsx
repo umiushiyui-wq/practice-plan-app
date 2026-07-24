@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   compareMembersByInstrument,
   getInstrumentLabel,
@@ -14,30 +14,28 @@ type ChannelSaveStatus = "idle" | "saving" | "saved" | "error";
 
 export function PieceMembersApp({ pieceId }: { pieceId: string }) {
   const localState = useLocalPracticeState();
-  const { state, updateState, flushSave, ready } = localState;
+  const { state, updateState, savePieceSlackChannelId, ready } = localState;
   const piece = state.pieces.find((item) => item.id === pieceId);
   const conductor = piece ? state.members.find((member) => member.id === piece.conductorId) : undefined;
   const sortedMembers = [...state.members].sort(compareMembersByInstrument);
 
   const [inviteStatus, setInviteStatus] = useState<InviteStatus>("idle");
   const [inviteMessage, setInviteMessage] = useState("");
+  const [channelIdDraft, setChannelIdDraft] = useState("");
   const [channelSaveStatus, setChannelSaveStatus] = useState<ChannelSaveStatus>("idle");
 
-  function updateChannelId(channelId: string) {
-    setChannelSaveStatus("idle");
-    updateState({
-      pieces: state.pieces.map((item) => (item.id === pieceId ? { ...item, slackChannelId: channelId } : item))
-    });
-  }
+  useEffect(() => {
+    if (piece) setChannelIdDraft(piece.slackChannelId ?? "");
+  }, [piece?.slackChannelId]);
 
   async function saveChannelIdNow() {
     setChannelSaveStatus("saving");
-    const ok = await flushSave();
-    setChannelSaveStatus(ok ? "saved" : "error");
+    const saved = await savePieceSlackChannelId(pieceId, channelIdDraft.trim());
+    setChannelSaveStatus(saved ? "saved" : "error");
   }
 
   async function inviteMembersToChannel() {
-    const trimmedChannelId = (piece?.slackChannelId ?? "").trim();
+    const trimmedChannelId = channelIdDraft.trim();
     if (!trimmedChannelId) return;
 
     setInviteStatus("sending");
@@ -117,8 +115,11 @@ export function PieceMembersApp({ pieceId }: { pieceId: string }) {
           </p>
           <div className="row">
             <input
-              value={piece.slackChannelId ?? ""}
-              onChange={(event) => updateChannelId(event.target.value)}
+              value={channelIdDraft}
+              onChange={(event) => {
+                setChannelIdDraft(event.target.value);
+                setChannelSaveStatus("idle");
+              }}
               placeholder={"チャンネルID（例: C0123456789）"}
             />
             <button className="secondary" type="button" onClick={saveChannelIdNow} disabled={channelSaveStatus === "saving"}>
@@ -127,7 +128,7 @@ export function PieceMembersApp({ pieceId }: { pieceId: string }) {
             <button
               type="button"
               onClick={inviteMembersToChannel}
-              disabled={inviteStatus === "sending" || !(piece.slackChannelId ?? "").trim()}
+              disabled={inviteStatus === "sending" || !channelIdDraft.trim()}
             >
               {inviteStatus === "sending" ? "招待中..." : "招待する"}
             </button>
