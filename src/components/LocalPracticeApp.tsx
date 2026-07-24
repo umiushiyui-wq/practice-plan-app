@@ -69,6 +69,7 @@ export type Piece = {
   dailyMaxMinutes: number;
   targetRangeStartDayId: string | null;
   targetRangeEndDayId: string | null;
+  slackChannelId?: string;
 };
 
 export type AvailabilityBreak = {
@@ -315,7 +316,8 @@ function normalizePiece(piece: LegacyPiece): Piece {
     targetMinutes: Number(piece.targetMinutes ?? 60),
     dailyMaxMinutes: Number(piece.dailyMaxMinutes ?? 45),
     targetRangeStartDayId: piece.targetRangeStartDayId ?? null,
-    targetRangeEndDayId: piece.targetRangeEndDayId ?? null
+    targetRangeEndDayId: piece.targetRangeEndDayId ?? null,
+    slackChannelId: typeof piece.slackChannelId === "string" ? piece.slackChannelId : ""
   };
 }
 
