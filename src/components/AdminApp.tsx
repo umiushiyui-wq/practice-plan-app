@@ -358,9 +358,11 @@ export function AdminApp() {
       duration: template.defaultMinutes,
       reason: template.reason
     };
-    insertBeforeCleanup(nextSlot);
+    const insertedAfterSelection = insertAfterSelectedSlot(nextSlot);
     setSelectedSlotId(nextSlot.id);
-    setPlanMessage("休憩の行を追加しました。");
+    setPlanMessage(
+      insertedAfterSelection ? "選択した行の直後に休憩を追加しました。" : "休憩の行を追加しました。"
+    );
   }
 
   function handleGeneratePlan() {
