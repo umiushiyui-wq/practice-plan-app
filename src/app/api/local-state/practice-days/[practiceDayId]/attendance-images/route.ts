@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { config, TIME_ZONE } from "@/lib/config";
-import { uploadSlackFile } from "@/lib/slack";
+import { joinConversation, uploadSlackFile } from "@/lib/slack";
 import { PART_SLACK_CHANNELS, TEST_SLACK_CHANNEL_ID } from "@/lib/partSlackChannels";
 
 export const runtime = "nodejs";
@@ -164,6 +164,10 @@ export async function POST(request: Request, context: { params: Promise<{ practi
     const text = isTest
       ? `【テスト送信】${dateLabel}の${part}の出欠情報です（${sentAtLabel}現在）`
       : `${dateLabel}の${part}の出欠情報です（${sentAtLabel}現在）`;
+    // public channelならbotが未参加でも自動join。private channelはjoin不可なのでエラーは無視し、
+    // 未参加のままなら後続のuploadSlackFileがnot_in_channel等を返す。
+    await joinConversation({ botToken: config.slackBotToken, channel }).catch(() => null);
+
     const uploaded = await uploadSlackFile({
       botToken: config.slackBotToken,
       channel,

@@ -133,7 +133,7 @@ export function PartAttendanceSenderPanel({ selectedDay, members }: PartAttendan
 
     const sortedMembers = [...members].sort(compareMembersByInstrument);
     const sentParts: string[] = [];
-    const failedParts: string[] = [];
+    const failedParts: Array<{ part: string; error: string }> = [];
 
     for (const part of INSTRUMENT_OPTIONS) {
       const partMembers = sortedMembers.filter((member) => getInstrumentLabel(member.instrument) === part);
@@ -150,10 +150,11 @@ export function PartAttendanceSenderPanel({ selectedDay, members }: PartAttendan
         if (response.ok) {
           sentParts.push(part);
         } else {
-          failedParts.push(part);
+          const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+          failedParts.push({ part, error: payload?.error ?? `HTTP ${response.status}` });
         }
-      } catch {
-        failedParts.push(part);
+      } catch (error) {
+        failedParts.push({ part, error: error instanceof Error ? error.message : "network_error" });
       }
     }
 
@@ -161,7 +162,8 @@ export function PartAttendanceSenderPanel({ selectedDay, members }: PartAttendan
 
     if (failedParts.length > 0) {
       setStatus("error");
-      setMessage(`${prefix}送信 ${sentParts.length}パート / 失敗 ${failedParts.length}パート（${failedParts.join("、")}）`);
+      const details = failedParts.map(({ part, error }) => `${part}(${error})`).join("、");
+      setMessage(`${prefix}送信 ${sentParts.length}パート / 失敗 ${failedParts.length}パート: ${details}`);
     } else {
       setStatus("sent");
       setMessage(
