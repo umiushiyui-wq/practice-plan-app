@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { config } from "@/lib/config";
 import { openSlackConversation, postSlackMessage } from "@/lib/slack";
+import { appendSendHistoryEntry } from "@/lib/sendHistory";
 
 export const runtime = "nodejs";
 
@@ -190,6 +191,15 @@ export async function POST(request: Request, context: { params: Promise<{ practi
         failures.push({ memberId: target.id, name: target.name, error: posted.error ?? "post_failed" });
       }
     }
+
+    await appendSendHistoryEntry({
+      type: "reminder",
+      practiceDayId,
+      practiceDateLabel: dateLabel,
+      success: failures.length === 0,
+      summary: `送信 ${sentCount}人 / 失敗 ${failures.length}人 / 未登録 ${missingSlackUserIdCount}人`,
+      detail: failures.length > 0 ? failures.map((failure) => `${failure.name}: ${failure.error}`).join("、") : undefined
+    }).catch(() => null);
 
     return NextResponse.json({
       ok: true,
