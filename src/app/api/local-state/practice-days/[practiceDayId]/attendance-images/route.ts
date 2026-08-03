@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { config, TIME_ZONE } from "@/lib/config";
 import { joinConversation, uploadSlackFile } from "@/lib/slack";
 import { PART_SLACK_CHANNELS, TEST_SLACK_CHANNEL_ID } from "@/lib/partSlackChannels";
+import { appendSendHistoryEntry } from "@/lib/sendHistory";
 
 export const runtime = "nodejs";
 
@@ -177,6 +178,17 @@ export async function POST(request: Request, context: { params: Promise<{ practi
       fileBuffer: imageBuffer,
       mimeType: "image/jpeg"
     });
+
+    await appendSendHistoryEntry({
+      type: "attendance-image",
+      practiceDayId,
+      practiceDateLabel: dateLabel,
+      success: uploaded.ok,
+      part,
+      isTest,
+      summary: uploaded.ok ? `${part}に出欠画像を送信` : `${part}への出欠画像送信に失敗`,
+      detail: uploaded.ok ? undefined : (uploaded.error ?? "slack_upload_failed")
+    }).catch(() => null);
 
     if (!uploaded.ok) {
       return NextResponse.json({ error: uploaded.error ?? "slack_upload_failed" }, { status: 502 });
