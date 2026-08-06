@@ -59,6 +59,11 @@ type SlackConversationInviteResponse = {
   errors?: Array<{ ok: boolean; error?: string; user?: string }>;
 };
 
+type SlackConversationKickResponse = {
+  ok: boolean;
+  error?: string;
+};
+
 type SlackConversationJoinResponse = {
   ok: boolean;
   error?: string;
@@ -220,6 +225,27 @@ export async function inviteToConversation({
   });
 
   return response.json() as Promise<SlackConversationInviteResponse>;
+}
+
+export async function kickFromConversation({
+  botToken,
+  channel,
+  userId
+}: {
+  botToken: string;
+  channel: string;
+  userId: string;
+}): Promise<SlackConversationKickResponse> {
+  const response = await fetch("https://slack.com/api/conversations.kick", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${botToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ channel, user: userId })
+  });
+
+  return response.json() as Promise<SlackConversationKickResponse>;
 }
 
 export async function uploadSlackFile({
