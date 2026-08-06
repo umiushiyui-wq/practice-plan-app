@@ -5,7 +5,8 @@ import type { SendHistoryEntry } from "@/lib/sendHistory";
 
 const TYPE_LABELS: Record<SendHistoryEntry["type"], string> = {
   reminder: "出欠催促",
-  "attendance-image": "出欠画像送信"
+  "attendance-image": "出欠画像送信",
+  "availability-save": "出欠回答保存"
 };
 
 function formatSentAt(iso: string) {
@@ -89,7 +90,7 @@ export function SendHistoryApp() {
                       {entry.isTest ? <span className="muted">（テスト）</span> : null}
                     </td>
                     <td>{entry.practiceDateLabel}</td>
-                    <td>{entry.part ?? "-"}</td>
+                    <td>{entry.part ?? entry.memberName ?? "-"}</td>
                     <td>
                       <span className="status-pill">{entry.success ? "成功" : "失敗"}</span>
                     </td>

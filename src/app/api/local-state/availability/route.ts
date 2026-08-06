@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { appendSendHistoryEntry } from "@/lib/sendHistory";
 
 export const runtime = "nodejs";
 
@@ -33,10 +34,44 @@ type PracticeDayLike = {
   [key: string]: unknown;
 };
 
+type MemberLike = {
+  id?: unknown;
+  name?: unknown;
+};
+
 type AppStateLike = {
   practiceDays?: PracticeDayLike[];
+  members?: MemberLike[];
   [key: string]: unknown;
 };
+
+function findMemberName(state: unknown, memberId: string): string {
+  if (!state || typeof state !== "object") return memberId;
+  const members = (state as AppStateLike).members;
+  if (!Array.isArray(members)) return memberId;
+  const member = members.find((item) => item.id === memberId);
+  return typeof member?.name === "string" && member.name ? member.name : memberId;
+}
+
+function findPracticeDateLabel(state: unknown, practiceDayId: string): string {
+  if (!state || typeof state !== "object") return practiceDayId;
+  const practiceDays = (state as AppStateLike).practiceDays;
+  if (!Array.isArray(practiceDays)) return practiceDayId;
+  const day = practiceDays.find((item) => item.id === practiceDayId);
+  const rawDate = day?.practiceDate;
+  if (typeof rawDate !== "string") return practiceDayId;
+
+  const parsed = new Date(`${rawDate}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return rawDate;
+  return `${parsed.getMonth() + 1}月${parsed.getDate()}日`;
+}
+
+function describePatch(patch: AvailabilityPatch): string {
+  if (patch.clear) return "入力を取り消しました（未回答に戻す）";
+  if (patch.absent) return "欠席で保存";
+  const breaksLabel = patch.breaks.length > 0 ? `／中抜け${patch.breaks.length}件` : "";
+  return `${patch.start}〜${patch.end}で保存${breaksLabel}`;
+}
 
 function redisConfig() {
   const url = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
@@ -257,6 +292,16 @@ export async function PUT(request: NextRequest) {
     }
 
     const stored = await writeCurrentState(nextState);
+
+    await appendSendHistoryEntry({
+      type: "availability-save",
+      practiceDayId: patch.practiceDayId,
+      practiceDateLabel: findPracticeDateLabel(current.state, patch.practiceDayId),
+      success: true,
+      memberName: findMemberName(current.state, patch.memberId),
+      summary: describePatch(patch)
+    }).catch(() => null);
+
     return NextResponse.json({ ok: true, state: stored.state, updatedAt: stored.updatedAt });
   } catch (error) {
     return NextResponse.json(

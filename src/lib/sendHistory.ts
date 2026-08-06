@@ -4,7 +4,7 @@ const MAX_ENTRIES = 300;
 
 export type SendHistoryEntry = {
   id: string;
-  type: "reminder" | "attendance-image";
+  type: "reminder" | "attendance-image" | "availability-save";
   sentAt: string;
   practiceDayId: string;
   practiceDateLabel: string;
@@ -13,6 +13,7 @@ export type SendHistoryEntry = {
   detail?: string;
   part?: string;
   isTest?: boolean;
+  memberName?: string;
 };
 
 function redisConfig() {
