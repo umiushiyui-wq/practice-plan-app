@@ -653,9 +653,30 @@ export function useLocalPracticeState() {
     setSaveStatus("saving");
     setSaveError("");
 
+    // pieces[].memberIds drives a controlled checkbox, so update it optimistically
+    // here (bypassing the debounced full-state save) — otherwise React snaps the
+    // checkbox back to its previous value the instant the click handler returns,
+    // before the request round-trips.
+    const previousState = state;
+    const optimisticState: AppState = {
+      ...state,
+      pieces: state.pieces.map((piece) =>
+        piece.id === patch.pieceId
+          ? {
+              ...piece,
+              memberIds: patch.selected
+                ? Array.from(new Set([...piece.memberIds, patch.memberId]))
+                : piece.memberIds.filter((id) => id !== patch.memberId)
+            }
+          : piece
+      )
+    };
+    shouldPersistRef.current = false;
+    setState(optimisticState);
+
     try {
       const saved = await putPieceMembershipPatch(patch);
-      const nextState = saved.state ? migrateState(saved.state) : state;
+      const nextState = saved.state ? migrateState(saved.state) : optimisticState;
       shouldPersistRef.current = false;
       setState(nextState);
       cacheStateLocally(nextState);
@@ -664,6 +685,8 @@ export function useLocalPracticeState() {
       setSaveStatus("saved");
       return nextState;
     } catch {
+      shouldPersistRef.current = false;
+      setState(previousState);
       setSaveStatus("error");
       setSaveError(SAVE_ERROR_MESSAGE);
       return null;
