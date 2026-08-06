@@ -11,26 +11,17 @@ type StoredLocalState = {
   updatedAt: string;
 };
 
-type AvailabilityBreak = {
-  start: string;
-  end: string;
-};
-
-type AvailabilityPatch = {
-  practiceDayId: string;
+type PieceMembershipPatch = {
+  pieceId: string;
   memberId: string;
-  start: string;
-  end: string;
-  breaks: AvailabilityBreak[];
-  absent: boolean;
-  clear?: boolean;
+  selected: boolean;
+  actor: "self" | "admin";
 };
 
-type PracticeDayLike = {
+type PieceLike = {
   id?: unknown;
-  availabilities?: Array<{ memberId?: unknown; start?: unknown; end?: unknown; breaks?: unknown }>;
-  absentMemberIds?: unknown[];
-  respondedMemberIds?: unknown[];
+  title?: unknown;
+  memberIds?: unknown[];
   [key: string]: unknown;
 };
 
@@ -40,7 +31,7 @@ type MemberLike = {
 };
 
 type AppStateLike = {
-  practiceDays?: PracticeDayLike[];
+  pieces?: PieceLike[];
   members?: MemberLike[];
   [key: string]: unknown;
 };
@@ -53,24 +44,12 @@ function findMemberName(state: unknown, memberId: string): string {
   return typeof member?.name === "string" && member.name ? member.name : memberId;
 }
 
-function findPracticeDateLabel(state: unknown, practiceDayId: string): string {
-  if (!state || typeof state !== "object") return practiceDayId;
-  const practiceDays = (state as AppStateLike).practiceDays;
-  if (!Array.isArray(practiceDays)) return practiceDayId;
-  const day = practiceDays.find((item) => item.id === practiceDayId);
-  const rawDate = day?.practiceDate;
-  if (typeof rawDate !== "string") return practiceDayId;
-
-  const parsed = new Date(`${rawDate}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return rawDate;
-  return `${parsed.getMonth() + 1}月${parsed.getDate()}日`;
-}
-
-function describePatch(patch: AvailabilityPatch): string {
-  if (patch.clear) return "入力を取り消しました（未回答に戻す）";
-  if (patch.absent) return "欠席で保存";
-  const breaksLabel = patch.breaks.length > 0 ? `／中抜け${patch.breaks.length}件` : "";
-  return `${patch.start}〜${patch.end}で保存${breaksLabel}`;
+function findPieceTitle(state: unknown, pieceId: string): string {
+  if (!state || typeof state !== "object") return pieceId;
+  const pieces = (state as AppStateLike).pieces;
+  if (!Array.isArray(pieces)) return pieceId;
+  const piece = pieces.find((item) => item.id === pieceId);
+  return typeof piece?.title === "string" && piece.title ? piece.title : pieceId;
 }
 
 function redisConfig() {
@@ -184,94 +163,50 @@ async function writeCurrentState(state: unknown) {
   return redisConfig() ? await writeToRedis(state) : await writeToFile(state);
 }
 
-function parsePatch(value: unknown): AvailabilityPatch | null {
+function parsePatch(value: unknown): PieceMembershipPatch | null {
   const patch = value && typeof value === "object" && "patch" in value ? (value as { patch: unknown }).patch : value;
   if (!patch || typeof patch !== "object") return null;
 
-  const candidate = patch as Partial<AvailabilityPatch>;
-  if (typeof candidate.practiceDayId !== "string" || typeof candidate.memberId !== "string") {
-    return null;
-  }
-
-  // 「未入力に戻す」操作: 入力内容を消して未回答状態に戻す
-  if (candidate.clear === true) {
-    return {
-      practiceDayId: candidate.practiceDayId,
-      memberId: candidate.memberId,
-      start: "",
-      end: "",
-      breaks: [],
-      absent: false,
-      clear: true
-    };
-  }
-
-  if (typeof candidate.absent !== "boolean") {
-    return null;
-  }
-
-  if (!candidate.absent && (typeof candidate.start !== "string" || typeof candidate.end !== "string")) {
+  const candidate = patch as Partial<PieceMembershipPatch>;
+  if (
+    typeof candidate.pieceId !== "string" ||
+    typeof candidate.memberId !== "string" ||
+    typeof candidate.selected !== "boolean" ||
+    (candidate.actor !== "self" && candidate.actor !== "admin")
+  ) {
     return null;
   }
 
   return {
-    practiceDayId: candidate.practiceDayId,
+    pieceId: candidate.pieceId,
     memberId: candidate.memberId,
-    start: typeof candidate.start === "string" ? candidate.start : "",
-    end: typeof candidate.end === "string" ? candidate.end : "",
-    breaks: Array.isArray(candidate.breaks)
-      ? candidate.breaks
-          .filter((item): item is AvailabilityBreak => {
-            return !!item && typeof item === "object" && typeof item.start === "string" && typeof item.end === "string";
-          })
-          .map((item) => ({ start: item.start, end: item.end }))
-      : [],
-    absent: candidate.absent
+    selected: candidate.selected,
+    actor: candidate.actor
   };
 }
 
-function patchAvailability(state: unknown, patch: AvailabilityPatch) {
+function patchPieceMembership(state: unknown, patch: PieceMembershipPatch) {
   if (!state || typeof state !== "object") return null;
 
   const appState = state as AppStateLike;
-  if (!Array.isArray(appState.practiceDays)) return null;
+  if (!Array.isArray(appState.pieces)) return null;
 
-  let foundDay = false;
-  const nextPracticeDays = appState.practiceDays.map((day) => {
-    if (day.id !== patch.practiceDayId) return day;
-    foundDay = true;
+  let foundPiece = false;
+  const nextPieces = appState.pieces.map((piece) => {
+    if (piece.id !== patch.pieceId) return piece;
+    foundPiece = true;
 
-    const availabilities = Array.isArray(day.availabilities) ? day.availabilities : [];
-    const absentMemberIds = Array.isArray(day.absentMemberIds) ? day.absentMemberIds.filter((id): id is string => typeof id === "string") : [];
-    const respondedMemberIds = Array.isArray(day.respondedMemberIds)
-      ? day.respondedMemberIds.filter((id): id is string => typeof id === "string")
-      : [];
-
-    if (patch.clear) {
-      return {
-        ...day,
-        availabilities: availabilities.filter((item) => item.memberId !== patch.memberId),
-        absentMemberIds: absentMemberIds.filter((id) => id !== patch.memberId),
-        respondedMemberIds: respondedMemberIds.filter((id) => id !== patch.memberId)
-      };
-    }
+    const memberIds = Array.isArray(piece.memberIds) ? piece.memberIds.filter((id): id is string => typeof id === "string") : [];
 
     return {
-      ...day,
-      availabilities: patch.absent
-        ? availabilities.filter((item) => item.memberId !== patch.memberId)
-        : [
-            ...availabilities.filter((item) => item.memberId !== patch.memberId),
-            { memberId: patch.memberId, start: patch.start, end: patch.end, breaks: patch.breaks }
-          ],
-      absentMemberIds: patch.absent
-        ? Array.from(new Set([...absentMemberIds, patch.memberId]))
-        : absentMemberIds.filter((id) => id !== patch.memberId),
-      respondedMemberIds: Array.from(new Set([...respondedMemberIds, patch.memberId]))
+      ...piece,
+      memberIds: patch.selected
+        ? Array.from(new Set([...memberIds, patch.memberId]))
+        : memberIds.filter((id) => id !== patch.memberId)
     };
   });
 
-  return foundDay ? { ...appState, practiceDays: nextPracticeDays } : null;
+  return foundPiece ? { ...appState, pieces: nextPieces } : null;
 }
 
 export async function PUT(request: NextRequest) {
@@ -282,29 +217,30 @@ export async function PUT(request: NextRequest) {
 
     const patch = parsePatch(await request.json());
     if (!patch) {
-      return NextResponse.json({ error: "Invalid availability patch" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid piece membership patch" }, { status: 400 });
     }
 
     const current = await readCurrentState();
-    const nextState = patchAvailability(current.state, patch);
+    const nextState = patchPieceMembership(current.state, patch);
     if (!nextState) {
-      return NextResponse.json({ error: "Practice day was not found" }, { status: 404 });
+      return NextResponse.json({ error: "Piece was not found" }, { status: 404 });
     }
 
     const stored = await writeCurrentState(nextState);
 
     await appendHistoryEntry({
-      category: "availability",
-      practiceDayId: patch.practiceDayId,
-      practiceDateLabel: findPracticeDateLabel(current.state, patch.practiceDayId),
+      category: "piece-selection",
+      pieceId: patch.pieceId,
+      pieceTitle: findPieceTitle(current.state, patch.pieceId),
       memberName: findMemberName(current.state, patch.memberId),
-      summary: describePatch(patch)
+      selected: patch.selected,
+      actor: patch.actor
     }).catch(() => null);
 
     return NextResponse.json({ ok: true, state: stored.state, updatedAt: stored.updatedAt });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update availability" },
+      { error: error instanceof Error ? error.message : "Failed to update piece membership" },
       { status: 500 }
     );
   }

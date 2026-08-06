@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { config, TIME_ZONE } from "@/lib/config";
 import { joinConversation, uploadSlackFile } from "@/lib/slack";
 import { PART_SLACK_CHANNELS, TEST_SLACK_CHANNEL_ID } from "@/lib/partSlackChannels";
-import { appendSendHistoryEntry } from "@/lib/sendHistory";
+import { appendHistoryEntry } from "@/lib/history";
 
 export const runtime = "nodejs";
 
@@ -179,8 +179,9 @@ export async function POST(request: Request, context: { params: Promise<{ practi
       mimeType: "image/jpeg"
     });
 
-    await appendSendHistoryEntry({
-      type: "attendance-image",
+    await appendHistoryEntry({
+      category: "slack",
+      kind: "attendance-image",
       practiceDayId,
       practiceDateLabel: dateLabel,
       success: uploaded.ok,

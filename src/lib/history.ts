@@ -1,11 +1,15 @@
-const HISTORY_KEY = process.env.LOCAL_SEND_HISTORY_KEY ?? "nagosui:send-history";
+const HISTORY_KEY = process.env.LOCAL_HISTORY_KEY ?? "nagosui:local-activity-history";
 const STORAGE_NOT_CONFIGURED_MESSAGE = "Redis/KV storage is not configured";
 const MAX_ENTRIES = 300;
 
-export type SendHistoryEntry = {
+type BaseEntry = {
   id: string;
-  type: "reminder" | "attendance-image";
-  sentAt: string;
+  recordedAt: string;
+};
+
+export type SlackHistoryEntry = BaseEntry & {
+  category: "slack";
+  kind: "reminder" | "attendance-image";
   practiceDayId: string;
   practiceDateLabel: string;
   success: boolean;
@@ -14,6 +18,30 @@ export type SendHistoryEntry = {
   part?: string;
   isTest?: boolean;
 };
+
+export type AvailabilityHistoryEntry = BaseEntry & {
+  category: "availability";
+  practiceDayId: string;
+  practiceDateLabel: string;
+  memberName: string;
+  summary: string;
+};
+
+export type PieceSelectionHistoryEntry = BaseEntry & {
+  category: "piece-selection";
+  pieceId: string;
+  pieceTitle: string;
+  memberName: string;
+  selected: boolean;
+  actor: "self" | "admin";
+};
+
+export type HistoryEntry = SlackHistoryEntry | AvailabilityHistoryEntry | PieceSelectionHistoryEntry;
+
+// Plain `Omit<HistoryEntry, K>` collapses the union to only its common keys.
+// Distributing over each member first preserves the per-category fields.
+type DistributiveOmit<T, K extends keyof never> = T extends unknown ? Omit<T, K> : never;
+type NewHistoryEntry = DistributiveOmit<HistoryEntry, "id" | "recordedAt">;
 
 function redisConfig() {
   const url = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
@@ -25,17 +53,17 @@ function canUseFileFallback() {
   return process.env.NODE_ENV !== "production";
 }
 
-function parseEntries(raw: string | null): SendHistoryEntry[] {
+function parseEntries(raw: string | null): HistoryEntry[] {
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as SendHistoryEntry[]) : [];
+    return Array.isArray(parsed) ? (parsed as HistoryEntry[]) : [];
   } catch {
     return [];
   }
 }
 
-async function readFromRedis(): Promise<SendHistoryEntry[]> {
+async function readFromRedis(): Promise<HistoryEntry[]> {
   const redis = redisConfig();
   if (!redis) throw new Error(STORAGE_NOT_CONFIGURED_MESSAGE);
 
@@ -53,7 +81,7 @@ async function readFromRedis(): Promise<SendHistoryEntry[]> {
   return parseEntries(payload.result ?? null);
 }
 
-async function writeToRedis(entries: SendHistoryEntry[]) {
+async function writeToRedis(entries: HistoryEntry[]) {
   const redis = redisConfig();
   if (!redis) throw new Error(STORAGE_NOT_CONFIGURED_MESSAGE);
 
@@ -73,10 +101,10 @@ async function writeToRedis(entries: SendHistoryEntry[]) {
 
 async function historyFilePath() {
   const path = await import("node:path");
-  return path.join(process.cwd(), ".data", "local-send-history.json");
+  return path.join(process.cwd(), ".data", "local-activity-history.json");
 }
 
-async function readFromFile(): Promise<SendHistoryEntry[]> {
+async function readFromFile(): Promise<HistoryEntry[]> {
   try {
     const fs = await import("node:fs/promises");
     const content = await fs.readFile(await historyFilePath(), "utf8");
@@ -86,7 +114,7 @@ async function readFromFile(): Promise<SendHistoryEntry[]> {
   }
 }
 
-async function writeToFile(entries: SendHistoryEntry[]) {
+async function writeToFile(entries: HistoryEntry[]) {
   const fs = await import("node:fs/promises");
   const path = await import("node:path");
   const filePath = await historyFilePath();
@@ -94,20 +122,20 @@ async function writeToFile(entries: SendHistoryEntry[]) {
   await fs.writeFile(filePath, JSON.stringify(entries, null, 2), "utf8");
 }
 
-export async function readSendHistory(): Promise<SendHistoryEntry[]> {
+export async function readHistory(): Promise<HistoryEntry[]> {
   if (redisConfig()) return readFromRedis();
   if (canUseFileFallback()) return readFromFile();
   throw new Error(STORAGE_NOT_CONFIGURED_MESSAGE);
 }
 
-export async function appendSendHistoryEntry(entry: Omit<SendHistoryEntry, "id" | "sentAt">): Promise<void> {
-  const fullEntry: SendHistoryEntry = {
+export async function appendHistoryEntry(entry: NewHistoryEntry): Promise<void> {
+  const fullEntry = {
     ...entry,
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-    sentAt: new Date().toISOString()
-  };
+    recordedAt: new Date().toISOString()
+  } as HistoryEntry;
 
-  const existing = await readSendHistory().catch(() => [] as SendHistoryEntry[]);
+  const existing = await readHistory().catch(() => [] as HistoryEntry[]);
   const next = [fullEntry, ...existing].slice(0, MAX_ENTRIES);
 
   if (redisConfig()) {

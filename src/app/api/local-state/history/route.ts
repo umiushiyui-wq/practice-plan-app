@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { readSendHistory } from "@/lib/sendHistory";
+import { readHistory } from "@/lib/history";
 
 export const runtime = "nodejs";
 
 export async function GET() {
   try {
-    const entries = await readSendHistory();
+    const entries = await readHistory();
     return NextResponse.json({ entries });
   } catch (error) {
     return NextResponse.json(
