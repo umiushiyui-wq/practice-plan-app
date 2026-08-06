@@ -484,20 +484,14 @@ export function PlayerApp() {
     setSaveMessage(`${getPracticeDayLabel(savedDay)} の入力を未入力に戻しました。`);
   }
 
-  function togglePiece(pieceId: string, checked: boolean) {
+  async function togglePiece(pieceId: string, checked: boolean) {
     if (!selected) return;
 
-    updateState({
-      pieces: state.pieces.map((piece) =>
-        piece.id === pieceId
-          ? {
-              ...piece,
-              memberIds: checked
-                ? Array.from(new Set([...piece.memberIds, selected.id]))
-                : piece.memberIds.filter((id) => id !== selected.id)
-            }
-          : piece
-      )
+    await localState.savePieceMembership({
+      pieceId,
+      memberId: selected.id,
+      selected: checked,
+      actor: "self"
     });
   }
 

@@ -130,18 +130,12 @@ export function PieceMembersApp({ pieceId }: { pieceId: string }) {
     }
   }
 
-  function toggleMember(memberId: string, checked: boolean) {
-    updateState({
-      pieces: state.pieces.map((item) =>
-        item.id === pieceId
-          ? {
-              ...item,
-              memberIds: checked
-                ? Array.from(new Set([...item.memberIds, memberId]))
-                : item.memberIds.filter((id) => id !== memberId)
-            }
-          : item
-      )
+  async function toggleMember(memberId: string, checked: boolean) {
+    await localState.savePieceMembership({
+      pieceId,
+      memberId,
+      selected: checked,
+      actor: "admin"
     });
   }
 

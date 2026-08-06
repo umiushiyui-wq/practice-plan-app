@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { config } from "@/lib/config";
 import { openSlackConversation, postSlackMessage } from "@/lib/slack";
-import { appendSendHistoryEntry } from "@/lib/sendHistory";
+import { appendHistoryEntry } from "@/lib/history";
 
 export const runtime = "nodejs";
 
@@ -192,8 +192,9 @@ export async function POST(request: Request, context: { params: Promise<{ practi
       }
     }
 
-    await appendSendHistoryEntry({
-      type: "reminder",
+    await appendHistoryEntry({
+      category: "slack",
+      kind: "reminder",
       practiceDayId,
       practiceDateLabel: dateLabel,
       success: failures.length === 0,

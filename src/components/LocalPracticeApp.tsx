@@ -128,6 +128,13 @@ export type AvailabilityPatch = {
   clear?: boolean;
 };
 
+export type PieceMembershipPatch = {
+  pieceId: string;
+  memberId: string;
+  selected: boolean;
+  actor: "self" | "admin";
+};
+
 type LegacyPiece = Partial<Piece> & {
   id?: string;
   title?: string;
@@ -455,6 +462,21 @@ async function putAvailabilityPatch(patch: AvailabilityPatch) {
   return (await response.json()) as { ok: true; state: unknown; updatedAt?: string | null };
 }
 
+async function putPieceMembershipPatch(patch: PieceMembershipPatch) {
+  const response = await fetch("/api/local-state/piece-membership", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ patch })
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(payload?.error ?? SAVE_ERROR_MESSAGE);
+  }
+
+  return (await response.json()) as { ok: true; state: unknown; updatedAt?: string | null };
+}
+
 export function useLocalPracticeState() {
   const [state, setState] = useState<AppState>(defaultState);
   const [ready, setReady] = useState(false);
@@ -627,6 +649,27 @@ export function useLocalPracticeState() {
     }
   }
 
+  async function savePieceMembership(patch: PieceMembershipPatch) {
+    setSaveStatus("saving");
+    setSaveError("");
+
+    try {
+      const saved = await putPieceMembershipPatch(patch);
+      const nextState = saved.state ? migrateState(saved.state) : state;
+      shouldPersistRef.current = false;
+      setState(nextState);
+      cacheStateLocally(nextState);
+      setServerUpdatedAt(saved.updatedAt ?? null);
+      setHasLocalMigrationCandidate(false);
+      setSaveStatus("saved");
+      return nextState;
+    } catch {
+      setSaveStatus("error");
+      setSaveError(SAVE_ERROR_MESSAGE);
+      return null;
+    }
+  }
+
   return {
     state,
     setState: updateFullState,
@@ -639,7 +682,8 @@ export function useLocalPracticeState() {
     isReloading,
     reloadServerState,
     migrateLocalStateToServer,
-    saveAvailabilityPatch
+    saveAvailabilityPatch,
+    savePieceMembership
   };
 }
 

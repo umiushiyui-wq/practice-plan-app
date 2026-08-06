@@ -1,10 +1,10 @@
 import { AdminGate } from "@/components/AdminGate";
-import { SendHistoryApp } from "@/components/SendHistoryApp";
+import { AdminHistoryApp } from "@/components/AdminHistoryApp";
 
-export default function SendHistoryPage() {
+export default function AdminHistoryPage() {
   return (
     <AdminGate>
-      <SendHistoryApp />
+      <AdminHistoryApp />
     </AdminGate>
   );
 }
