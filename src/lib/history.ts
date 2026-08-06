@@ -128,19 +128,29 @@ export async function readHistory(): Promise<HistoryEntry[]> {
   throw new Error(STORAGE_NOT_CONFIGURED_MESSAGE);
 }
 
-export async function appendHistoryEntry(entry: NewHistoryEntry): Promise<void> {
-  const fullEntry = {
-    ...entry,
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-    recordedAt: new Date().toISOString()
-  } as HistoryEntry;
+// Concurrent read-modify-write cycles on the same key silently drop entries
+// (a fast check/uncheck from a member's checkbox is enough to trigger this).
+// Chaining onto this promise serializes appends within a single server process.
+let writeQueue: Promise<void> = Promise.resolve();
 
-  const existing = await readHistory().catch(() => [] as HistoryEntry[]);
-  const next = [fullEntry, ...existing].slice(0, MAX_ENTRIES);
+export function appendHistoryEntry(entry: NewHistoryEntry): Promise<void> {
+  const task = writeQueue.then(async () => {
+    const fullEntry = {
+      ...entry,
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      recordedAt: new Date().toISOString()
+    } as HistoryEntry;
 
-  if (redisConfig()) {
-    await writeToRedis(next);
-  } else if (canUseFileFallback()) {
-    await writeToFile(next);
-  }
+    const existing = await readHistory().catch(() => [] as HistoryEntry[]);
+    const next = [fullEntry, ...existing].slice(0, MAX_ENTRIES);
+
+    if (redisConfig()) {
+      await writeToRedis(next);
+    } else if (canUseFileFallback()) {
+      await writeToFile(next);
+    }
+  });
+
+  writeQueue = task.catch(() => undefined);
+  return task;
 }
