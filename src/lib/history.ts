@@ -38,6 +38,11 @@ export type PieceSelectionHistoryEntry = BaseEntry & {
 
 export type HistoryEntry = SlackHistoryEntry | AvailabilityHistoryEntry | PieceSelectionHistoryEntry;
 
+// Plain `Omit<HistoryEntry, K>` collapses the union to only its common keys.
+// Distributing over each member first preserves the per-category fields.
+type DistributiveOmit<T, K extends keyof never> = T extends unknown ? Omit<T, K> : never;
+type NewHistoryEntry = DistributiveOmit<HistoryEntry, "id" | "recordedAt">;
+
 function redisConfig() {
   const url = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
@@ -123,7 +128,7 @@ export async function readHistory(): Promise<HistoryEntry[]> {
   throw new Error(STORAGE_NOT_CONFIGURED_MESSAGE);
 }
 
-export async function appendHistoryEntry(entry: Omit<HistoryEntry, "id" | "recordedAt">): Promise<void> {
+export async function appendHistoryEntry(entry: NewHistoryEntry): Promise<void> {
   const fullEntry = {
     ...entry,
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
