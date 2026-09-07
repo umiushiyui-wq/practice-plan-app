@@ -165,6 +165,10 @@ export function MemberPieceManagerApp() {
           absentMemberIds: [],
           respondedMemberIds: [],
           isPlanPublished: false,
+          actualAvailabilities: [],
+          actualAbsentMemberIds: [],
+          actualRespondedMemberIds: [],
+          actualAttendanceSnapshotAt: null,
           plan: ensureDefaultUtilitySlots({
             id,
             practiceDate,
@@ -175,6 +179,10 @@ export function MemberPieceManagerApp() {
             absentMemberIds: [],
             respondedMemberIds: [],
             isPlanPublished: false,
+            actualAvailabilities: [],
+            actualAbsentMemberIds: [],
+            actualRespondedMemberIds: [],
+            actualAttendanceSnapshotAt: null,
             plan: []
           }).plan
         }

@@ -14,6 +14,7 @@
   --success: #2f8f46;
   --warning: #9b6a10;
   --danger: #b3261e;
+  --neutral: #8a97a6;
   --radius-sm: 8px;
   --radius: 12px;
   --radius-lg: 16px;
@@ -1286,6 +1287,67 @@ tbody tr:hover td {
 .member-row-dim th,
 .member-row-dim td {
   opacity: 0.35;
+}
+
+.attendance-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  flex: none;
+}
+
+.attendance-dot-full {
+  background: var(--success);
+}
+
+.attendance-dot-partial {
+  background: #eab308;
+}
+
+.attendance-dot-absent {
+  background: var(--danger);
+}
+
+.attendance-dot-unanswered {
+  background: var(--neutral);
+}
+
+.attendance-dot-none {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--line-strong);
+}
+
+.attendance-stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.attendance-stat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  background: #f2f6fa;
+  font-weight: 800;
+  font-size: 18px;
+}
+
+.attendance-rate-card {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: white;
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.attendance-rate-card strong {
+  font-size: 40px;
+  line-height: 1;
 }
 
 @media (max-width: 720px) {

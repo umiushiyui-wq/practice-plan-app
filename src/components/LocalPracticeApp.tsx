@@ -107,6 +107,11 @@ export type LocalPracticeDay = {
   respondedMemberIds: string[];
   isPlanPublished: boolean;
   plan: PlanSlot[];
+  // 「実際の出欠」（/admin/record 専用）。自己申告の availabilities 等とは独立して管理する。
+  actualAvailabilities: Availability[];
+  actualAbsentMemberIds: string[];
+  actualRespondedMemberIds: string[];
+  actualAttendanceSnapshotAt: string | null;
 };
 
 export type AppState = {
@@ -133,6 +138,16 @@ export type PieceMembershipPatch = {
   memberId: string;
   selected: boolean;
   actor: "self" | "admin";
+};
+
+export type AttendanceRecordPatch = {
+  practiceDayId: string;
+  memberId: string;
+  start: string;
+  end: string;
+  breaks: AvailabilityBreak[];
+  absent: boolean;
+  clear?: boolean;
 };
 
 type LegacyPiece = Partial<Piece> & {
@@ -249,7 +264,11 @@ function defaultPracticeDay(): LocalPracticeDay {
     absentMemberIds: [],
     respondedMemberIds: [],
     isPlanPublished: false,
-    plan: []
+    plan: [],
+    actualAvailabilities: [],
+    actualAbsentMemberIds: [],
+    actualRespondedMemberIds: [],
+    actualAttendanceSnapshotAt: null
   });
 }
 
@@ -363,7 +382,14 @@ function migrateState(value: unknown): AppState {
           respondedMemberIds: day.respondedMemberIds ?? [],
           isPlanPublished: typeof day.isPlanPublished === "boolean" ? day.isPlanPublished : false,
           availabilities: Array.isArray(day.availabilities) ? day.availabilities.map(normalizeAvailability) : [],
-          plan: Array.isArray(day.plan) ? day.plan : []
+          plan: Array.isArray(day.plan) ? day.plan : [],
+          actualAvailabilities: Array.isArray(day.actualAvailabilities)
+            ? day.actualAvailabilities.map(normalizeAvailability)
+            : [],
+          actualAbsentMemberIds: Array.isArray(day.actualAbsentMemberIds) ? day.actualAbsentMemberIds : [],
+          actualRespondedMemberIds: Array.isArray(day.actualRespondedMemberIds) ? day.actualRespondedMemberIds : [],
+          actualAttendanceSnapshotAt:
+            typeof day.actualAttendanceSnapshotAt === "string" ? day.actualAttendanceSnapshotAt : null
         })
       ),
       selectedPracticeDayId: saved.selectedPracticeDayId ?? saved.practiceDays[0].id
@@ -380,7 +406,11 @@ function migrateState(value: unknown): AppState {
     absentMemberIds: [],
     respondedMemberIds: [],
     isPlanPublished: false,
-    plan: saved.plan ?? []
+    plan: saved.plan ?? [],
+    actualAvailabilities: [],
+    actualAbsentMemberIds: [],
+    actualRespondedMemberIds: [],
+    actualAttendanceSnapshotAt: null
   };
 
   return {
@@ -452,6 +482,36 @@ async function putAvailabilityPatch(patch: AvailabilityPatch) {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ patch })
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(payload?.error ?? SAVE_ERROR_MESSAGE);
+  }
+
+  return (await response.json()) as { ok: true; state: unknown; updatedAt?: string | null };
+}
+
+async function putAttendanceRecordPatch(patch: AttendanceRecordPatch) {
+  const response = await fetch("/api/local-state/attendance-record", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ patch })
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(payload?.error ?? SAVE_ERROR_MESSAGE);
+  }
+
+  return (await response.json()) as { ok: true; state: unknown; updatedAt?: string | null };
+}
+
+async function postAttendanceRecordSnapshot(practiceDayId: string) {
+  const response = await fetch("/api/local-state/attendance-record/snapshot", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ practiceDayId })
   });
 
   if (!response.ok) {
@@ -693,6 +753,43 @@ export function useLocalPracticeState() {
     }
   }
 
+  async function saveAttendanceRecordPatch(patch: AttendanceRecordPatch) {
+    setSaveStatus("saving");
+    setSaveError("");
+
+    try {
+      const saved = await putAttendanceRecordPatch(patch);
+      const nextState = saved.state ? migrateState(saved.state) : state;
+      shouldPersistRef.current = false;
+      setState(nextState);
+      cacheStateLocally(nextState);
+      setServerUpdatedAt(saved.updatedAt ?? null);
+      setHasLocalMigrationCandidate(false);
+      setSaveStatus("saved");
+      return nextState;
+    } catch {
+      setSaveStatus("error");
+      setSaveError(SAVE_ERROR_MESSAGE);
+      return null;
+    }
+  }
+
+  // 練習日当日7:00(JST)以降に初めて開かれたとき、自己申告データを「実際の出欠」の初期値としてコピーする。
+  // 既にコピー済み(actualAttendanceSnapshotAt が設定済み)ならサーバー側が何もせず現状態を返す。
+  async function ensureAttendanceRecordSnapshot(practiceDayId: string) {
+    try {
+      const saved = await postAttendanceRecordSnapshot(practiceDayId);
+      const nextState = saved.state ? migrateState(saved.state) : state;
+      shouldPersistRef.current = false;
+      setState(nextState);
+      cacheStateLocally(nextState);
+      setServerUpdatedAt(saved.updatedAt ?? null);
+      return nextState;
+    } catch {
+      return null;
+    }
+  }
+
   return {
     state,
     setState: updateFullState,
@@ -706,7 +803,9 @@ export function useLocalPracticeState() {
     reloadServerState,
     migrateLocalStateToServer,
     saveAvailabilityPatch,
-    savePieceMembership
+    savePieceMembership,
+    saveAttendanceRecordPatch,
+    ensureAttendanceRecordSnapshot
   };
 }
 
@@ -884,6 +983,97 @@ export function isAvailable(availabilities: Availability[], memberId: string, st
   return availabilities.some(
     (item) => item.memberId === memberId && getAvailableSegments(item).some((segment) => segment.start <= start && segment.end >= end)
   );
+}
+
+const ATTENDANCE_RECORD_UNLOCK_HOUR = 7;
+
+// 練習日当日のこの時刻(JST)を過ぎると、自己申告から「実際の出欠」への自動コピー・編集が解禁される。
+export function getAttendanceRecordUnlockAt(practiceDate: string): Date {
+  return new Date(`${practiceDate}T${String(ATTENDANCE_RECORD_UNLOCK_HOUR).padStart(2, "0")}:00:00+09:00`);
+}
+
+export function isAttendanceRecordUnlocked(practiceDate: string, now: Date = new Date()): boolean {
+  const unlockAt = getAttendanceRecordUnlockAt(practiceDate);
+  return !Number.isNaN(unlockAt.getTime()) && now.getTime() >= unlockAt.getTime();
+}
+
+export type AttendanceStatus = "full" | "partial" | "absent" | "unanswered";
+
+// その練習日について「実際の出欠」がまだ記録されていなければ null（分析からも除外する）。
+export function classifyMemberAttendanceForDay(day: LocalPracticeDay, memberId: string): AttendanceStatus | null {
+  if (!day.actualAttendanceSnapshotAt) return null;
+  if (!day.actualRespondedMemberIds.includes(memberId)) return "unanswered";
+  if (day.actualAbsentMemberIds.includes(memberId)) return "absent";
+
+  const availability = day.actualAvailabilities.find((item) => item.memberId === memberId);
+  if (!availability) return "partial";
+
+  const practiceStart = toMinutes(day.startTime);
+  const practiceEnd = toMinutes(day.endTime);
+  const fullyCovered = getAvailableSegments(availability).some(
+    (segment) => segment.start <= practiceStart && segment.end >= practiceEnd
+  );
+
+  return fullyCovered ? "full" : "partial";
+}
+
+export function getActualAttendedMinutesForDay(day: LocalPracticeDay, memberId: string): number {
+  const status = classifyMemberAttendanceForDay(day, memberId);
+  if (status === null || status === "unanswered" || status === "absent") return 0;
+
+  const availability = day.actualAvailabilities.find((item) => item.memberId === memberId);
+  if (!availability) return 0;
+
+  const practiceStart = toMinutes(day.startTime);
+  const practiceEnd = toMinutes(day.endTime);
+
+  return getAvailableSegments(availability).reduce((total, segment) => {
+    const overlapStart = Math.max(segment.start, practiceStart);
+    const overlapEnd = Math.min(segment.end, practiceEnd);
+    return overlapEnd > overlapStart ? total + (overlapEnd - overlapStart) : total;
+  }, 0);
+}
+
+export type MemberAttendanceStats = {
+  fullCount: number;
+  partialCount: number;
+  absentCount: number;
+  unansweredCount: number;
+  recordedDayCount: number;
+  attendedMinutes: number;
+  totalMinutes: number;
+  attendanceRate: number | null;
+};
+
+// 出席率の分母は「実際の出欠が記録済みの練習日」の練習時間の合計のみ（未来日・未記録日は含めない）。
+export function computeMemberAttendanceStats(practiceDays: LocalPracticeDay[], memberId: string): MemberAttendanceStats {
+  const stats: MemberAttendanceStats = {
+    fullCount: 0,
+    partialCount: 0,
+    absentCount: 0,
+    unansweredCount: 0,
+    recordedDayCount: 0,
+    attendedMinutes: 0,
+    totalMinutes: 0,
+    attendanceRate: null
+  };
+
+  for (const day of practiceDays) {
+    const status = classifyMemberAttendanceForDay(day, memberId);
+    if (status === null) continue;
+
+    stats.recordedDayCount += 1;
+    if (status === "full") stats.fullCount += 1;
+    else if (status === "partial") stats.partialCount += 1;
+    else if (status === "absent") stats.absentCount += 1;
+    else stats.unansweredCount += 1;
+
+    stats.totalMinutes += Math.max(0, toMinutes(day.endTime) - toMinutes(day.startTime));
+    stats.attendedMinutes += getActualAttendedMinutesForDay(day, memberId);
+  }
+
+  stats.attendanceRate = stats.totalMinutes > 0 ? stats.attendedMinutes / stats.totalMinutes : null;
+  return stats;
 }
 
 function getEffectiveAvailabilities(day: LocalPracticeDay) {
