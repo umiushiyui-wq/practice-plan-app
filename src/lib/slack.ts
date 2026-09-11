@@ -1,4 +1,34 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { config } from "@/lib/config";
+
+const SLACK_REQUEST_MAX_AGE_SECONDS = 60 * 5;
+
+// Slackからのリクエストであることを検証する（スラッシュコマンド等）。
+// https://api.slack.com/authentication/verifying-requests-from-slack
+export function verifySlackRequestSignature({
+  timestamp,
+  rawBody,
+  signature
+}: {
+  timestamp: string | null;
+  rawBody: string;
+  signature: string | null;
+}): boolean {
+  if (!config.slackSigningSecret || !timestamp || !signature) return false;
+
+  const timestampSeconds = Number(timestamp);
+  if (!Number.isFinite(timestampSeconds)) return false;
+  if (Math.abs(Date.now() / 1000 - timestampSeconds) > SLACK_REQUEST_MAX_AGE_SECONDS) return false;
+
+  const expectedSignature = `v0=${createHmac("sha256", config.slackSigningSecret)
+    .update(`v0:${timestamp}:${rawBody}`)
+    .digest("hex")}`;
+  const expectedBuffer = Buffer.from(expectedSignature, "utf8");
+  const actualBuffer = Buffer.from(signature, "utf8");
+  if (expectedBuffer.length !== actualBuffer.length) return false;
+
+  return timingSafeEqual(expectedBuffer, actualBuffer);
+}
 
 type SlackOAuthResponse = {
   ok: boolean;

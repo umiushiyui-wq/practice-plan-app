@@ -26,6 +26,7 @@ SLACK_CLIENT_SECRET
 SLACK_REDIRECT_URI
 SLACK_BOT_TOKEN
 SLACK_REMINDER_CHANNEL_ID
+SLACK_SIGNING_SECRET
 ```
 
 `ALLOWED_SLACK_TEAM_ID` とSlack OAuthで返る `team.id` が一致するユーザーだけログインできます。
@@ -36,6 +37,17 @@ SLACK_REMINDER_CHANNEL_ID
 - Bot Token Scope: `chat:write`
 - User Token Scope: `identity.basic`, `identity.avatar`
 - リマインド投稿先チャンネルにはBotを参加させてください。
+
+### パート出欠確認コマンド（/出欠）
+
+各パートのSlackチャンネルで `/出欠` と入力すると、次回の練習日（今日以降で一番近い日付）の自分のパートの出欠状況を確認できます（本人にのみ表示されます）。管理画面の選択中の練習日とは無関係です。
+
+1. Slack Appの管理画面で「Slash Commands」から新規コマンドを作成する
+   - Command: `/出欠`
+   - Request URL: `${APP_URL}/api/local-state/slack-commands`
+   - Short Description: 任意（例: 自分のパートの出欠状況を確認）
+2. Slack Appの「Basic Information」にある Signing Secret を `SLACK_SIGNING_SECRET` に設定する
+3. コマンドを実行するチャンネルが `src/lib/partSlackChannels.ts` の `PART_SLACK_CHANNELS` に登録されている必要があります
 
 ## MVPのスケジューリング方針
 

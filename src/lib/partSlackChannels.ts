@@ -14,3 +14,10 @@ export const PART_SLACK_CHANNELS: Record<string, string> = {
   "低音": "C0ANF8W4N3C",
   "パーカッション": "C0AP9HCKVPS"
 };
+
+// チャンネルID逆引き。ユーフォニアムと低音のように複数パートが同一チャンネルの場合は複数返す。
+export function getPartNamesForChannel(channelId: string): string[] {
+  return Object.entries(PART_SLACK_CHANNELS)
+    .filter(([, value]) => value === channelId)
+    .map(([part]) => part);
+}

@@ -7,7 +7,8 @@ export const config = {
   slackRedirectUri:
     process.env.SLACK_REDIRECT_URI ?? "http://localhost:3000/api/auth/slack/callback",
   slackBotToken: process.env.SLACK_BOT_TOKEN ?? "",
-  slackReminderChannelId: process.env.SLACK_REMINDER_CHANNEL_ID ?? ""
+  slackReminderChannelId: process.env.SLACK_REMINDER_CHANNEL_ID ?? "",
+  slackSigningSecret: process.env.SLACK_SIGNING_SECRET ?? ""
 };
 
 export const TIME_ZONE = "Asia/Tokyo";
