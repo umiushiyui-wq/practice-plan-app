@@ -284,17 +284,37 @@ export async function uploadSlackFile({
     return { ok: false, error: uploadUrlPayload.error ?? "upload_url_failed" };
   }
 
-  const uploadResponse = await fetch(uploadUrlPayload.upload_url, {
-    method: "POST",
-    headers: {
-      "Content-Type": mimeType,
-      "Content-Length": fileBuffer.byteLength.toString()
-    },
-    body: new Uint8Array(fileBuffer)
-  });
+  const uploadUrl = uploadUrlPayload.upload_url;
+  const uploadRetryDelaysMs = [300, 900];
+  let lastUploadStatus = 0;
 
-  if (!uploadResponse.ok) {
-    return { ok: false, error: `file_upload_failed_${uploadResponse.status}` };
+  for (let attempt = 0; attempt <= uploadRetryDelaysMs.length; attempt += 1) {
+    const uploadResponse = await fetch(uploadUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": mimeType,
+        "Content-Length": fileBuffer.byteLength.toString()
+      },
+      body: new Uint8Array(fileBuffer)
+    });
+
+    if (uploadResponse.ok) {
+      lastUploadStatus = 0;
+      break;
+    }
+
+    lastUploadStatus = uploadResponse.status;
+    // 5xxはSlack側の一時的なタイムアウト等の可能性があるためリトライする。4xxは再試行しても無駄なので即失敗させる。
+    const isRetryable = uploadResponse.status >= 500 && uploadResponse.status < 600;
+    if (!isRetryable || attempt === uploadRetryDelaysMs.length) {
+      break;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, uploadRetryDelaysMs[attempt]));
+  }
+
+  if (lastUploadStatus !== 0) {
+    return { ok: false, error: `file_upload_failed_${lastUploadStatus}` };
   }
 
   const completeResponse = await fetch("https://slack.com/api/files.completeUploadExternal", {
