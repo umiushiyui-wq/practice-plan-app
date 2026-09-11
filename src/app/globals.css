@@ -518,6 +518,17 @@ tbody tr:hover td {
   min-width: 720px;
 }
 
+.history-table-wrap {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.history-table-wrap thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
 .summary-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -32,7 +32,7 @@ function SlackHistoryTable({ entries }: { entries: SlackHistoryEntry[] }) {
   if (entries.length === 0) return <p className="muted">送信履歴はまだありません。</p>;
 
   return (
-    <div className="table-wrap">
+    <div className="table-wrap history-table-wrap">
       <table>
         <thead>
           <tr>
@@ -70,7 +70,7 @@ function AvailabilityHistoryTable({ entries }: { entries: AvailabilityHistoryEnt
   if (entries.length === 0) return <p className="muted">出欠の保存履歴はまだありません。</p>;
 
   return (
-    <div className="table-wrap">
+    <div className="table-wrap history-table-wrap">
       <table>
         <thead>
           <tr>
@@ -99,7 +99,7 @@ function PieceSelectionHistoryTable({ entries }: { entries: PieceSelectionHistor
   if (entries.length === 0) return <p className="muted">出演曲選択の変更履歴はまだありません。</p>;
 
   return (
-    <div className="table-wrap">
+    <div className="table-wrap history-table-wrap">
       <table>
         <thead>
           <tr>
