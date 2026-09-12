@@ -242,7 +242,11 @@ function getMemberStatusLabel(day: NonNullable<ReturnType<typeof getNextPractice
 }
 
 function ephemeral(text: string) {
-  return NextResponse.json({ response_type: "ephemeral", mrkdwn: true, text });
+  return NextResponse.json({
+    response_type: "ephemeral",
+    text,
+    blocks: [{ type: "section", text: { type: "mrkdwn", text } }]
+  });
 }
 
 export async function POST(request: Request) {
