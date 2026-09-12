@@ -179,23 +179,28 @@ function getMembers(state: unknown) {
     }));
 }
 
-function getNextPracticeDay(state: unknown) {
-  if (!state || typeof state !== "object") return null;
+function getUpcomingPracticeDays(state: unknown) {
+  if (!state || typeof state !== "object") return [];
   const practiceDays = (state as AppStateLike).practiceDays;
-  if (!Array.isArray(practiceDays) || practiceDays.length === 0) return null;
+  if (!Array.isArray(practiceDays)) return [];
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
-  const upcoming = practiceDays
+  return practiceDays
     .filter((item): item is PracticeDayLike & { practiceDate: string } => typeof item.practiceDate === "string")
     .map((item) => ({ item, date: new Date(`${item.practiceDate}T00:00:00`) }))
     .filter((entry) => !Number.isNaN(entry.date.getTime()) && entry.date.getTime() >= todayStart.getTime())
     .sort((a, b) => a.date.getTime() - b.date.getTime());
+}
 
-  const day = upcoming[0]?.item;
-  if (!day || typeof day.practiceDate !== "string") return null;
+function listUpcomingDates(state: unknown, limit = 8): string[] {
+  return getUpcomingPracticeDays(state)
+    .slice(0, limit)
+    .map((entry) => entry.item.practiceDate);
+}
 
+function normalizePracticeDay(day: PracticeDayLike & { practiceDate: string }) {
   return {
     practiceDate: day.practiceDate,
     location: typeof day.location === "string" ? day.location : "",
@@ -227,6 +232,46 @@ function getNextPracticeDay(state: unknown) {
           }))
       : []
   };
+}
+
+function getNextPracticeDay(state: unknown) {
+  const day = getUpcomingPracticeDays(state)[0]?.item;
+  return day ? normalizePracticeDay(day) : null;
+}
+
+function getPracticeDayByDate(state: unknown, dateStr: string) {
+  if (!state || typeof state !== "object") return null;
+  const practiceDays = (state as AppStateLike).practiceDays;
+  if (!Array.isArray(practiceDays)) return null;
+
+  const day = practiceDays.find(
+    (item): item is PracticeDayLike & { practiceDate: string } => item.practiceDate === dateStr
+  );
+  return day ? normalizePracticeDay(day) : null;
+}
+
+function buildDateString(year: number, month: number, day: number): string | null {
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+// "2026-09-19" "2026/9/19" のようなフル指定、"9/19" "9-19" "9月19日" のような月日のみの指定（年は今年扱い）に対応する。
+function parseTargetDate(text: string, now: Date): string | null {
+  const trimmed = text.trim();
+
+  const fullMatch = trimmed.match(/^(\d{4})[\/\-年](\d{1,2})[\/\-月](\d{1,2})日?$/);
+  if (fullMatch) {
+    const [, year, month, day] = fullMatch;
+    return buildDateString(Number(year), Number(month), Number(day));
+  }
+
+  const shortMatch = trimmed.match(/^(\d{1,2})[\/\-月](\d{1,2})日?$/);
+  if (shortMatch) {
+    const [, month, day] = shortMatch;
+    return buildDateString(now.getFullYear(), Number(month), Number(day));
+  }
+
+  return null;
 }
 
 function getMemberStatusLabel(day: NonNullable<ReturnType<typeof getNextPracticeDay>>, memberId: string): string {
@@ -275,11 +320,43 @@ export async function POST(request: Request) {
     return ephemeral("このチャンネルはパート出欠コマンドに対応していません。");
   }
 
+  const text = (form.get("text") ?? "").trim();
+
   try {
     const current = await readCurrentState();
-    const day = getNextPracticeDay(current.state);
-    if (!day) {
-      return ephemeral("次回の練習予定がまだ登録されていません。");
+
+    if (text === "一覧" || text.toLowerCase() === "list") {
+      const dates = listUpcomingDates(current.state);
+      if (dates.length === 0) {
+        return ephemeral("今後の練習予定が登録されていません。");
+      }
+      return ephemeral(
+        [
+          "*今後の練習日一覧*",
+          ...dates.map((date) => `・${formatDateLabel(date)}`),
+          "",
+          "日付を指定するには `/出欠 9/19` のように入力してください。"
+        ].join("\n")
+      );
+    }
+
+    let day: ReturnType<typeof getNextPracticeDay>;
+    if (text) {
+      const targetDate = parseTargetDate(text, new Date());
+      if (!targetDate) {
+        return ephemeral(
+          "日付の形式が正しくありません。例: `/出欠 9/19`、`/出欠 2026-09-19`\n今後の日程一覧は `/出欠 一覧`"
+        );
+      }
+      day = getPracticeDayByDate(current.state, targetDate);
+      if (!day) {
+        return ephemeral(`${formatDateLabel(targetDate)} の練習予定が見つかりません。`);
+      }
+    } else {
+      day = getNextPracticeDay(current.state);
+      if (!day) {
+        return ephemeral("次回の練習予定がまだ登録されていません。");
+      }
     }
 
     const members = getMembers(current.state).filter((member) =>
