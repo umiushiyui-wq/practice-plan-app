@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   buildAvailabilitySlots,
   compareMembersByInstrument,
@@ -33,6 +33,24 @@ type SlackReminderResult = {
   totalUnansweredCount: number;
 };
 
+type LastReminder = {
+  sentAt: string;
+  summary: string;
+};
+
+function formatReminderSentAt(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleString("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    month: "numeric",
+    day: "numeric",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
 function formatPracticeTimeAndLocation(day: { startTime: string; endTime: string; location: string }) {
   const location = day.location.trim();
   return location ? `${day.startTime}〜${day.endTime} ＠${location}` : `${day.startTime}〜${day.endTime}`;
@@ -54,6 +72,23 @@ export function AvailabilityTableApp() {
   const [slackReminderStatus, setSlackReminderStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [slackReminderResult, setSlackReminderResult] = useState<SlackReminderResult | null>(null);
   const [slackReminderMessage, setSlackReminderMessage] = useState("");
+  const [lastReminder, setLastReminder] = useState<{ practiceDayId: string; value: LastReminder | null } | null>(null);
+
+  useEffect(() => {
+    const practiceDayId = selectedDay.id;
+    let cancelled = false;
+    fetch(`/api/local-state/practice-days/${practiceDayId}/slack-reminders`, { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: { lastReminder?: LastReminder | null } | null) => {
+        if (!cancelled && payload) setLastReminder({ practiceDayId, value: payload.lastReminder ?? null });
+      })
+      .catch(() => null);
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDay.id]);
+
+  const selectedDayLastReminder = lastReminder?.practiceDayId === selectedDay.id ? lastReminder : null;
 
   const partOptions = useMemo(
     () => getSortedInstrumentOptions(state.members.map((member) => member.instrument)),
@@ -146,13 +181,16 @@ export function AvailabilityTableApp() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ targetMemberIds: reminderTargetMemberIds })
       });
-      const payload = (await response.json().catch(() => null)) as (SlackReminderResult & { error?: string }) | null;
+      const payload = (await response.json().catch(() => null)) as
+        | (SlackReminderResult & { error?: string; lastReminder?: LastReminder })
+        | null;
 
       if (!response.ok) {
         throw new Error(payload?.error ?? "Slack\u901a\u77e5\u3092\u9001\u4fe1\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002");
       }
 
       setSlackReminderResult(payload);
+      if (payload?.lastReminder) setLastReminder({ practiceDayId: selectedDay.id, value: payload.lastReminder });
       setSlackReminderStatus("sent");
       setSlackReminderMessage(
         `Slack\u901a\u77e5: \u9001\u4fe1 ${payload?.sentCount ?? 0}\u4eba / Slack ID\u672a\u767b\u9332 ${payload?.missingSlackUserIdCount ?? 0}\u4eba / \u5931\u6557 ${payload?.failedCount ?? 0}\u4eba`
@@ -230,6 +268,13 @@ export function AvailabilityTableApp() {
           </button>
           <PartAttendanceSenderPanel selectedDay={selectedDay} members={state.members} />
         </div>
+        {selectedDayLastReminder ? (
+          <p className="muted">
+            {selectedDayLastReminder.value
+              ? `この練習日の最終催促: ${formatReminderSentAt(selectedDayLastReminder.value.sentAt)}（${selectedDayLastReminder.value.summary}）`
+              : "この練習日はまだ催促していません"}
+          </p>
+        ) : null}
       </section>
 
       <LocalStateStatusPanel {...localState} />

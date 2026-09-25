@@ -154,3 +154,98 @@ export function appendHistoryEntry(entry: NewHistoryEntry): Promise<void> {
   writeQueue = task.catch(() => undefined);
   return task;
 }
+
+// The activity history above is capped at MAX_ENTRIES and gets flooded by
+// availability edits, so the last reminder per practice day is kept separately.
+const LAST_REMINDER_KEY = process.env.LOCAL_LAST_REMINDER_KEY ?? "nagosui:last-slack-reminders";
+
+export type LastReminder = {
+  sentAt: string;
+  summary: string;
+};
+
+type LastReminderMap = Record<string, LastReminder>;
+
+function parseLastReminders(raw: string | null): LastReminderMap {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as LastReminderMap) : {};
+  } catch {
+    return {};
+  }
+}
+
+async function lastReminderFilePath() {
+  const path = await import("node:path");
+  return path.join(process.cwd(), ".data", "last-slack-reminders.json");
+}
+
+async function readLastReminderMap(): Promise<LastReminderMap> {
+  const redis = redisConfig();
+  if (redis) {
+    const response = await fetch(`${redis.url}/get/${encodeURIComponent(LAST_REMINDER_KEY)}`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${redis.token}` },
+      cache: "no-store"
+    });
+    if (!response.ok) throw new Error(`Upstash read failed: ${response.status}`);
+    const payload = (await response.json()) as { result?: string | null };
+    return parseLastReminders(payload.result ?? null);
+  }
+
+  if (canUseFileFallback()) {
+    try {
+      const fs = await import("node:fs/promises");
+      return parseLastReminders(await fs.readFile(await lastReminderFilePath(), "utf8"));
+    } catch {
+      return {};
+    }
+  }
+
+  throw new Error(STORAGE_NOT_CONFIGURED_MESSAGE);
+}
+
+export async function readLastReminder(practiceDayId: string): Promise<LastReminder | null> {
+  const map = await readLastReminderMap();
+  if (map[practiceDayId]) return map[practiceDayId];
+
+  // Reminders sent before this map existed only live in the activity history.
+  const entries = await readHistory().catch(() => [] as HistoryEntry[]);
+  const fromHistory = entries.find(
+    (entry): entry is SlackHistoryEntry =>
+      entry.category === "slack" && entry.kind === "reminder" && entry.practiceDayId === practiceDayId
+  );
+  return fromHistory ? { sentAt: fromHistory.recordedAt, summary: fromHistory.summary } : null;
+}
+
+let lastReminderWriteQueue: Promise<void> = Promise.resolve();
+
+export function recordLastReminder(practiceDayId: string, reminder: LastReminder): Promise<void> {
+  const task = lastReminderWriteQueue.then(async () => {
+    const map = await readLastReminderMap().catch(() => ({}) as LastReminderMap);
+    const next = { ...map, [practiceDayId]: reminder };
+    const redis = redisConfig();
+
+    if (redis) {
+      const response = await fetch(`${redis.url}/set/${encodeURIComponent(LAST_REMINDER_KEY)}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${redis.token}`,
+          "Content-Type": "text/plain"
+        },
+        body: JSON.stringify(next)
+      });
+      if (!response.ok) throw new Error(`Upstash write failed: ${response.status}`);
+    } else if (canUseFileFallback()) {
+      const fs = await import("node:fs/promises");
+      const path = await import("node:path");
+      const filePath = await lastReminderFilePath();
+      await fs.mkdir(path.dirname(filePath), { recursive: true });
+      await fs.writeFile(filePath, JSON.stringify(next, null, 2), "utf8");
+    }
+  });
+
+  lastReminderWriteQueue = task.catch(() => undefined);
+  return task;
+}

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { config } from "@/lib/config";
 import { openSlackConversation, postSlackMessage } from "@/lib/slack";
-import { appendHistoryEntry } from "@/lib/history";
+import { appendHistoryEntry, readLastReminder, recordLastReminder } from "@/lib/history";
+import type { LastReminder } from "@/lib/history";
 
 export const runtime = "nodejs";
 
@@ -141,6 +142,18 @@ function getTargetMemberIdSet(value: unknown) {
   return new Set(targetMemberIds.filter((id): id is string => typeof id === "string"));
 }
 
+export async function GET(_request: Request, context: { params: Promise<{ practiceDayId: string }> }) {
+  try {
+    const { practiceDayId } = await context.params;
+    return NextResponse.json({ lastReminder: await readLastReminder(practiceDayId) });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "最終催促日時を取得できませんでした。" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(request: Request, context: { params: Promise<{ practiceDayId: string }> }) {
   try {
     if (!config.slackBotToken) {
@@ -192,13 +205,17 @@ export async function POST(request: Request, context: { params: Promise<{ practi
       }
     }
 
+    const summary = `送信 ${sentCount}人 / 失敗 ${failures.length}人 / 未登録 ${missingSlackUserIdCount}人`;
+    const lastReminder: LastReminder = { sentAt: new Date().toISOString(), summary };
+    await recordLastReminder(practiceDayId, lastReminder).catch(() => null);
+
     await appendHistoryEntry({
       category: "slack",
       kind: "reminder",
       practiceDayId,
       practiceDateLabel: dateLabel,
       success: failures.length === 0,
-      summary: `送信 ${sentCount}人 / 失敗 ${failures.length}人 / 未登録 ${missingSlackUserIdCount}人`,
+      summary,
       detail: failures.length > 0 ? failures.map((failure) => `${failure.name}: ${failure.error}`).join("、") : undefined
     }).catch(() => null);
 
@@ -209,7 +226,8 @@ export async function POST(request: Request, context: { params: Promise<{ practi
       failedCount: failures.length,
       skippedAnsweredCount: scopedMembers.length - unanswered.length,
       totalUnansweredCount: unanswered.length,
-      failures
+      failures,
+      lastReminder
     });
   } catch (error) {
     return NextResponse.json(
