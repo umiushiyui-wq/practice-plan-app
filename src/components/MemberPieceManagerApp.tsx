@@ -16,6 +16,11 @@ import {
   resolvePieceTargetRange,
   useLocalPracticeState
 } from "@/components/LocalPracticeApp";
+import {
+  buildScheduleChangeNoticeText,
+  hasScheduleTimeChanged,
+  type ScheduleDetails
+} from "@/lib/scheduleChangeNotice";
 
 
 const SETUP_SECTIONS = [
@@ -25,6 +30,14 @@ const SETUP_SECTIONS = [
 ] as const;
 
 type SetupSectionId = (typeof SETUP_SECTIONS)[number]["id"];
+
+type PendingScheduleChangeNotice = {
+  practiceDayId: string;
+  previous: ScheduleDetails;
+  next: ScheduleDetails;
+  respondedMemberIds: string[];
+  missingSlackUserIdCount: number;
+};
 
 function readSetupSectionFromHash(): SetupSectionId {
   if (typeof window === "undefined") return "practice-days";
@@ -40,6 +53,14 @@ export function MemberPieceManagerApp() {
   const [selectedPieceId, setSelectedPieceId] = useState("");
   const [editingPracticeDayId, setEditingPracticeDayId] = useState("");
   const [activeSetupSection, setActiveSetupSection] = useState<SetupSectionId>("practice-days");
+  const [pendingScheduleChangeNotice, setPendingScheduleChangeNotice] = useState<PendingScheduleChangeNotice | null>(
+    null
+  );
+  const [scheduleChangeNoticeStatus, setScheduleChangeNoticeStatus] = useState<"idle" | "sending" | "sent" | "error">(
+    "idle"
+  );
+  const [scheduleChangeNoticeMessage, setScheduleChangeNoticeMessage] = useState("");
+  const [shouldResetAttendance, setShouldResetAttendance] = useState(false);
 
   const selectedPiece =
     state.pieces.find((piece) => piece.id === selectedPieceId) ?? state.pieces[0] ?? null;
@@ -193,21 +214,99 @@ export function MemberPieceManagerApp() {
   function updatePracticeDayDetails(dayId: string, formData: FormData) {
     const practiceDate = String(formData.get("practiceDate") ?? "").trim();
     if (!practiceDate) return;
+    const day = state.practiceDays.find((item) => item.id === dayId);
+    if (!day) return;
+
+    const previous: ScheduleDetails = {
+      practiceDate: day.practiceDate,
+      startTime: day.startTime,
+      endTime: day.endTime,
+      location: day.location
+    };
+    const next: ScheduleDetails = {
+      practiceDate,
+      location: String(formData.get("location") ?? "").trim(),
+      startTime: String(formData.get("startTime") ?? day.startTime),
+      endTime: String(formData.get("endTime") ?? day.endTime)
+    };
 
     updateState({
-      practiceDays: state.practiceDays.map((day) =>
-        day.id === dayId
-          ? {
-              ...day,
-              practiceDate,
-              location: String(formData.get("location") ?? "").trim(),
-              startTime: String(formData.get("startTime") ?? day.startTime),
-              endTime: String(formData.get("endTime") ?? day.endTime)
-            }
-          : day
-      )
+      practiceDays: state.practiceDays.map((item) => (item.id === dayId ? { ...item, ...next } : item))
     });
     setEditingPracticeDayId("");
+
+    const respondedMemberIdSet = new Set(day.respondedMemberIds);
+    const respondedMembers = state.members.filter((member) => respondedMemberIdSet.has(member.id));
+    if (respondedMembers.length === 0 || !hasScheduleTimeChanged(previous, next)) return;
+
+    setScheduleChangeNoticeStatus("idle");
+    setScheduleChangeNoticeMessage("");
+    setShouldResetAttendance(false);
+    setPendingScheduleChangeNotice({
+      practiceDayId: dayId,
+      previous,
+      next,
+      respondedMemberIds: respondedMembers.map((member) => member.id),
+      missingSlackUserIdCount: respondedMembers.filter((member) => !member.slackUserId?.trim()).length
+    });
+  }
+
+  // 出欠の回答だけを消して未回答に戻す。練習計画と出欠記録(actual*)は残す。
+  function resetPracticeDayAttendance(dayId: string) {
+    updateState({
+      practiceDays: state.practiceDays.map((day) =>
+        day.id === dayId ? { ...day, availabilities: [], absentMemberIds: [], respondedMemberIds: [] } : day
+      )
+    });
+  }
+
+  function closeScheduleChangeNoticeWithoutDm(notice: PendingScheduleChangeNotice) {
+    setPendingScheduleChangeNotice(null);
+    if (!shouldResetAttendance) return;
+
+    resetPracticeDayAttendance(notice.practiceDayId);
+    setScheduleChangeNoticeStatus("sent");
+    setScheduleChangeNoticeMessage(`${notice.respondedMemberIds.length}人の出欠入力をリセットしました（DMは送信していません）。`);
+  }
+
+  async function sendScheduleChangeNotice(notice: PendingScheduleChangeNotice) {
+    setScheduleChangeNoticeStatus("sending");
+    setScheduleChangeNoticeMessage("");
+    if (shouldResetAttendance) {
+      resetPracticeDayAttendance(notice.practiceDayId);
+    }
+
+    try {
+      const response = await fetch(`/api/local-state/practice-days/${notice.practiceDayId}/schedule-change-notice`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          previous: notice.previous,
+          next: notice.next,
+          resetAttendance: shouldResetAttendance,
+          targetMemberIds: notice.respondedMemberIds
+        })
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+        sentCount?: number;
+        failedCount?: number;
+        missingSlackUserIdCount?: number;
+      } | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Slack通知を送信できませんでした。");
+      }
+
+      setPendingScheduleChangeNotice(null);
+      setScheduleChangeNoticeStatus("sent");
+      setScheduleChangeNoticeMessage(
+        `${shouldResetAttendance ? "出欠入力をリセットしました。" : ""}練習日時変更のSlack通知: 送信 ${payload?.sentCount ?? 0}人 / Slack ID未登録 ${payload?.missingSlackUserIdCount ?? 0}人 / 失敗 ${payload?.failedCount ?? 0}人`
+      );
+    } catch (error) {
+      setScheduleChangeNoticeStatus("error");
+      setScheduleChangeNoticeMessage(error instanceof Error ? error.message : "Slack通知を送信できませんでした。");
+    }
   }
 
   function deletePracticeDay(dayId: string) {
@@ -473,6 +572,9 @@ export function MemberPieceManagerApp() {
             </div>
             <button type="submit">練習日を追加</button>
           </form>
+          {scheduleChangeNoticeStatus === "sent" && scheduleChangeNoticeMessage ? (
+            <div className="notice">{scheduleChangeNoticeMessage}</div>
+          ) : null}
           <details className="fold-panel" open>
             <summary>
               入力済みの練習日
@@ -539,6 +641,71 @@ export function MemberPieceManagerApp() {
             </div>
           </details>
         </section>
+        ) : null}
+
+        {pendingScheduleChangeNotice ? (
+          <div
+            className="modal-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-label="練習日時変更の通知確認"
+            onClick={(event) => {
+              if (event.target === event.currentTarget && scheduleChangeNoticeStatus !== "sending") {
+                setPendingScheduleChangeNotice(null);
+              }
+            }}
+          >
+            <div className="modal-card stack">
+              <h2>出欠入力済みの人にSlackで知らせますか？</h2>
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={shouldResetAttendance}
+                  disabled={scheduleChangeNoticeStatus === "sending"}
+                  onChange={(event) => setShouldResetAttendance(event.target.checked)}
+                />
+                この練習日の出欠入力をリセットする（{pendingScheduleChangeNotice.respondedMemberIds.length}人を未回答に戻す）
+              </label>
+              <p className="muted">
+                この練習日に出欠入力済みの {pendingScheduleChangeNotice.respondedMemberIds.length}人 に、Slack botから次のDMを送ります。
+                {pendingScheduleChangeNotice.missingSlackUserIdCount > 0
+                  ? `（うち ${pendingScheduleChangeNotice.missingSlackUserIdCount}人 はSlack ID未登録のため送信されません）`
+                  : null}
+              </p>
+              <pre className="notice" style={{ whiteSpace: "pre-wrap", margin: 0, fontFamily: "inherit" }}>
+                {buildScheduleChangeNoticeText(
+                  pendingScheduleChangeNotice.practiceDayId,
+                  pendingScheduleChangeNotice.previous,
+                  pendingScheduleChangeNotice.next,
+                  shouldResetAttendance
+                )}
+              </pre>
+              {scheduleChangeNoticeStatus === "error" && scheduleChangeNoticeMessage ? (
+                <div className="error">{scheduleChangeNoticeMessage}</div>
+              ) : null}
+              <div className="row">
+                <button
+                  type="button"
+                  disabled={scheduleChangeNoticeStatus === "sending"}
+                  onClick={() => sendScheduleChangeNotice(pendingScheduleChangeNotice)}
+                >
+                  {scheduleChangeNoticeStatus === "sending"
+                    ? "送信中..."
+                    : shouldResetAttendance
+                      ? "リセットしてDMを送信"
+                      : "DMを送信する"}
+                </button>
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={scheduleChangeNoticeStatus === "sending"}
+                  onClick={() => closeScheduleChangeNoticeWithoutDm(pendingScheduleChangeNotice)}
+                >
+                  {shouldResetAttendance ? "リセットのみ（DMは送らない）" : "送信しない"}
+                </button>
+              </div>
+            </div>
+          </div>
         ) : null}
 
         {activeSetupSection === "pieces" ? (

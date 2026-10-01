@@ -200,6 +200,8 @@ export function PlayerApp() {
   const restoredSelectionRef = useRef(false);
   const skipNextSelectionPersistRef = useRef(false);
   const skipNextMemberStateResetRef = useRef(false);
+  // Slack DMのリンク(/player?day=<練習日ID>)で指定された練習日。奏者が選ばれた後に一度だけ反映する。
+  const requestedInputDayIdRef = useRef<string | null | undefined>(undefined);
 
   const partOptions = getSortedInstrumentOptions(state.members.map((member) => member.instrument));
   const activePart = partOptions.includes(selectedPart) ? selectedPart : partOptions[0] ?? "";
@@ -365,6 +367,19 @@ export function PlayerApp() {
       setSelectedInputDayId("");
     }
   }, [selected, selectedInputDay, selectedInputDayId]);
+
+  useEffect(() => {
+    if (requestedInputDayIdRef.current === undefined) {
+      requestedInputDayIdRef.current = new URLSearchParams(window.location.search).get("day");
+    }
+
+    const requestedDayId = requestedInputDayIdRef.current;
+    if (!requestedDayId || !selected) return;
+    if (!sortedPracticeDays.some((day) => day.id === requestedDayId)) return;
+
+    requestedInputDayIdRef.current = null;
+    selectPracticeDayForInput(requestedDayId);
+  }, [selected, sortedPracticeDays]);
 
   function updateDayDraft(dayId: string, patch: Partial<DraftByDay[string]>) {
     setDraftsByDay((current) => ({

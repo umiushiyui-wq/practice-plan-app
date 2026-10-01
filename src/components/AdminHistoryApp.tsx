@@ -10,7 +10,8 @@ import type {
 
 const SLACK_KIND_LABELS: Record<SlackHistoryEntry["kind"], string> = {
   reminder: "出欠催促",
-  "attendance-image": "出欠画像送信"
+  "attendance-image": "出欠画像送信",
+  "schedule-change": "練習日時変更通知"
 };
 
 function formatRecordedAt(iso: string) {
