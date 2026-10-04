@@ -53,7 +53,10 @@ export function compareMembersByInstrument<T extends { instrument: string; name:
 
 // 乗り番のセクション名（例: "Fl 2nd", "A.Sax 1st", "St.B"）の先頭にある楽器略称をスコア順に並べる。
 // ふるぼえ・低音のように1パートに複数楽器がいる場合も、パート内で楽器ごとにまとまるようにするため。
+const CONDUCTOR_SECTION_ALIASES = ["cond", "conductor", "指揮", "指揮者"];
+const ELECTRIC_BASS_SECTION_ALIASES = ["eb", "ebass", "elb", "elbass", "elecbass", "electricbass", "エレキベース", "エレベ", "エレキ"];
 const SECTION_INSTRUMENT_ALIASES: string[][] = [
+  CONDUCTOR_SECTION_ALIASES,
   ["picc", "pic", "ピッコロ"],
   ["fl", "flute", "フルート"],
   ["ob", "oboe", "オーボエ"],
@@ -76,12 +79,15 @@ const SECTION_INSTRUMENT_ALIASES: string[][] = [
   ["euph", "eup", "euphonium", "ユーフォ", "ユーフォニアム"],
   ["tu", "tuba", "チューバ"],
   ["stb", "cb", "kb", "contrabass", "コントラバス", "弦バス"],
+  ELECTRIC_BASS_SECTION_ALIASES,
   ["perc", "timp", "ティンパニ", "パーカッション", "打楽器"]
 ];
 
 const SECTION_INSTRUMENT_INDEX = new Map(
   SECTION_INSTRUMENT_ALIASES.flatMap((aliases, index) => aliases.map((alias) => [alias, index] as const))
 );
+const CONDUCTOR_SECTION_INDEX = SECTION_INSTRUMENT_ALIASES.indexOf(CONDUCTOR_SECTION_ALIASES);
+const ELECTRIC_BASS_SECTION_INDEX = SECTION_INSTRUMENT_ALIASES.indexOf(ELECTRIC_BASS_SECTION_ALIASES);
 
 export function normalizeSectionLabel(section: string) {
   return section.normalize("NFKC").trim().replace(/\s+/g, " ");
@@ -97,17 +103,29 @@ function getSectionSortKey(section: string) {
   };
 }
 
+// 指揮者とエレキベースはパートを横断するので、セクションでパート自体を上書きする。
+// Cond は全パートより上、E.B. は登録パートに関係なく低音パート(St.B の下)に並べる。
+function getEffectivePartSortIndex(instrument: string, section: string) {
+  if (section) {
+    const { instrumentIndex } = getSectionSortKey(section);
+    if (instrumentIndex === CONDUCTOR_SECTION_INDEX) return -1;
+    if (instrumentIndex === ELECTRIC_BASS_SECTION_INDEX) return getInstrumentSortIndex("低音");
+  }
+  return getInstrumentSortIndex(instrument);
+}
+
 // パート順 → セクションの楽器(スコア順) → 番号(1st, 2nd...) → 名前。セクション未設定の人はパート内の最後。
 export function compareMembersByInstrumentAndSection<T extends { id: string; instrument: string; name: string }>(
   first: T,
   second: T,
   memberSections: Record<string, string>
 ) {
-  const partOrder = getInstrumentSortIndex(first.instrument) - getInstrumentSortIndex(second.instrument);
-  if (partOrder) return partOrder;
-
   const firstSection = memberSections[first.id] ?? "";
   const secondSection = memberSections[second.id] ?? "";
+  const partOrder =
+    getEffectivePartSortIndex(first.instrument, firstSection) - getEffectivePartSortIndex(second.instrument, secondSection);
+  if (partOrder) return partOrder;
+
   if (!firstSection || !secondSection) {
     if (firstSection !== secondSection) return firstSection ? -1 : 1;
     return first.name.localeCompare(second.name, "ja");
