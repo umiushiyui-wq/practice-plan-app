@@ -173,7 +173,10 @@ export function PieceMembersApp({ pieceId }: { pieceId: string }) {
   return (
     <main className="stack setup-page">
       <section className="panel stack">
-        <Link href="/admin/setup#pieces">← 曲の設定へ戻る</Link>
+        <div className="row">
+          <Link href="/admin/setup#pieces">← 曲の設定へ戻る</Link>
+          <Link href="/admin/piece-members">乗り番表で一括編集 →</Link>
+        </div>
         <p className="muted">参加メンバー選択</p>
         <h1>{piece ? piece.title : "読み込み中..."}</h1>
         {piece ? <p className="muted">指揮者: {conductor?.name ?? "未設定"}</p> : null}

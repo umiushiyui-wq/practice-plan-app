@@ -448,6 +448,9 @@ export function MemberPieceManagerApp() {
           <Link className="button secondary" href="/admin">
             練習計画の画面へ
           </Link>
+          <Link className="button secondary" href="/admin/piece-members">
+            乗り番表で一括編集
+          </Link>
         </div>
       </section>
 

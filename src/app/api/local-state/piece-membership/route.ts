@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { appendHistoryEntry } from "@/lib/history";
+import { appendHistoryEntries } from "@/lib/history";
 
 export const runtime = "nodejs";
 
@@ -165,8 +165,20 @@ async function writeCurrentState(state: unknown) {
   return redisConfig() ? await writeToRedis(state) : await writeToFile(state);
 }
 
-function parsePatch(value: unknown): PieceMembershipPatch | null {
-  const patch = value && typeof value === "object" && "patch" in value ? (value as { patch: unknown }).patch : value;
+// { patch } / パッチ単体 / { patches: [...] }（乗り番表からの一括保存）のいずれかを受け付ける
+function parsePatches(value: unknown): PieceMembershipPatch[] | null {
+  if (value && typeof value === "object" && "patches" in value) {
+    const patches = (value as { patches: unknown }).patches;
+    if (!Array.isArray(patches) || patches.length === 0) return null;
+    const parsed = patches.map(parsePatch);
+    return parsed.every((patch): patch is PieceMembershipPatch => patch !== null) ? parsed : null;
+  }
+
+  const patch = parsePatch(value && typeof value === "object" && "patch" in value ? (value as { patch: unknown }).patch : value);
+  return patch ? [patch] : null;
+}
+
+function parsePatch(patch: unknown): PieceMembershipPatch | null {
   if (!patch || typeof patch !== "object") return null;
 
   const candidate = patch as Partial<PieceMembershipPatch>;
@@ -226,28 +238,34 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: STORAGE_NOT_CONFIGURED_MESSAGE }, { status: 500 });
     }
 
-    const patch = parsePatch(await request.json());
-    if (!patch) {
+    const patches = parsePatches(await request.json());
+    if (!patches) {
       return NextResponse.json({ error: "Invalid piece membership patch" }, { status: 400 });
     }
 
+    // 1回読んで全パッチを当て、1回だけ書く（連続リクエスト同士で変更を消し合わないように）
     const current = await readCurrentState();
-    const nextState = patchPieceMembership(current.state, patch);
-    if (!nextState) {
-      return NextResponse.json({ error: "Piece was not found" }, { status: 404 });
+    let nextState: unknown = current.state;
+    for (const patch of patches) {
+      nextState = patchPieceMembership(nextState, patch);
+      if (!nextState) {
+        return NextResponse.json({ error: "Piece was not found" }, { status: 404 });
+      }
     }
 
     const stored = await writeCurrentState(nextState);
 
-    await appendHistoryEntry({
-      category: "piece-selection",
-      pieceId: patch.pieceId,
-      pieceTitle: findPieceTitle(current.state, patch.pieceId),
-      memberName: findMemberName(current.state, patch.memberId),
-      selected: patch.selected,
-      actor: patch.actor,
-      ...(patch.selected && patch.section !== undefined ? { section: patch.section } : {})
-    }).catch(() => null);
+    await appendHistoryEntries(
+      patches.map((patch) => ({
+        category: "piece-selection" as const,
+        pieceId: patch.pieceId,
+        pieceTitle: findPieceTitle(current.state, patch.pieceId),
+        memberName: findMemberName(current.state, patch.memberId),
+        selected: patch.selected,
+        actor: patch.actor,
+        ...(patch.selected && patch.section !== undefined ? { section: patch.section } : {})
+      }))
+    ).catch(() => null);
 
     return NextResponse.json({ ok: true, state: stored.state, updatedAt: stored.updatedAt });
   } catch (error) {

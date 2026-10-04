@@ -646,6 +646,21 @@ async function postAttendanceRecordSnapshot(practiceDayId: string) {
   return (await response.json()) as { ok: true; state: unknown; updatedAt?: string | null };
 }
 
+async function putPieceMembershipPatches(patches: PieceMembershipPatch[]) {
+  const response = await fetch("/api/local-state/piece-membership", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ patches })
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(payload?.error ?? SAVE_ERROR_MESSAGE);
+  }
+
+  return (await response.json()) as { ok: true; state: unknown; updatedAt?: string | null };
+}
+
 async function putPieceMembershipPatch(patch: PieceMembershipPatch) {
   const response = await fetch("/api/local-state/piece-membership", {
     method: "PUT",
@@ -868,6 +883,28 @@ export function useLocalPracticeState() {
     }
   }
 
+  // 乗り番表からの一括保存。サーバーの結果で state を置き換えるので楽観的更新はしない。
+  async function savePieceMembershipPatches(patches: PieceMembershipPatch[]) {
+    setSaveStatus("saving");
+    setSaveError("");
+
+    try {
+      const saved = await putPieceMembershipPatches(patches);
+      const nextState = saved.state ? migrateState(saved.state) : state;
+      shouldPersistRef.current = false;
+      setState(nextState);
+      cacheStateLocally(nextState);
+      setServerUpdatedAt(saved.updatedAt ?? null);
+      setHasLocalMigrationCandidate(false);
+      setSaveStatus("saved");
+      return nextState;
+    } catch {
+      setSaveStatus("error");
+      setSaveError(SAVE_ERROR_MESSAGE);
+      return null;
+    }
+  }
+
   async function saveAttendanceRecordPatch(patch: AttendanceRecordPatch) {
     setSaveStatus("saving");
     setSaveError("");
@@ -919,6 +956,7 @@ export function useLocalPracticeState() {
     migrateLocalStateToServer,
     saveAvailabilityPatch,
     savePieceMembership,
+    savePieceMembershipPatches,
     saveAttendanceRecordPatch,
     ensureAttendanceRecordSnapshot
   };

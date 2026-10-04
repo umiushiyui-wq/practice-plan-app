@@ -136,15 +136,28 @@ export async function readHistory(): Promise<HistoryEntry[]> {
 let writeQueue: Promise<void> = Promise.resolve();
 
 export function appendHistoryEntry(entry: NewHistoryEntry): Promise<void> {
+  return appendHistoryEntries([entry]);
+}
+
+// 複数件を1回の読み書きで追加する。entries は古い順に渡す（新しいものが先頭に来る）。
+export function appendHistoryEntries(entries: NewHistoryEntry[]): Promise<void> {
+  if (entries.length === 0) return Promise.resolve();
+
   const task = writeQueue.then(async () => {
-    const fullEntry = {
-      ...entry,
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-      recordedAt: new Date().toISOString()
-    } as HistoryEntry;
+    const recordedAt = new Date().toISOString();
+    const fullEntries = entries
+      .map(
+        (entry) =>
+          ({
+            ...entry,
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+            recordedAt
+          }) as HistoryEntry
+      )
+      .reverse();
 
     const existing = await readHistory().catch(() => [] as HistoryEntry[]);
-    const next = [fullEntry, ...existing].slice(0, MAX_ENTRIES);
+    const next = [...fullEntries, ...existing].slice(0, MAX_ENTRIES);
 
     if (redisConfig()) {
       await writeToRedis(next);
