@@ -16,12 +16,14 @@ type PieceMembershipPatch = {
   memberId: string;
   selected: boolean;
   actor: "self" | "admin";
+  section?: string;
 };
 
 type PieceLike = {
   id?: unknown;
   title?: unknown;
   memberIds?: unknown[];
+  memberSections?: unknown;
   [key: string]: unknown;
 };
 
@@ -172,7 +174,8 @@ function parsePatch(value: unknown): PieceMembershipPatch | null {
     typeof candidate.pieceId !== "string" ||
     typeof candidate.memberId !== "string" ||
     typeof candidate.selected !== "boolean" ||
-    (candidate.actor !== "self" && candidate.actor !== "admin")
+    (candidate.actor !== "self" && candidate.actor !== "admin") ||
+    (candidate.section !== undefined && typeof candidate.section !== "string")
   ) {
     return null;
   }
@@ -181,7 +184,8 @@ function parsePatch(value: unknown): PieceMembershipPatch | null {
     pieceId: candidate.pieceId,
     memberId: candidate.memberId,
     selected: candidate.selected,
-    actor: candidate.actor
+    actor: candidate.actor,
+    section: candidate.section === undefined ? undefined : candidate.section.normalize("NFKC").trim().replace(/\s+/g, " ")
   };
 }
 
@@ -197,12 +201,19 @@ function patchPieceMembership(state: unknown, patch: PieceMembershipPatch) {
     foundPiece = true;
 
     const memberIds = Array.isArray(piece.memberIds) ? piece.memberIds.filter((id): id is string => typeof id === "string") : [];
+    const memberSections: Record<string, unknown> =
+      piece.memberSections && typeof piece.memberSections === "object" ? { ...(piece.memberSections as Record<string, unknown>) } : {};
+
+    // 乗り番を外したらセクションも消す。section 指定時のみセクションを更新（空文字で削除）。
+    if (!patch.selected || patch.section !== undefined) delete memberSections[patch.memberId];
+    if (patch.selected && patch.section) memberSections[patch.memberId] = patch.section;
 
     return {
       ...piece,
       memberIds: patch.selected
         ? Array.from(new Set([...memberIds, patch.memberId]))
-        : memberIds.filter((id) => id !== patch.memberId)
+        : memberIds.filter((id) => id !== patch.memberId),
+      memberSections
     };
   });
 
@@ -234,7 +245,8 @@ export async function PUT(request: NextRequest) {
       pieceTitle: findPieceTitle(current.state, patch.pieceId),
       memberName: findMemberName(current.state, patch.memberId),
       selected: patch.selected,
-      actor: patch.actor
+      actor: patch.actor,
+      ...(patch.selected && patch.section !== undefined ? { section: patch.section } : {})
     }).catch(() => null);
 
     return NextResponse.json({ ok: true, state: stored.state, updatedAt: stored.updatedAt });

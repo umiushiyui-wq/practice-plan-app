@@ -51,6 +51,78 @@ export function compareMembersByInstrument<T extends { instrument: string; name:
   return order || first.name.localeCompare(second.name, "ja");
 }
 
+// 乗り番のセクション名（例: "Fl 2nd", "A.Sax 1st", "St.B"）の先頭にある楽器略称をスコア順に並べる。
+// ふるぼえ・低音のように1パートに複数楽器がいる場合も、パート内で楽器ごとにまとまるようにするため。
+const SECTION_INSTRUMENT_ALIASES: string[][] = [
+  ["picc", "pic", "ピッコロ"],
+  ["fl", "flute", "フルート"],
+  ["ob", "oboe", "オーボエ"],
+  ["eh", "ehr", "englishhorn", "イングリッシュホルン"],
+  ["fg", "bsn", "fag", "bassoon", "ファゴット", "バスーン"],
+  ["escl", "esclarinet"],
+  ["cl", "clarinet", "クラリネット"],
+  ["acl", "altocl"],
+  ["bcl", "bassclarinet", "バスクラ", "バスクラリネット"],
+  ["ssax", "ssx"],
+  ["asax", "asx", "アルト", "アルトサックス"],
+  ["tsax", "tsx", "テナー", "テナーサックス"],
+  ["bsax", "bsx", "バリトン", "バリトンサックス", "バリサク"],
+  ["tp", "trp", "trumpet", "トランペット"],
+  ["cor", "cornet", "コルネット"],
+  ["flh", "flugelhorn"],
+  ["hr", "hrn", "horn", "ホルン"],
+  ["tb", "trb", "trombone", "トロンボーン"],
+  ["btb", "btrb", "basstrombone", "バストロ", "バストロンボーン"],
+  ["euph", "eup", "euphonium", "ユーフォ", "ユーフォニアム"],
+  ["tu", "tuba", "チューバ"],
+  ["stb", "cb", "kb", "contrabass", "コントラバス", "弦バス"],
+  ["perc", "timp", "ティンパニ", "パーカッション", "打楽器"]
+];
+
+const SECTION_INSTRUMENT_INDEX = new Map(
+  SECTION_INSTRUMENT_ALIASES.flatMap((aliases, index) => aliases.map((alias) => [alias, index] as const))
+);
+
+export function normalizeSectionLabel(section: string) {
+  return section.normalize("NFKC").trim().replace(/\s+/g, " ");
+}
+
+function getSectionSortKey(section: string) {
+  const compact = normalizeSectionLabel(section).toLowerCase().replace(/[\s.\-_・]/g, "");
+  const prefix = compact.match(/^[^\d]+/)?.[0] ?? "";
+  const number = compact.match(/\d+/)?.[0];
+  return {
+    instrumentIndex: SECTION_INSTRUMENT_INDEX.get(prefix) ?? SECTION_INSTRUMENT_ALIASES.length,
+    number: number === undefined ? Number.MAX_SAFE_INTEGER : Number(number)
+  };
+}
+
+// パート順 → セクションの楽器(スコア順) → 番号(1st, 2nd...) → 名前。セクション未設定の人はパート内の最後。
+export function compareMembersByInstrumentAndSection<T extends { id: string; instrument: string; name: string }>(
+  first: T,
+  second: T,
+  memberSections: Record<string, string>
+) {
+  const partOrder = getInstrumentSortIndex(first.instrument) - getInstrumentSortIndex(second.instrument);
+  if (partOrder) return partOrder;
+
+  const firstSection = memberSections[first.id] ?? "";
+  const secondSection = memberSections[second.id] ?? "";
+  if (!firstSection || !secondSection) {
+    if (firstSection !== secondSection) return firstSection ? -1 : 1;
+    return first.name.localeCompare(second.name, "ja");
+  }
+
+  const firstKey = getSectionSortKey(firstSection);
+  const secondKey = getSectionSortKey(secondSection);
+  return (
+    firstKey.instrumentIndex - secondKey.instrumentIndex ||
+    firstKey.number - secondKey.number ||
+    firstSection.localeCompare(secondSection, "ja", { numeric: true }) ||
+    first.name.localeCompare(second.name, "ja")
+  );
+}
+
 export type Member = {
   id: string;
   name: string;
@@ -65,6 +137,8 @@ export type Piece = {
   title: string;
   conductorId: string;
   memberIds: string[];
+  // memberId -> 乗り番のセクション名（例: "Tb 1st"）。キーは必ず memberIds に含まれる。
+  memberSections: Record<string, string>;
   targetMinutes: number;
   dailyMaxMinutes: number;
   targetRangeStartDayId: string | null;
@@ -138,7 +212,23 @@ export type PieceMembershipPatch = {
   memberId: string;
   selected: boolean;
   actor: "self" | "admin";
+  // 指定時のみセクションを更新する（空文字で削除）。selected: false ならセクションも消える。
+  section?: string;
 };
+
+export function applyPieceMembershipPatch(piece: Piece, patch: PieceMembershipPatch): Piece {
+  if (!patch.selected) {
+    const { [patch.memberId]: _removed, ...memberSections } = piece.memberSections;
+    return { ...piece, memberIds: piece.memberIds.filter((id) => id !== patch.memberId), memberSections };
+  }
+
+  const memberIds = Array.from(new Set([...piece.memberIds, patch.memberId]));
+  if (patch.section === undefined) return { ...piece, memberIds };
+
+  const { [patch.memberId]: _previous, ...memberSections } = piece.memberSections;
+  const section = normalizeSectionLabel(patch.section);
+  return { ...piece, memberIds, memberSections: section ? { ...memberSections, [patch.memberId]: section } : memberSections };
+}
 
 export type AttendanceRecordPatch = {
   practiceDayId: string;
@@ -333,12 +423,28 @@ export function buildAvailabilitySlots(startMin: number, endMin: number, padMin 
   return Array.from({ length: Math.max(1, length) }, (_, index) => from + index * step);
 }
 
+function normalizeMemberSections(value: unknown, memberIds: string[]) {
+  if (!value || typeof value !== "object") return {};
+  const memberIdSet = new Set(memberIds);
+  const sections: Record<string, string> = {};
+
+  for (const [memberId, section] of Object.entries(value as Record<string, unknown>)) {
+    if (!memberIdSet.has(memberId) || typeof section !== "string") continue;
+    const normalized = normalizeSectionLabel(section);
+    if (normalized) sections[memberId] = normalized;
+  }
+
+  return sections;
+}
+
 function normalizePiece(piece: LegacyPiece): Piece {
+  const memberIds = Array.isArray(piece.memberIds) ? piece.memberIds : [];
   return {
     id: piece.id ?? makeId("p"),
     title: piece.title ?? "",
     conductorId: piece.conductorId ?? "",
-    memberIds: Array.isArray(piece.memberIds) ? piece.memberIds : [],
+    memberIds,
+    memberSections: normalizeMemberSections(piece.memberSections, memberIds),
     targetMinutes: Number(piece.targetMinutes ?? 60),
     dailyMaxMinutes: Number(piece.dailyMaxMinutes ?? 45),
     targetRangeStartDayId: piece.targetRangeStartDayId ?? null,
@@ -720,16 +826,7 @@ export function useLocalPracticeState() {
     const previousState = state;
     const optimisticState: AppState = {
       ...state,
-      pieces: state.pieces.map((piece) =>
-        piece.id === patch.pieceId
-          ? {
-              ...piece,
-              memberIds: patch.selected
-                ? Array.from(new Set([...piece.memberIds, patch.memberId]))
-                : piece.memberIds.filter((id) => id !== patch.memberId)
-            }
-          : piece
-      )
+      pieces: state.pieces.map((piece) => (piece.id === patch.pieceId ? applyPieceMembershipPatch(piece, patch) : piece))
     };
     shouldPersistRef.current = false;
     setState(optimisticState);

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   buildAvailabilitySlots,
   compareMembersByInstrument,
+  compareMembersByInstrumentAndSection,
   formatPracticeDateLabel,
   getAvailabilityRange,
   getInstrumentLabel,
@@ -95,11 +96,21 @@ export function AvailabilityTableApp() {
     [state.members]
   );
 
+  // 曲を選んでいるときだけ、その曲のセクションを表示・並び順に使う
+  const selectedPieceSections = useMemo(
+    () => state.pieces.find((piece) => piece.id === selectedPieceFilter)?.memberSections ?? null,
+    [selectedPieceFilter, state.pieces]
+  );
+
   const visibleMembers = useMemo(() => {
-    const sortedMembers = [...state.members].sort(compareMembersByInstrument);
+    const sortedMembers = [...state.members].sort((first, second) =>
+      selectedPieceSections
+        ? compareMembersByInstrumentAndSection(first, second, selectedPieceSections)
+        : compareMembersByInstrument(first, second)
+    );
     if (selectedPartFilter === ALL_PARTS_FILTER) return sortedMembers;
     return sortedMembers.filter((member) => getInstrumentLabel(member.instrument) === selectedPartFilter);
-  }, [selectedPartFilter, state.members]);
+  }, [selectedPartFilter, selectedPieceSections, state.members]);
 
   // 管理画面だけに見せる出欠サマリー（奏者ページ・ホームには出さない）
   const attendanceSummary = useMemo(() => {
@@ -249,7 +260,7 @@ export function AvailabilityTableApp() {
             </select>
           </label>
         </div>
-        <p className="muted">曲を選ぶとその曲に乗っている人を濃く表示し、パートでは一覧自体を絞り込めます。</p>
+        <p className="muted">曲を選ぶとその曲に乗っている人を濃く表示し、セクション（例: Tb 1st）とセクション順の並びも表示します。パートでは一覧自体を絞り込めます。</p>
         <div className="row">
           <Link className="button secondary" href="/admin/plan">
             練習計画へ
@@ -347,6 +358,7 @@ export function AvailabilityTableApp() {
                       ? "未入力"
                       : "未回答";
                 const isHighlighted = isMemberHighlighted(member.id);
+                const section = selectedPieceSections?.[member.id] ?? "";
 
                 return (
                   <tr key={member.id} className={isHighlighted ? "" : "member-row-dim"}>
@@ -359,7 +371,7 @@ export function AvailabilityTableApp() {
                       >
                         <span>{member.name}</span>
                         <span className="muted">
-                          {getInstrumentLabel(member.instrument) + " / " + availabilityLabel}
+                          {[getInstrumentLabel(member.instrument), section, availabilityLabel].filter(Boolean).join(" / ")}
                         </span>
                       </button>
                     </th>

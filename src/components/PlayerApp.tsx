@@ -935,6 +935,9 @@ export function PlayerApp() {
                   onChange={(event) => togglePiece(piece.id, event.target.checked)}
                 />
                 {piece.title}
+                {piece.memberIds.includes(selected.id) && piece.memberSections[selected.id] ? (
+                  <span className="muted">{piece.memberSections[selected.id]}</span>
+                ) : null}
               </label>
             ))}
           </section>
