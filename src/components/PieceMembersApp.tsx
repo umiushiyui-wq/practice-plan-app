@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useState } from "react";
 import {
-  compareMembersByInstrument,
+  compareMembersByInstrumentAndSection,
   getInstrumentLabel,
+  normalizeSectionLabel,
   LocalStateStatusPanel,
   useLocalPracticeState
 } from "@/components/LocalPracticeApp";
@@ -18,7 +19,13 @@ export function PieceMembersApp({ pieceId }: { pieceId: string }) {
   const { state, updateState, ready } = localState;
   const piece = state.pieces.find((item) => item.id === pieceId);
   const conductor = piece ? state.members.find((member) => member.id === piece.conductorId) : undefined;
-  const sortedMembers = [...state.members].sort(compareMembersByInstrument);
+  const memberSections = piece?.memberSections ?? {};
+  const sortedMembers = [...state.members].sort((first, second) =>
+    compareMembersByInstrumentAndSection(first, second, memberSections)
+  );
+  const sectionSuggestions = Array.from(new Set(Object.values(memberSections))).sort((a, b) =>
+    a.localeCompare(b, "ja", { numeric: true })
+  );
 
   const [inviteStatus, setInviteStatus] = useState<InviteStatus>("idle");
   const [inviteMessage, setInviteMessage] = useState("");
@@ -139,6 +146,19 @@ export function PieceMembersApp({ pieceId }: { pieceId: string }) {
     });
   }
 
+  async function updateSection(memberId: string, section: string) {
+    if (!piece || !piece.memberIds.includes(memberId)) return;
+    if (normalizeSectionLabel(section) === (piece.memberSections[memberId] ?? "")) return;
+
+    await localState.savePieceMembership({
+      pieceId,
+      memberId,
+      selected: true,
+      actor: "admin",
+      section
+    });
+  }
+
   if (ready && !piece) {
     return (
       <main className="stack setup-page">
@@ -245,22 +265,51 @@ export function PieceMembersApp({ pieceId }: { pieceId: string }) {
           <p className="muted">
             ここでのチェックは奏者本人が奏者ページで行うチェックと同じ項目です。どちらで操作しても同じ参加メンバーとして扱われます。
           </p>
+          <p className="muted">
+            セクション（例: Fl 2nd, Tb 1st）は乗っている人だけ入力できます。楽器名を先頭に書くと、パート内で楽器ごと・番号順に並びます。乗り番を外すとセクションも消えます。
+          </p>
+          <datalist id={`piece-sections-${pieceId}`}>
+            {sectionSuggestions.map((section) => (
+              <option key={section} value={section} />
+            ))}
+          </datalist>
           <div className="stack">
             {sortedMembers.length === 0 ? <p className="muted">まだ奏者が登録されていません。</p> : null}
-            {sortedMembers.map((member) => (
-              <label className="row" key={member.id}>
-                <input
-                  style={{ width: "auto" }}
-                  type="checkbox"
-                  checked={piece.memberIds.includes(member.id)}
-                  onChange={(event) => toggleMember(member.id, event.target.checked)}
-                />
-                <div>
-                  <strong>{member.name}</strong>
-                  <div className="muted">{getInstrumentLabel(member.instrument)}</div>
+            {sortedMembers.map((member) => {
+              const isSelected = piece.memberIds.includes(member.id);
+              const section = piece.memberSections[member.id] ?? "";
+
+              return (
+                <div className="row" key={member.id}>
+                  <label className="row">
+                    <input
+                      style={{ width: "auto" }}
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={(event) => toggleMember(member.id, event.target.checked)}
+                    />
+                    <div>
+                      <strong>{member.name}</strong>
+                      <div className="muted">{getInstrumentLabel(member.instrument)}</div>
+                    </div>
+                  </label>
+                  <input
+                    // サーバーから返った値で入力欄を作り直すため、値を key に含める
+                    key={`${member.id}-${isSelected}-${section}`}
+                    style={{ width: "10em" }}
+                    defaultValue={section}
+                    disabled={!isSelected}
+                    list={`piece-sections-${pieceId}`}
+                    placeholder={isSelected ? "セクション" : ""}
+                    aria-label={`${member.name} のセクション`}
+                    onBlur={(event) => updateSection(member.id, event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.nativeEvent.isComposing) event.currentTarget.blur();
+                    }}
+                  />
                 </div>
-              </label>
-            ))}
+              );
+            })}
           </div>
         </section>
       ) : null}

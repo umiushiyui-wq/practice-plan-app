@@ -135,7 +135,8 @@ export function MemberPieceManagerApp() {
       pieces: state.pieces.map((piece) => ({
         ...piece,
         conductorId: piece.conductorId === memberId ? "" : piece.conductorId,
-        memberIds: piece.memberIds.filter((id) => id !== memberId)
+        memberIds: piece.memberIds.filter((id) => id !== memberId),
+        memberSections: Object.fromEntries(Object.entries(piece.memberSections).filter(([id]) => id !== memberId))
       }))
     });
   }
@@ -349,6 +350,7 @@ export function MemberPieceManagerApp() {
           title,
           conductorId,
           memberIds: [],
+          memberSections: {},
           targetMinutes: 60,
           dailyMaxMinutes: 45,
           targetRangeStartDayId: sortedPracticeDays[0]?.id ?? null,
@@ -393,6 +395,7 @@ export function MemberPieceManagerApp() {
               ...item,
               conductorId: "",
               memberIds: [],
+              memberSections: {},
               targetMinutes: 60,
               dailyMaxMinutes: 45,
               targetRangeStartDayId: sortedPracticeDays[0]?.id ?? null,

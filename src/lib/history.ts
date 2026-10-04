@@ -34,6 +34,8 @@ export type PieceSelectionHistoryEntry = BaseEntry & {
   memberName: string;
   selected: boolean;
   actor: "self" | "admin";
+  // セクション変更時のみ（空文字はセクション削除）
+  section?: string;
 };
 
 export type HistoryEntry = SlackHistoryEntry | AvailabilityHistoryEntry | PieceSelectionHistoryEntry;

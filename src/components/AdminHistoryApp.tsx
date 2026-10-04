@@ -120,7 +120,15 @@ function PieceSelectionHistoryTable({ entries }: { entries: PieceSelectionHistor
               </td>
               <td>{entry.memberName}</td>
               <td>{entry.pieceTitle}</td>
-              <td>{entry.selected ? "選択" : "解除"}</td>
+              <td>
+                {entry.section !== undefined
+                  ? entry.section
+                    ? `セクション: ${entry.section}`
+                    : "セクション削除"
+                  : entry.selected
+                    ? "選択"
+                    : "解除"}
+              </td>
             </tr>
           ))}
         </tbody>
