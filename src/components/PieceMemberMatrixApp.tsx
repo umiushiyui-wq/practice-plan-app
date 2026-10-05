@@ -12,6 +12,7 @@ import {
   useLocalPracticeState
 } from "@/components/LocalPracticeApp";
 import type { Member, Piece, PieceMembershipPatch } from "@/components/LocalPracticeApp";
+import type { HistoryEntry } from "@/lib/history";
 
 const ALL_PARTS_FILTER = "__all__";
 const UNSAVED_CONFIRM_MESSAGE = "保存していない変更があります。破棄して移動しますか？";
@@ -42,6 +43,7 @@ export function PieceMemberMatrixApp() {
   const [drafts, setDrafts] = useState<Record<string, Cell>>({});
   const [partFilter, setPartFilter] = useState(ALL_PARTS_FILTER);
   const [isSaving, setIsSaving] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
   const [message, setMessage] = useState<{ kind: "notice" | "error"; text: string } | null>(null);
   const inputRefs = useRef(new Map<string, HTMLInputElement>());
 
@@ -163,6 +165,68 @@ export function PieceMemberMatrixApp() {
     }
   }
 
+  // 変更履歴から「曲 × 奏者」ごとの最新のセクションを探し、今も乗っていてセクションが空のマスを下書きに埋める。
+  // 保存はしないので、確認してから「保存」を押してもらう。
+  async function restoreSectionsFromHistory() {
+    setIsRestoring(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch("/api/local-state/history", { cache: "no-store" });
+      const payload = (await response.json().catch(() => null)) as { entries?: HistoryEntry[]; error?: string } | null;
+      if (!response.ok || !payload?.entries) throw new Error(payload?.error ?? "履歴を取得できませんでした。");
+
+      // 履歴には奏者名しかないので、同名の奏者がいる場合は判別できず対象外にする
+      const membersByName = new Map<string, Member[]>();
+      for (const member of state.members) {
+        membersByName.set(member.name, [...(membersByName.get(member.name) ?? []), member]);
+      }
+
+      // entries は新しい順。曲 × 奏者名ごとに最初に出てきたもの（最新）だけを見る
+      const seen = new Set<string>();
+      const restored: Record<string, Cell> = {};
+      let ambiguousCount = 0;
+
+      for (const entry of payload.entries) {
+        if (entry.category !== "piece-selection") continue;
+        const key = `${entry.pieceId}:${entry.memberName}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        const section = entry.selected && entry.section ? normalizeSectionLabel(entry.section) : "";
+        if (!section) continue;
+
+        const piece = pieces.find((item) => item.id === entry.pieceId);
+        const candidates = membersByName.get(entry.memberName) ?? [];
+        if (!piece || candidates.length === 0) continue;
+        if (candidates.length > 1) {
+          ambiguousCount += 1;
+          continue;
+        }
+
+        const member = candidates[0];
+        const saved = getSavedCell(piece, member.id);
+        if (!saved.selected || saved.section || drafts[cellKey(piece.id, member.id)]) continue;
+        restored[cellKey(piece.id, member.id)] = { selected: true, section };
+      }
+
+      const count = Object.keys(restored).length;
+      setDrafts((current) => ({ ...current, ...restored }));
+      setMessage({
+        kind: "notice",
+        text:
+          (count > 0
+            ? `履歴から ${count}マスのセクションを下書きに読み込みました。オレンジ枠のマスを確認して「保存」を押してください。`
+            : "履歴から復元できるセクションはありませんでした。") +
+          (ambiguousCount > 0 ? `（同じ名前の奏者がいて判別できない ${ambiguousCount}件は対象外）` : "")
+      });
+    } catch (error) {
+      setMessage({ kind: "error", text: error instanceof Error ? error.message : "履歴を取得できませんでした。" });
+    } finally {
+      setIsRestoring(false);
+    }
+  }
+
   async function save() {
     if (!isDirty || isSaving) return;
     setIsSaving(true);
@@ -214,6 +278,12 @@ export function PieceMemberMatrixApp() {
         <p className="muted">
           操作: ↑↓ / Enter で上下に移動、←→ で左右に移動（文字の端で）。空欄でスペースを押すと「セクション未定のまま乗る / 降りる」を切り替え。Esc でそのマスを保存済みの状態に戻します。
         </p>
+        <div className="row">
+          <button className="secondary" type="button" onClick={restoreSectionsFromHistory} disabled={!ready || isRestoring || isSaving}>
+            {isRestoring ? "読み込み中..." : "履歴からセクションを下書きに読み込む"}
+          </button>
+          <span className="muted">今も乗っていてセクションが空のマスだけを、変更履歴の最新のセクションで埋めます（保存はしません）。</span>
+        </div>
         <label>
           パートで絞り込む
           <select value={partFilter} onChange={(event) => setPartFilter(event.target.value)}>
