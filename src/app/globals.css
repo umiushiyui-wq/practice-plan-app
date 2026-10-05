@@ -1838,3 +1838,81 @@ button:disabled:hover {
 .app-update-card {
   width: min(480px, 100%);
 }
+
+/* Slackリアクション確認（/admin/slack-reactions） */
+.reaction-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reaction-summary-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  background: #f2f6fa;
+  border: 1px solid var(--line);
+  font-weight: 600;
+}
+
+.reaction-summary-chip.pending {
+  background: #fff4e5;
+  border-color: #f0c88a;
+  color: var(--warning);
+}
+
+.reaction-emoji {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.reaction-emoji-image {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  vertical-align: middle;
+}
+
+.reaction-emoji-name {
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.reaction-table .reaction-cell,
+.reaction-table thead th.reaction-cell {
+  min-width: 3.5em;
+  text-align: center;
+}
+
+.reaction-table .reaction-check-cell,
+.reaction-table thead th.reaction-check-cell {
+  min-width: 3em;
+  text-align: center;
+}
+
+.reaction-table td.is-reacted {
+  background: #dcf1e1;
+  color: #1f7a33;
+}
+
+.reaction-table td.is-pending {
+  background: #fff4e5;
+  color: var(--warning);
+}
+
+.reaction-table tr.reaction-multi-row th,
+.reaction-table tr.reaction-multi-row td:not(.is-reacted) {
+  background: #fffbe0;
+}
+
+.reaction-message-text {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 4px solid var(--line-strong);
+  color: var(--muted);
+  white-space: pre-wrap;
+  max-height: 8em;
+  overflow: auto;
+}

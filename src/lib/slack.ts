@@ -362,3 +362,116 @@ export async function uploadSlackFile({
 
   return completeResponse.json() as Promise<SlackCompleteUploadExternalResponse>;
 }
+
+// ---- 投稿のリアクション確認（/admin/slack-reactions） ----
+
+export type SlackReaction = { name: string; users: string[]; count: number };
+
+type SlackReactionsGetResponse = {
+  ok: boolean;
+  error?: string;
+  needed?: string;
+  message?: { user?: string; bot_id?: string; ts?: string; text?: string; permalink?: string; reactions?: SlackReaction[] };
+};
+
+export async function getMessageReactions({
+  botToken,
+  channel,
+  timestamp
+}: {
+  botToken: string;
+  channel: string;
+  timestamp: string;
+}): Promise<SlackReactionsGetResponse> {
+  const url = new URL("https://slack.com/api/reactions.get");
+  url.searchParams.set("channel", channel);
+  url.searchParams.set("timestamp", timestamp);
+  // full=true にしないと、リアクションした人の一覧が途中で切られることがある
+  url.searchParams.set("full", "true");
+
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${botToken}` } });
+  return response.json() as Promise<SlackReactionsGetResponse>;
+}
+
+export type SlackWorkspaceUser = { id: string; name: string; isBot: boolean; deleted: boolean };
+
+type SlackUsersListResponse = {
+  ok: boolean;
+  error?: string;
+  needed?: string;
+  members?: Array<{
+    id: string;
+    name?: string;
+    real_name?: string;
+    deleted?: boolean;
+    is_bot?: boolean;
+    profile?: { display_name?: string; real_name?: string };
+  }>;
+  response_metadata?: { next_cursor?: string };
+};
+
+// ワークスペースのユーザー一覧（名前とボット判定用）。users:read が必要。
+export async function listWorkspaceUsers({
+  botToken
+}: {
+  botToken: string;
+}): Promise<{ ok: boolean; error?: string; needed?: string; users: SlackWorkspaceUser[] }> {
+  const users: SlackWorkspaceUser[] = [];
+  let cursor = "";
+
+  do {
+    const url = new URL("https://slack.com/api/users.list");
+    url.searchParams.set("limit", "200");
+    if (cursor) url.searchParams.set("cursor", cursor);
+
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${botToken}` } });
+    const payload = (await response.json()) as SlackUsersListResponse;
+    if (!payload.ok) return { ok: false, error: payload.error, needed: payload.needed, users: [] };
+
+    for (const member of payload.members ?? []) {
+      users.push({
+        id: member.id,
+        name: member.profile?.display_name || member.profile?.real_name || member.real_name || member.name || member.id,
+        isBot: Boolean(member.is_bot) || member.id === "USLACKBOT",
+        deleted: Boolean(member.deleted)
+      });
+    }
+    cursor = payload.response_metadata?.next_cursor ?? "";
+  } while (cursor);
+
+  return { ok: true, users };
+}
+
+type SlackEmojiListResponse = { ok: boolean; error?: string; needed?: string; emoji?: Record<string, string> };
+
+// ワークスペースのカスタム絵文字（名前 → 画像URL または "alias:別名"）。emoji:read が必要。
+export async function listCustomEmoji({ botToken }: { botToken: string }): Promise<SlackEmojiListResponse> {
+  const response = await fetch("https://slack.com/api/emoji.list", { headers: { Authorization: `Bearer ${botToken}` } });
+  return response.json() as Promise<SlackEmojiListResponse>;
+}
+
+type SlackAuthTestResponse = { ok: boolean; error?: string; user_id?: string };
+
+export async function getBotUserId({ botToken }: { botToken: string }): Promise<string | null> {
+  const response = await fetch("https://slack.com/api/auth.test", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${botToken}` }
+  });
+  const payload = (await response.json()) as SlackAuthTestResponse;
+  return payload.ok && payload.user_id ? payload.user_id : null;
+}
+
+// https://xxx.slack.com/archives/C0123ABC/p1712345678123456(?thread_ts=...) → チャンネルIDと投稿のts
+export function parseSlackMessageUrl(value: string): { channel: string; timestamp: string } | null {
+  let url: URL;
+  try {
+    url = new URL(value.trim());
+  } catch {
+    return null;
+  }
+  if (!url.hostname.endsWith("slack.com")) return null;
+
+  const match = url.pathname.match(/\/archives\/([A-Z0-9]+)\/p(\d{10})(\d{6})\/?$/);
+  if (!match) return null;
+  return { channel: match[1], timestamp: `${match[2]}.${match[3]}` };
+}

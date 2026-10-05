@@ -626,6 +626,9 @@ export function AdminApp() {
           <Link className="button secondary" href="/sheet">
             表で見る
           </Link>
+          <Link className="button secondary" href="/admin/slack-reactions">
+            Slackリアクション確認
+          </Link>
         </div>
         {planMessage ? <div className="notice">{planMessage}</div> : null}
       </section>
