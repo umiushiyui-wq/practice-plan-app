@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AppUpdateNotice } from "@/components/AppUpdateNotice";
 import "./globals.css";
 import "./admin-plan.css";
 
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
         {children}
+        <AppUpdateNotice />
       </body>
     </html>
   );

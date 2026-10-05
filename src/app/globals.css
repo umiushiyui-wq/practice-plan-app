@@ -1834,3 +1834,7 @@ button:disabled:hover {
   padding: 6px 10px;
   margin-right: auto;
 }
+
+.app-update-card {
+  width: min(480px, 100%);
+}

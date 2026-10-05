@@ -97,20 +97,33 @@ export function AvailabilityTableApp() {
   );
 
   // 曲を選んでいるときだけ、その曲のセクションを表示・並び順に使う
-  const selectedPieceSections = useMemo(
-    () => state.pieces.find((piece) => piece.id === selectedPieceFilter)?.memberSections ?? null,
+  const selectedPiece = useMemo(
+    () => state.pieces.find((piece) => piece.id === selectedPieceFilter) ?? null,
     [selectedPieceFilter, state.pieces]
   );
+  const selectedPieceSections = selectedPiece?.memberSections ?? null;
 
   const visibleMembers = useMemo(() => {
-    const sortedMembers = [...state.members].sort((first, second) =>
-      selectedPieceSections
-        ? compareMembersByInstrumentAndSection(first, second, selectedPieceSections)
-        : compareMembersByInstrument(first, second)
-    );
+    // 曲で絞っているときは、濃く表示する人（乗っている人 / 「その他」なら曲に乗っていない人）を
+    // パートに関係なく全員上にまとめ、薄く表示する人をその下に回す
+    const isOnPiece = (memberId: string) => state.pieces.some((piece) => piece.memberIds.includes(memberId));
+    const isHighlighted = (memberId: string) =>
+      selectedPieceFilter === ALL_PIECES_FILTER
+        ? true
+        : selectedPieceFilter === OTHER_PIECES_FILTER
+          ? !isOnPiece(memberId)
+          : Boolean(selectedPiece?.memberIds.includes(memberId));
+
+    const sortedMembers = [...state.members].sort((first, second) => {
+      const highlightOrder = Number(!isHighlighted(first.id)) - Number(!isHighlighted(second.id));
+      if (highlightOrder) return highlightOrder;
+      return selectedPiece && isHighlighted(first.id)
+        ? compareMembersByInstrumentAndSection(first, second, selectedPiece.memberSections)
+        : compareMembersByInstrument(first, second);
+    });
     if (selectedPartFilter === ALL_PARTS_FILTER) return sortedMembers;
     return sortedMembers.filter((member) => getInstrumentLabel(member.instrument) === selectedPartFilter);
-  }, [selectedPartFilter, selectedPieceSections, state.members]);
+  }, [selectedPartFilter, selectedPiece, selectedPieceFilter, state.members, state.pieces]);
 
   // 管理画面だけに見せる出欠サマリー（奏者ページ・ホームには出さない）
   const attendanceSummary = useMemo(() => {

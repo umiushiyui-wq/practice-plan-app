@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { APP_OUTDATED_EVENT, APP_VERSION, APP_VERSION_HEADER } from "@/lib/appVersion";
 
 export const INSTRUMENT_OPTIONS = [
   "ふるぼえ",
@@ -549,7 +550,21 @@ function migrateState(value: unknown): AppState {
 type LocalStatePayload = {
   state: unknown | null;
   updatedAt?: string | null;
+  appVersion?: string;
 };
+
+// 一度でも新しいバージョンを検知したら、再読み込みするまで全体保存を止める（ページを開き直すとリセットされる）
+let isAppOutdated = false;
+
+// サーバーが新しいバージョンのとき、共通のポップアップを出す
+function notifyIfAppOutdated(serverAppVersion: string | undefined) {
+  if (!serverAppVersion || serverAppVersion === APP_VERSION) return false;
+  isAppOutdated = true;
+  window.dispatchEvent(new Event(APP_OUTDATED_EVENT));
+  return true;
+}
+
+class OutdatedClientError extends Error {}
 
 function readLocalSavedState() {
   if (typeof window === "undefined") return null;
@@ -568,6 +583,28 @@ function readLocalSavedState() {
   return null;
 }
 
+const OUTDATED_CLIENT_MESSAGE = "新しいバージョンが公開されています。ページを再読み込みしてください。再読み込みするまで、この画面からの保存は止めています。";
+const STALE_STATE_MESSAGE =
+  "他の画面でデータが更新されていたため、この画面の変更は保存せず最新のデータを読み込み直しました。必要ならもう一度操作してください。";
+const SELECTED_PRACTICE_DAY_STORAGE_KEY = "nagosui:selected-practice-day-id";
+
+// 表示する練習日の選択はブラウザごとの設定として持つ（サーバーには保存しない）
+function readLocalSelectedPracticeDayId() {
+  try {
+    return localStorage.getItem(SELECTED_PRACTICE_DAY_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalSelectedPracticeDayId(practiceDayId: string) {
+  try {
+    localStorage.setItem(SELECTED_PRACTICE_DAY_STORAGE_KEY, practiceDayId);
+  } catch {
+    // 選択の記憶は補助的なものなので、保存できなくても動作は続ける
+  }
+}
+
 function cacheStateLocally(state: AppState) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -583,18 +620,34 @@ async function fetchServerState(): Promise<LocalStatePayload> {
     throw new Error(payload?.error ?? "Failed to load shared state");
   }
 
-  return (await response.json()) as LocalStatePayload;
+  const payload = (await response.json()) as LocalStatePayload;
+  notifyIfAppOutdated(payload.appVersion);
+  return payload;
 }
 
-async function putServerState(state: AppState) {
+// 全体保存が、他の画面での更新と衝突したとき（サーバーの版が読み込んだ時点と違う）に投げる
+class StaleStateError extends Error {
+  constructor(readonly serverState: unknown, readonly serverUpdatedAt: string | null) {
+    super(STALE_STATE_MESSAGE);
+  }
+}
+
+async function putServerState(state: AppState, baseUpdatedAt: string | null) {
   const response = await fetch("/api/local-state", {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ state })
+    headers: { "Content-Type": "application/json", [APP_VERSION_HEADER]: APP_VERSION },
+    body: JSON.stringify({ state, baseUpdatedAt })
   });
 
   if (!response.ok) {
     const payload = await response.json().catch(() => null);
+    if (response.status === 409 && payload?.outdated) {
+      notifyIfAppOutdated(payload.appVersion);
+      throw new OutdatedClientError(OUTDATED_CLIENT_MESSAGE);
+    }
+    if (response.status === 409 && payload?.conflict) {
+      throw new StaleStateError(payload.state ?? null, payload.updatedAt ?? null);
+    }
     throw new Error(payload?.error ?? SAVE_ERROR_MESSAGE);
   }
 
@@ -677,7 +730,9 @@ async function putPieceMembershipPatch(patch: PieceMembershipPatch) {
 }
 
 export function useLocalPracticeState() {
-  const [state, setState] = useState<AppState>(defaultState);
+  // rawState はサーバーと同じ内容。画面に返す state は、練習日の選択だけをこのブラウザの選択で上書きしたもの。
+  const [rawState, setState] = useState<AppState>(defaultState);
+  const [localSelectedPracticeDayId, setLocalSelectedPracticeDayId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [saveError, setSaveError] = useState("");
@@ -686,6 +741,27 @@ export function useLocalPracticeState() {
   const [isReloading, setIsReloading] = useState(false);
   const shouldPersistRef = useRef(false);
   const saveSequenceRef = useRef(0);
+  // 全体保存に付けて送る「読み込んだ時点の版」。保存のたびに最新へ更新する。
+  const serverUpdatedAtRef = useRef<string | null>(null);
+  // 全体保存を1件ずつ順番に送るためのキュー（自分の保存同士で版が衝突しないように）
+  const fullSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
+
+  const state = useMemo(
+    () =>
+      localSelectedPracticeDayId && rawState.practiceDays.some((day) => day.id === localSelectedPracticeDayId)
+        ? { ...rawState, selectedPracticeDayId: localSelectedPracticeDayId }
+        : rawState,
+    [localSelectedPracticeDayId, rawState]
+  );
+
+  function rememberServerUpdatedAt(updatedAt: string | null) {
+    serverUpdatedAtRef.current = updatedAt;
+    setServerUpdatedAt(updatedAt);
+  }
+
+  useEffect(() => {
+    setLocalSelectedPracticeDayId(readLocalSelectedPracticeDayId());
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -706,7 +782,7 @@ export function useLocalPracticeState() {
           setState(defaultState);
           setHasLocalMigrationCandidate(readLocalSavedState() !== null);
         }
-        setServerUpdatedAt(payload.updatedAt ?? null);
+        rememberServerUpdatedAt(payload.updatedAt ?? null);
         setSaveError("");
         setSaveStatus("idle");
       } catch {
@@ -731,26 +807,82 @@ export function useLocalPracticeState() {
     if (!ready || !shouldPersistRef.current) return;
 
     const sequence = ++saveSequenceRef.current;
+    const stateToSave = rawState;
     const timeout = window.setTimeout(() => {
+      if (isAppOutdated) {
+        window.dispatchEvent(new Event(APP_OUTDATED_EVENT));
+        setSaveStatus("error");
+        setSaveError(OUTDATED_CLIENT_MESSAGE);
+        return;
+      }
+
       setSaveStatus("saving");
       setSaveError("");
 
-      putServerState(state)
-        .then((payload) => {
-          if (sequence !== saveSequenceRef.current) return;
-          setSaveStatus("saved");
-          setServerUpdatedAt(payload.updatedAt ?? null);
-          cacheStateLocally(state);
-        })
-        .catch(() => {
-          if (sequence !== saveSequenceRef.current) return;
-          setSaveStatus("error");
-          setSaveError(SAVE_ERROR_MESSAGE);
-        });
+      fullSaveQueueRef.current = fullSaveQueueRef.current.then(() =>
+        putServerState(stateToSave, serverUpdatedAtRef.current)
+          .then((payload) => {
+            serverUpdatedAtRef.current = payload.updatedAt ?? null;
+            if (sequence !== saveSequenceRef.current) return;
+            // この保存より後の編集がなければ、未保存の変更なしとして扱う（フォーカス時の再読み込みを許可する）
+            shouldPersistRef.current = false;
+            setSaveStatus("saved");
+            rememberServerUpdatedAt(payload.updatedAt ?? null);
+            cacheStateLocally(stateToSave);
+          })
+          .catch((error: unknown) => {
+            if (error instanceof StaleStateError) {
+              // 古い状態で上書きせず、サーバーの最新を読み込み直す
+              const latest = error.serverState ? migrateState(error.serverState) : null;
+              shouldPersistRef.current = false;
+              saveSequenceRef.current += 1;
+              if (latest) {
+                setState(latest);
+                cacheStateLocally(latest);
+              }
+              rememberServerUpdatedAt(error.serverUpdatedAt);
+              setSaveStatus("error");
+              setSaveError(STALE_STATE_MESSAGE);
+              return;
+            }
+            if (sequence !== saveSequenceRef.current) return;
+            setSaveStatus("error");
+            setSaveError(error instanceof OutdatedClientError ? OUTDATED_CLIENT_MESSAGE : SAVE_ERROR_MESSAGE);
+          })
+      );
     }, 300);
 
     return () => window.clearTimeout(timeout);
-  }, [ready, state]);
+  }, [ready, rawState]);
+
+  // タブに戻ってきたときにサーバーの最新を読み込み直し、古い状態のまま操作しないようにする。
+  // 未保存の変更があるとき（全体保存待ち）は上書きしない。
+  useEffect(() => {
+    if (!ready) return;
+
+    async function refreshIfStale() {
+      if (document.visibilityState !== "visible") return;
+      try {
+        // 未保存の変更があっても新バージョンの検知はしたいので、取得自体は毎回行う
+        const payload = await fetchServerState();
+        if (isAppOutdated || shouldPersistRef.current || !payload.state) return;
+        if ((payload.updatedAt ?? null) === serverUpdatedAtRef.current) return;
+        const migrated = migrateState(payload.state);
+        setState(migrated);
+        cacheStateLocally(migrated);
+        rememberServerUpdatedAt(payload.updatedAt ?? null);
+      } catch {
+        // 再読み込みに失敗しても、次の保存時の版チェックで古い上書きは防がれる
+      }
+    }
+
+    window.addEventListener("focus", refreshIfStale);
+    document.addEventListener("visibilitychange", refreshIfStale);
+    return () => {
+      window.removeEventListener("focus", refreshIfStale);
+      document.removeEventListener("visibilitychange", refreshIfStale);
+    };
+  }, [ready]);
 
   function updateFullState(value: AppState | ((current: AppState) => AppState)) {
     shouldPersistRef.current = true;
@@ -758,8 +890,16 @@ export function useLocalPracticeState() {
   }
 
   function updateState(patch: Partial<AppState>) {
+    // 練習日の選択はこのブラウザだけの設定にし、サーバーへの全体保存を起こさない
+    const { selectedPracticeDayId, ...sharedPatch } = patch;
+    if (selectedPracticeDayId !== undefined) {
+      setLocalSelectedPracticeDayId(selectedPracticeDayId);
+      writeLocalSelectedPracticeDayId(selectedPracticeDayId);
+    }
+    if (Object.keys(sharedPatch).length === 0) return;
+
     shouldPersistRef.current = true;
-    setState((current) => ({ ...current, ...patch }));
+    setState((current) => ({ ...current, ...sharedPatch }));
   }
 
   async function reloadServerState() {
@@ -779,7 +919,7 @@ export function useLocalPracticeState() {
         setHasLocalMigrationCandidate(readLocalSavedState() !== null);
       }
 
-      setServerUpdatedAt(payload.updatedAt ?? null);
+      rememberServerUpdatedAt(payload.updatedAt ?? null);
       setSaveStatus("idle");
       setSaveError("");
     } catch {
@@ -807,18 +947,18 @@ export function useLocalPracticeState() {
         shouldPersistRef.current = didMigrateState(currentServer.state, migratedServerState);
         setState(migratedServerState);
         cacheStateLocally(migratedServerState);
-        setServerUpdatedAt(currentServer.updatedAt ?? null);
+        rememberServerUpdatedAt(currentServer.updatedAt ?? null);
         setHasLocalMigrationCandidate(false);
         setSaveStatus("saved");
         return;
       }
 
       const migratedLocalState = migrateState(localState);
-      const payload = await putServerState(migratedLocalState);
+      const payload = await putServerState(migratedLocalState, currentServer.updatedAt ?? null);
       shouldPersistRef.current = false;
       setState(migratedLocalState);
       cacheStateLocally(migratedLocalState);
-      setServerUpdatedAt(payload.updatedAt ?? null);
+      rememberServerUpdatedAt(payload.updatedAt ?? null);
       setHasLocalMigrationCandidate(false);
       setSaveStatus("saved");
     } catch {
@@ -833,11 +973,11 @@ export function useLocalPracticeState() {
 
     try {
       const saved = await putAvailabilityPatch(patch);
-      const nextState = saved.state ? migrateState(saved.state) : state;
+      const nextState = saved.state ? migrateState(saved.state) : rawState;
       shouldPersistRef.current = false;
       setState(nextState);
       cacheStateLocally(nextState);
-      setServerUpdatedAt(saved.updatedAt ?? null);
+      rememberServerUpdatedAt(saved.updatedAt ?? null);
       setHasLocalMigrationCandidate(false);
       setSaveStatus("saved");
       return nextState;
@@ -856,10 +996,10 @@ export function useLocalPracticeState() {
     // here (bypassing the debounced full-state save) — otherwise React snaps the
     // checkbox back to its previous value the instant the click handler returns,
     // before the request round-trips.
-    const previousState = state;
+    const previousState = rawState;
     const optimisticState: AppState = {
-      ...state,
-      pieces: state.pieces.map((piece) => (piece.id === patch.pieceId ? applyPieceMembershipPatch(piece, patch) : piece))
+      ...rawState,
+      pieces: rawState.pieces.map((piece) => (piece.id === patch.pieceId ? applyPieceMembershipPatch(piece, patch) : piece))
     };
     shouldPersistRef.current = false;
     setState(optimisticState);
@@ -870,7 +1010,7 @@ export function useLocalPracticeState() {
       shouldPersistRef.current = false;
       setState(nextState);
       cacheStateLocally(nextState);
-      setServerUpdatedAt(saved.updatedAt ?? null);
+      rememberServerUpdatedAt(saved.updatedAt ?? null);
       setHasLocalMigrationCandidate(false);
       setSaveStatus("saved");
       return nextState;
@@ -890,11 +1030,11 @@ export function useLocalPracticeState() {
 
     try {
       const saved = await putPieceMembershipPatches(patches);
-      const nextState = saved.state ? migrateState(saved.state) : state;
+      const nextState = saved.state ? migrateState(saved.state) : rawState;
       shouldPersistRef.current = false;
       setState(nextState);
       cacheStateLocally(nextState);
-      setServerUpdatedAt(saved.updatedAt ?? null);
+      rememberServerUpdatedAt(saved.updatedAt ?? null);
       setHasLocalMigrationCandidate(false);
       setSaveStatus("saved");
       return nextState;
@@ -911,11 +1051,11 @@ export function useLocalPracticeState() {
 
     try {
       const saved = await putAttendanceRecordPatch(patch);
-      const nextState = saved.state ? migrateState(saved.state) : state;
+      const nextState = saved.state ? migrateState(saved.state) : rawState;
       shouldPersistRef.current = false;
       setState(nextState);
       cacheStateLocally(nextState);
-      setServerUpdatedAt(saved.updatedAt ?? null);
+      rememberServerUpdatedAt(saved.updatedAt ?? null);
       setHasLocalMigrationCandidate(false);
       setSaveStatus("saved");
       return nextState;
@@ -931,11 +1071,11 @@ export function useLocalPracticeState() {
   async function ensureAttendanceRecordSnapshot(practiceDayId: string) {
     try {
       const saved = await postAttendanceRecordSnapshot(practiceDayId);
-      const nextState = saved.state ? migrateState(saved.state) : state;
+      const nextState = saved.state ? migrateState(saved.state) : rawState;
       shouldPersistRef.current = false;
       setState(nextState);
       cacheStateLocally(nextState);
-      setServerUpdatedAt(saved.updatedAt ?? null);
+      rememberServerUpdatedAt(saved.updatedAt ?? null);
       return nextState;
     } catch {
       return null;

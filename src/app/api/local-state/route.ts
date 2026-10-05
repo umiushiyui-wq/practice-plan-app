@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { APP_VERSION, APP_VERSION_HEADER } from "@/lib/appVersion";
 
 export const runtime = "nodejs";
 
 const STATE_KEY = process.env.LOCAL_STATE_KEY ?? "nagosui:local-practice-state";
 const STORAGE_NOT_CONFIGURED_MESSAGE = "Redis/KV storage is not configured";
+const OUTDATED_CLIENT_MESSAGE = "新しいバージョンが公開されています。ページを再読み込みしてからやり直してください。";
+const STALE_STATE_MESSAGE = "他の画面でデータが更新されていたため保存しませんでした。ページを再読み込みしてからやり直してください。";
 
 type StoredLocalState = {
   state: unknown;
@@ -116,7 +119,7 @@ export async function GET() {
     }
 
     const payload = redisConfig() ? await readFromRedis() : await readFromFile();
-    return NextResponse.json(payload);
+    return NextResponse.json({ ...payload, appVersion: APP_VERSION });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to read state" },
@@ -127,9 +130,26 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = (await request.json()) as { state?: unknown; baseUpdatedAt?: unknown };
     if (!redisConfig() && !canUseFileFallback()) {
       return NextResponse.json({ error: STORAGE_NOT_CONFIGURED_MESSAGE }, { status: 500 });
+    }
+
+    // デプロイ前の古い画面からの全体保存は、新しいデータ項目を消しかねないので拒否する
+    if (request.headers.get(APP_VERSION_HEADER) !== APP_VERSION) {
+      return NextResponse.json({ error: OUTDATED_CLIENT_MESSAGE, outdated: true, appVersion: APP_VERSION }, { status: 409 });
+    }
+
+    // 状態全体の上書きは、読み込んだ時点の版(baseUpdatedAt)がサーバーの最新と一致するときだけ許可する。
+    // 古いタブ（デプロイ前のコードを含む）が他の画面での変更を丸ごと消さないようにするため。
+    // baseUpdatedAt を送らない古いクライアントも拒否する。
+    const current = redisConfig() ? await readFromRedis() : await readFromFile();
+    const baseUpdatedAt = typeof body.baseUpdatedAt === "string" || body.baseUpdatedAt === null ? body.baseUpdatedAt : undefined;
+    if (baseUpdatedAt === undefined || baseUpdatedAt !== current.updatedAt) {
+      return NextResponse.json(
+        { error: STALE_STATE_MESSAGE, conflict: true, state: current.state, updatedAt: current.updatedAt },
+        { status: 409 }
+      );
     }
 
     const updatedAt = redisConfig() ? await writeToRedis(body.state) : await writeToFile(body.state);
