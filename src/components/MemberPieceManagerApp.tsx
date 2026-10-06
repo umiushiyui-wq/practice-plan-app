@@ -46,6 +46,18 @@ function readSetupSectionFromHash(): SetupSectionId {
   return SETUP_SECTIONS.some((section) => section.id === sectionId) ? (sectionId as SetupSectionId) : "practice-days";
 }
 
+function PrivateDayCheckbox({ defaultChecked }: { defaultChecked: boolean }) {
+  return (
+    <label className="row">
+      <input name="isPrivate" type="checkbox" style={{ width: "auto" }} defaultChecked={defaultChecked} />
+      <span>
+        非公開にする
+        <span className="muted">（奏者ページ・練習表・ホーム・Slackの/出欠には出さず、出欠の入力も求めません。出欠は管理画面の参加可能時間表で入力します）</span>
+      </span>
+    </label>
+  );
+}
+
 export function MemberPieceManagerApp() {
   const localState = useLocalPracticeState();
   const { state, updateState } = localState;
@@ -171,6 +183,7 @@ export function MemberPieceManagerApp() {
     const startTime = String(formData.get("startTime") ?? "18:00");
     const endTime = String(formData.get("endTime") ?? "21:00");
     const location = String(formData.get("location") ?? "").trim();
+    const isPrivate = formData.get("isPrivate") === "on";
     const id = makeId("d");
 
     updateState({
@@ -187,6 +200,7 @@ export function MemberPieceManagerApp() {
           absentMemberIds: [],
           respondedMemberIds: [],
           isPlanPublished: false,
+          isPrivate,
           actualAvailabilities: [],
           actualAbsentMemberIds: [],
           actualRespondedMemberIds: [],
@@ -201,6 +215,7 @@ export function MemberPieceManagerApp() {
             absentMemberIds: [],
             respondedMemberIds: [],
             isPlanPublished: false,
+            isPrivate,
             actualAvailabilities: [],
             actualAbsentMemberIds: [],
             actualRespondedMemberIds: [],
@@ -231,10 +246,13 @@ export function MemberPieceManagerApp() {
       endTime: String(formData.get("endTime") ?? day.endTime)
     };
 
+    const isPrivate = formData.get("isPrivate") === "on";
     updateState({
-      practiceDays: state.practiceDays.map((item) => (item.id === dayId ? { ...item, ...next } : item))
+      practiceDays: state.practiceDays.map((item) => (item.id === dayId ? { ...item, ...next, isPrivate } : item))
     });
     setEditingPracticeDayId("");
+    // 非公開の日は奏者に出欠を求めていないので、日時変更のDM通知も出さない
+    if (isPrivate) return;
 
     const respondedMemberIdSet = new Set(day.respondedMemberIds);
     const respondedMembers = state.members.filter((member) => respondedMemberIdSet.has(member.id));
@@ -576,6 +594,7 @@ export function MemberPieceManagerApp() {
                 <input name="endTime" type="time" step="300" defaultValue="21:00" required />
               </label>
             </div>
+            <PrivateDayCheckbox defaultChecked={false} />
             <button type="submit">練習日を追加</button>
           </form>
           {scheduleChangeNoticeStatus === "sent" && scheduleChangeNoticeMessage ? (
@@ -596,6 +615,7 @@ export function MemberPieceManagerApp() {
                     <div className="row setup-practice-day-row">
                       <div className="setup-practice-day-summary">
                         <strong>{formatPracticeDateLabel(day.practiceDate)}</strong>
+                        {day.isPrivate ? <span className="status-pill">🔒非公開</span> : null}
                         <span className="muted">{day.startTime} - {day.endTime}</span>
                         {day.location.trim() ? <span className="muted">＠{day.location.trim()}</span> : null}
                       </div>
@@ -638,6 +658,7 @@ export function MemberPieceManagerApp() {
                             <input name="location" defaultValue={day.location} placeholder="例: 市民ホール" />
                           </label>
                         </div>
+                        <PrivateDayCheckbox defaultChecked={day.isPrivate} />
                         <button type="submit">この練習日を保存</button>
                       </form>
                     ) : null}

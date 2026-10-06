@@ -43,6 +43,7 @@ type PracticeDayLike = {
   availabilities?: AvailabilityLike[];
   absentMemberIds?: unknown[];
   respondedMemberIds?: unknown[];
+  isPrivate?: unknown;
 };
 
 type AppStateLike = {
@@ -187,7 +188,9 @@ function getUpcomingPracticeDays(state: unknown) {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
+  // 非公開の練習日は /出欠 には出さない
   return practiceDays
+    .filter((item) => item.isPrivate !== true)
     .filter((item): item is PracticeDayLike & { practiceDate: string } => typeof item.practiceDate === "string")
     .map((item) => ({ item, date: new Date(`${item.practiceDate}T00:00:00`) }))
     .filter((entry) => !Number.isNaN(entry.date.getTime()) && entry.date.getTime() >= todayStart.getTime())
@@ -245,7 +248,7 @@ function getPracticeDayByDate(state: unknown, dateStr: string) {
   if (!Array.isArray(practiceDays)) return null;
 
   const day = practiceDays.find(
-    (item): item is PracticeDayLike & { practiceDate: string } => item.practiceDate === dateStr
+    (item): item is PracticeDayLike & { practiceDate: string } => item.practiceDate === dateStr && item.isPrivate !== true
   );
   return day ? normalizePracticeDay(day) : null;
 }

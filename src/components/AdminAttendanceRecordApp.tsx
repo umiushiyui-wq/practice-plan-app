@@ -19,7 +19,8 @@ import {
   LocalStateStatusPanel,
   toMinutes,
   toTime,
-  useLocalPracticeState
+  useLocalPracticeState,
+  getPrivateDayMark
 } from "@/components/LocalPracticeApp";
 import type { AttendanceStatus, LocalPracticeDay } from "@/components/LocalPracticeApp";
 
@@ -287,6 +288,7 @@ export function AdminAttendanceRecordApp() {
             <select value={selectedDay.id} onChange={(event) => localState.updateState({ selectedPracticeDayId: event.target.value })}>
               {sortedPracticeDays.map((day) => (
                 <option key={day.id} value={day.id}>
+                  {getPrivateDayMark(day)}
                   {formatPracticeDateLabel(day.practiceDate)} {formatPracticeTimeAndLocation(day)}
                 </option>
               ))}

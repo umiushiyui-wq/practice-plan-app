@@ -18,7 +18,8 @@ import {
   updatePracticeDay,
   useLocalPracticeState,
   usePieceMap,
-  type PlanSlot
+  type PlanSlot,
+  getPrivateDayMark
 } from "@/components/LocalPracticeApp";
 
 type UtilitySlotKind = "break" | "setup" | "cleanup";
@@ -532,6 +533,10 @@ export function AdminApp() {
     if (!nextPublished) return;
 
     setPlanMessage("");
+    if (selectedDay.isPrivate) {
+      setPlanMessage("非公開の練習日のため、Slackへのアナウンスは行いません。");
+      return;
+    }
     if (confirm("スケジュール公開をアナウンスしますか？")) {
       void sendPublishAnnouncement(normalizedDay);
     } else {
@@ -649,6 +654,7 @@ export function AdminApp() {
             >
               {sortedPracticeDays.map((day) => (
                 <option key={day.id} value={day.id}>
+                  {getPrivateDayMark(day)}
                   {formatPracticeDateLabel(day.practiceDate)} {formatPracticeTimeAndLocation(day)}
                 </option>
               ))}

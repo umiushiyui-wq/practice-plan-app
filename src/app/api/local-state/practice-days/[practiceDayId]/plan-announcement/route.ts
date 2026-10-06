@@ -1,4 +1,5 @@
 ﻿import { NextResponse } from "next/server";
+import { isPrivatePracticeDay, PRIVATE_DAY_SLACK_ERROR } from "@/lib/practiceDayVisibility";
 import { config } from "@/lib/config";
 import { uploadSlackFile } from "@/lib/slack";
 
@@ -136,6 +137,9 @@ export async function POST(request: Request, context: { params: Promise<{ practi
     const practiceDay = findPracticeDay(current.state, practiceDayId);
     if (!practiceDay) {
       return NextResponse.json({ error: "\u7df4\u7fd2\u65e5\u304c\u898b\u3064\u304b\u308a\u307e\u305b\u3093\u3002" }, { status: 404 });
+    }
+    if (isPrivatePracticeDay(current.state, practiceDayId)) {
+      return NextResponse.json({ error: PRIVATE_DAY_SLACK_ERROR }, { status: 400 });
     }
 
     const dateLabel = formatAnnouncementDate(practiceDay.practiceDate);

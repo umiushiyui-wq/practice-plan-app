@@ -5,6 +5,7 @@ import {
   formatPracticeDateLabel,
   getPracticeDayLabel,
   getPlanSlotLabel,
+  getPublicPracticeDays,
   getSelectedPracticeDay,
   getSortedPracticeDays,
   sortPlanByTime,
@@ -20,10 +21,22 @@ function formatPracticeTimeAndLocation(day: { startTime: string; endTime: string
 export function SheetViewApp() {
   const localState = useLocalPracticeState();
   const { state, updateState } = localState;
-  const selectedDay = getSelectedPracticeDay(state);
-  const sortedPracticeDays = getSortedPracticeDays(state.practiceDays);
+  // 奏者も見る公開画面なので、非公開の練習日は出さない
+  const sortedPracticeDays = getSortedPracticeDays(getPublicPracticeDays(state.practiceDays));
+  const selectedDay = sortedPracticeDays.find((day) => day.id === getSelectedPracticeDay(state).id) ?? sortedPracticeDays[0];
   const pieceMap = usePieceMap(state.pieces);
-  const sortedPlan = sortPlanByTime(selectedDay.plan);
+  const sortedPlan = sortPlanByTime(selectedDay?.plan ?? []);
+
+  if (!selectedDay) {
+    return (
+      <main className="stack">
+        <section className="panel stack">
+          <h1>練習計画表</h1>
+          <p className="muted">表示できる練習日はまだありません。</p>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="stack">

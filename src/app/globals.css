@@ -1916,3 +1916,10 @@ button:disabled:hover {
   max-height: 8em;
   overflow: auto;
 }
+
+.admin-availability-editor {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+}

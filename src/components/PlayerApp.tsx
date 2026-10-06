@@ -11,6 +11,7 @@ import {
   getInstrumentLabel,
   getPracticeDayLabel,
   getSortedInstrumentOptions,
+  getPublicPracticeDays,
   getSortedPracticeDays,
   toMinutes,
   toTime,
@@ -183,7 +184,11 @@ function TimePartSelect({
 export function PlayerApp() {
   const localState = useLocalPracticeState();
   const { state, updateState, ready } = localState;
-  const sortedPracticeDays = useMemo(() => getSortedPracticeDays(state.practiceDays), [state.practiceDays]);
+  // 非公開の練習日は奏者に出欠を求めないので、奏者ページには出さない
+  const sortedPracticeDays = useMemo(
+    () => getSortedPracticeDays(getPublicPracticeDays(state.practiceDays)),
+    [state.practiceDays]
+  );
   const AVAILABILITY_SLOTS = useMemo(() => {
     const range = getAvailabilityRange(sortedPracticeDays);
     return buildAvailabilitySlots(range.startMin, range.endMin);

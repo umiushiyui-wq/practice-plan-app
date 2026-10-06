@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isPrivatePracticeDay, PRIVATE_DAY_SLACK_ERROR } from "@/lib/practiceDayVisibility";
 import { config } from "@/lib/config";
 import { openSlackConversation, postSlackMessage } from "@/lib/slack";
 import { appendHistoryEntry } from "@/lib/history";
@@ -168,6 +169,9 @@ export async function POST(request: Request, context: { params: Promise<{ practi
     const respondedMemberIds = findRespondedMemberIds(current.state, practiceDayId);
     if (!respondedMemberIds) {
       return NextResponse.json({ error: "練習日が見つかりません。" }, { status: 404 });
+    }
+    if (isPrivatePracticeDay(current.state, practiceDayId)) {
+      return NextResponse.json({ error: PRIVATE_DAY_SLACK_ERROR }, { status: 400 });
     }
 
     // 出欠リセットと同時に送る場合、保存済みstateの回答者はすでに空になり得るため、クライアントが変更前の回答者を渡す。

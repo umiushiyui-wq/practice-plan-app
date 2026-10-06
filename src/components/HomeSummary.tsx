@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import {
   formatPracticeDateLabel,
+  getPublicPracticeDays,
   getSortedPracticeDays,
   useLocalPracticeState
 } from "@/components/LocalPracticeApp";
@@ -13,7 +14,7 @@ export function HomeSummary() {
   const { state, ready } = useLocalPracticeState();
 
   const nextDay = useMemo(() => {
-    const sorted = getSortedPracticeDays(state.practiceDays);
+    const sorted = getSortedPracticeDays(getPublicPracticeDays(state.practiceDays));
     if (sorted.length === 0) return null;
     const today = new Date().toISOString().slice(0, 10);
     return sorted.find((day) => day.practiceDate >= today) ?? sorted[sorted.length - 1];

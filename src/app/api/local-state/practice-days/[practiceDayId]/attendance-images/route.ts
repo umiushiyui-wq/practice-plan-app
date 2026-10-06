@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isPrivatePracticeDay, PRIVATE_DAY_SLACK_ERROR } from "@/lib/practiceDayVisibility";
 import { config, TIME_ZONE } from "@/lib/config";
 import { joinConversation, uploadSlackFile } from "@/lib/slack";
 import { PART_SLACK_CHANNELS, TEST_SLACK_CHANNEL_ID } from "@/lib/partSlackChannels";
@@ -158,6 +159,9 @@ export async function POST(request: Request, context: { params: Promise<{ practi
     const practiceDay = findPracticeDay(current.state, practiceDayId);
     if (!practiceDay) {
       return NextResponse.json({ error: "練習日が見つかりません。" }, { status: 404 });
+    }
+    if (isPrivatePracticeDay(current.state, practiceDayId)) {
+      return NextResponse.json({ error: PRIVATE_DAY_SLACK_ERROR }, { status: 400 });
     }
 
     const dateLabel = formatAttendanceDate(practiceDay.practiceDate);

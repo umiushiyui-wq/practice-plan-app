@@ -178,7 +178,8 @@ export function PartAttendanceSenderPanel({ selectedDay, members }: PartAttendan
         className="slack-reminder-button"
         type="button"
         onClick={() => setIsConfirmOpen(true)}
-        disabled={status === "sending"}
+        disabled={status === "sending" || selectedDay.isPrivate}
+        title={selectedDay.isPrivate ? "非公開の練習日には送信できません" : undefined}
       >
         {status === "sending" ? "送信中" : "パート別に出欠画像を送る"}
       </button>

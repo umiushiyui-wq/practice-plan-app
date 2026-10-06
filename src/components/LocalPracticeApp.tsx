@@ -199,6 +199,8 @@ export type LocalPracticeDay = {
   absentMemberIds: string[];
   respondedMemberIds: string[];
   isPlanPublished: boolean;
+  // 非公開の練習日（出欠の入力を求めない）。管理画面にだけ表示し、奏者向け画面・Slack送信からは除く。
+  isPrivate: boolean;
   plan: PlanSlot[];
   // 「実際の出欠」（/admin/record 専用）。自己申告の availabilities 等とは独立して管理する。
   actualAvailabilities: Availability[];
@@ -373,6 +375,7 @@ function defaultPracticeDay(): LocalPracticeDay {
     absentMemberIds: [],
     respondedMemberIds: [],
     isPlanPublished: false,
+    isPrivate: false,
     plan: [],
     actualAvailabilities: [],
     actualAbsentMemberIds: [],
@@ -506,6 +509,7 @@ function migrateState(value: unknown): AppState {
           absentMemberIds: day.absentMemberIds ?? [],
           respondedMemberIds: day.respondedMemberIds ?? [],
           isPlanPublished: typeof day.isPlanPublished === "boolean" ? day.isPlanPublished : false,
+          isPrivate: day.isPrivate === true,
           availabilities: Array.isArray(day.availabilities) ? day.availabilities.map(normalizeAvailability) : [],
           plan: Array.isArray(day.plan) ? day.plan : [],
           actualAvailabilities: Array.isArray(day.actualAvailabilities)
@@ -531,6 +535,7 @@ function migrateState(value: unknown): AppState {
     absentMemberIds: [],
     respondedMemberIds: [],
     isPlanPublished: false,
+    isPrivate: false,
     plan: saved.plan ?? [],
     actualAvailabilities: [],
     actualAbsentMemberIds: [],
@@ -1181,6 +1186,16 @@ export function updatePracticeDay(
   patch: Partial<LocalPracticeDay>
 ): LocalPracticeDay[] {
   return state.practiceDays.map((day) => (day.id === dayId ? { ...day, ...patch } : day));
+}
+
+// 奏者向け画面（ホーム・奏者ページ・練習表）に出す練習日（非公開の日を除く）
+export function getPublicPracticeDays(practiceDays: LocalPracticeDay[]) {
+  return practiceDays.filter((day) => !day.isPrivate);
+}
+
+// 管理画面の練習日の選択肢などで、非公開の日に付ける印
+export function getPrivateDayMark(day: Pick<LocalPracticeDay, "isPrivate">) {
+  return day.isPrivate ? "🔒非公開 " : "";
 }
 
 export function getSortedPracticeDays(practiceDays: LocalPracticeDay[]) {

@@ -17,9 +17,11 @@ import {
   LocalStateStatusPanel,
   toMinutes,
   toTime,
-  useLocalPracticeState
+  useLocalPracticeState,
+  getPrivateDayMark
 } from "@/components/LocalPracticeApp";
 import type { LocalPracticeDay } from "@/components/LocalPracticeApp";
+import { AdminAvailabilityEditor } from "@/components/AdminAvailabilityEditor";
 import { PartAttendanceSenderPanel } from "@/components/PartAttendanceSenderPanel";
 
 const ALL_PIECES_FILTER = "__all__";
@@ -244,6 +246,7 @@ export function AvailabilityTableApp() {
             >
               {sortedPracticeDays.map((day) => (
                 <option key={day.id} value={day.id}>
+                  {getPrivateDayMark(day)}
                   {formatPracticeDateLabel(day.practiceDate)} {formatPracticeTimeAndLocation(day)}
                 </option>
               ))}
@@ -273,7 +276,7 @@ export function AvailabilityTableApp() {
             </select>
           </label>
         </div>
-        <p className="muted">曲を選ぶとその曲に乗っている人を濃く表示し、セクション（例: Tb 1st）とセクション順の並びも表示します。パートでは一覧自体を絞り込めます。</p>
+        <p className="muted">曲を選ぶとその曲に乗っている人を濃く表示し、セクション（例: Tb 1st）とセクション順の並びも表示します。パートでは一覧自体を絞り込めます。奏者名を押すと、その人の出欠を代わりに入力できます。</p>
         <div className="row">
           <Link className="button secondary" href="/admin/plan">
             練習計画へ
@@ -287,7 +290,13 @@ export function AvailabilityTableApp() {
           <Link className="button secondary" href="/sheet">
             {"\u8868\u3067\u898b\u308b"}
           </Link>
-          <button className="slack-reminder-button" type="button" onClick={sendSlackReminders} disabled={slackReminderStatus === "sending"}>
+          <button
+            className="slack-reminder-button"
+            type="button"
+            onClick={sendSlackReminders}
+            disabled={slackReminderStatus === "sending" || selectedDay.isPrivate}
+            title={selectedDay.isPrivate ? "非公開の練習日には送信できません" : undefined}
+          >
             {slackReminderStatus === "sending" ? "\u9001\u4fe1\u4e2d" : "\u672a\u5165\u529b\u8005\u306b\u30e1\u30c3\u30bb\u30fc\u30b8\u3092\u9001\u308b"}
           </button>
           <PartAttendanceSenderPanel selectedDay={selectedDay} members={state.members} />
@@ -380,7 +389,7 @@ export function AvailabilityTableApp() {
                         type="button"
                         className="availability-day-button"
                         onClick={() => setDetailMemberId(member.id)}
-                        title={`${member.name} の参加可能時間表を見る`}
+                        title={`${member.name} の参加可能時間表を見る・出欠を編集する`}
                       >
                         <span>{member.name}</span>
                         <span className="muted">
@@ -447,6 +456,13 @@ export function AvailabilityTableApp() {
                 閉じる
               </button>
             </div>
+
+            <AdminAvailabilityEditor
+              key={`${selectedDay.id}-${detailMember.id}`}
+              day={selectedDay}
+              member={detailMember}
+              onSave={localState.saveAvailabilityPatch}
+            />
 
             <div className="availability-wrap">
               <table className="availability-table player-availability-table">

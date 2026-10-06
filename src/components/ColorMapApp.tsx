@@ -10,7 +10,8 @@ import {
   LocalStateStatusPanel,
   toMinutes,
   toTime,
-  useLocalPracticeState
+  useLocalPracticeState,
+  getPrivateDayMark
 } from "@/components/LocalPracticeApp";
 
 const HEATMAP_SLOTS = Array.from({ length: 15 }, (_, index) => 8 * 60 + index * 60);
@@ -133,6 +134,7 @@ export function ColorMapApp() {
             >
               {sortedPracticeDays.map((day) => (
                 <option key={day.id} value={day.id}>
+                  {getPrivateDayMark(day)}
                   {getPracticeDayLabel(day)} {day.startTime}〜{day.endTime}
                 </option>
               ))}
