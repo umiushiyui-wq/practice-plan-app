@@ -9,7 +9,7 @@ type BaseEntry = {
 
 export type SlackHistoryEntry = BaseEntry & {
   category: "slack";
-  kind: "reminder" | "attendance-image" | "schedule-change" | "reaction-reminder";
+  kind: "reminder" | "attendance-image" | "schedule-change" | "reaction-reminder" | "answer-confirmation";
   practiceDayId: string;
   practiceDateLabel: string;
   success: boolean;

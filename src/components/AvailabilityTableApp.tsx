@@ -36,6 +36,13 @@ type SlackReminderResult = {
   totalUnansweredCount: number;
 };
 
+type AnswerConfirmationResult = {
+  sentCount: number;
+  missingSlackUserIdCount: number;
+  failedCount: number;
+  totalAnsweredCount: number;
+};
+
 type LastReminder = {
   sentAt: string;
   summary: string;
@@ -76,6 +83,8 @@ export function AvailabilityTableApp() {
   const [slackReminderResult, setSlackReminderResult] = useState<SlackReminderResult | null>(null);
   const [slackReminderMessage, setSlackReminderMessage] = useState("");
   const [lastReminder, setLastReminder] = useState<{ practiceDayId: string; value: LastReminder | null } | null>(null);
+  const [answerConfirmationStatus, setAnswerConfirmationStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [answerConfirmationMessage, setAnswerConfirmationMessage] = useState("");
 
   useEffect(() => {
     const practiceDayId = selectedDay.id;
@@ -227,6 +236,35 @@ export function AvailabilityTableApp() {
     }
   }
 
+  // \u5165\u529b\u6e08\u307f\u306e\u4eba\u306b\u3001\u53d7\u3051\u4ed8\u3051\u305f\u5185\u5bb9\u3092\u306a\u3054\u307e\u308b\u304b\u3089DM\u3067\u9001\u308a\u8fd4\u3059\uff08\u9593\u9055\u3063\u3066\u3044\u305f\u3089\u5165\u529b\u3057\u76f4\u3057\u3066\u3082\u3089\u3046\uff09
+  async function sendAnswerConfirmations() {
+    if (!confirm("\u5165\u529b\u6e08\u307f\u306e\u4eba\u306b\u3001\u5165\u529b\u5185\u5bb9\u306e\u78ba\u8a8d\u30e1\u30c3\u30bb\u30fc\u30b8\u3092Slack DM\u3067\u9001\u4fe1\u3057\u307e\u3059\u304b\uff1f")) return;
+
+    setAnswerConfirmationStatus("sending");
+    setAnswerConfirmationMessage("");
+
+    try {
+      const response = await fetch(`/api/local-state/practice-days/${selectedDay.id}/answer-confirmations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetMemberIds: reminderTargetMemberIds })
+      });
+      const payload = (await response.json().catch(() => null)) as (AnswerConfirmationResult & { error?: string }) | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "\u78ba\u8a8d\u30e1\u30c3\u30bb\u30fc\u30b8\u3092\u9001\u4fe1\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002");
+      }
+
+      setAnswerConfirmationStatus("sent");
+      setAnswerConfirmationMessage(
+        `\u78ba\u8a8d\u30e1\u30c3\u30bb\u30fc\u30b8: \u9001\u4fe1 ${payload?.sentCount ?? 0}\u4eba / Slack ID\u672a\u767b\u9332 ${payload?.missingSlackUserIdCount ?? 0}\u4eba / \u5931\u6557 ${payload?.failedCount ?? 0}\u4eba\uff08\u5165\u529b\u6e08\u307f ${payload?.totalAnsweredCount ?? 0}\u4eba\uff09`
+      );
+    } catch (error) {
+      setAnswerConfirmationStatus("error");
+      setAnswerConfirmationMessage(error instanceof Error ? error.message : "\u78ba\u8a8d\u30e1\u30c3\u30bb\u30fc\u30b8\u3092\u9001\u4fe1\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002");
+    }
+  }
+
   return (
     <main className="stack">
       <section className="panel stack">
@@ -242,6 +280,8 @@ export function AvailabilityTableApp() {
                 setSlackReminderStatus("idle");
                 setSlackReminderResult(null);
                 setSlackReminderMessage("");
+                setAnswerConfirmationStatus("idle");
+                setAnswerConfirmationMessage("");
               }}
             >
               {sortedPracticeDays.map((day) => (
@@ -299,6 +339,15 @@ export function AvailabilityTableApp() {
           >
             {slackReminderStatus === "sending" ? "\u9001\u4fe1\u4e2d" : "\u672a\u5165\u529b\u8005\u306b\u30e1\u30c3\u30bb\u30fc\u30b8\u3092\u9001\u308b"}
           </button>
+          <button
+            className="slack-reminder-button"
+            type="button"
+            onClick={sendAnswerConfirmations}
+            disabled={answerConfirmationStatus === "sending" || selectedDay.isPrivate}
+            title={selectedDay.isPrivate ? "非公開の練習日には送信できません" : undefined}
+          >
+            {answerConfirmationStatus === "sending" ? "送信中" : "入力済みの人に確認メッセージを送る"}
+          </button>
           <PartAttendanceSenderPanel selectedDay={selectedDay} members={state.members} />
         </div>
         {selectedDayLastReminder ? (
@@ -340,6 +389,9 @@ export function AvailabilityTableApp() {
               </span>
             ) : null}
           </div>
+        ) : null}
+        {answerConfirmationMessage ? (
+          <div className={answerConfirmationStatus === "error" ? "error" : "notice"}>{answerConfirmationMessage}</div>
         ) : null}
         {hoveredSlot !== null ? (
           <div className="notice">
