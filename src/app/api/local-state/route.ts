@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { APP_VERSION, APP_VERSION_HEADER } from "@/lib/appVersion";
+import { listPasswordMemberIds, migratePlaintextMemberPasswords, stripMemberPasswords } from "@/lib/memberPasswords";
 
 export const runtime = "nodejs";
 
@@ -118,8 +119,18 @@ export async function GET() {
       return NextResponse.json({ error: STORAGE_NOT_CONFIGURED_MESSAGE }, { status: 500 });
     }
 
-    const payload = redisConfig() ? await readFromRedis() : await readFromFile();
-    return NextResponse.json({ ...payload, appVersion: APP_VERSION });
+    let payload = redisConfig() ? await readFromRedis() : await readFromFile();
+
+    // 共有データに平文のパスワードが残っていれば、ハッシュ化して別キーへ移し、共有データからは消す
+    const migrated = await migratePlaintextMemberPasswords(payload.state);
+    if (migrated) {
+      const updatedAt = redisConfig() ? await writeToRedis(migrated) : await writeToFile(migrated);
+      payload = { state: migrated, updatedAt };
+    }
+
+    // パスワード自体は返さず、「設定済みの奏者」だけを返す
+    const passwordMemberIds = await listPasswordMemberIds();
+    return NextResponse.json({ ...payload, appVersion: APP_VERSION, passwordMemberIds });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to read state" },
@@ -152,7 +163,9 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const updatedAt = redisConfig() ? await writeToRedis(body.state) : await writeToFile(body.state);
+    // パスワードは共有データに入れない（別キーで管理）。混ざっていても取り除いて保存する。
+    const stateToWrite = stripMemberPasswords(body.state) ?? body.state;
+    const updatedAt = redisConfig() ? await writeToRedis(stateToWrite) : await writeToFile(stateToWrite);
     return NextResponse.json({ ok: true, updatedAt });
   } catch (error) {
     return NextResponse.json(

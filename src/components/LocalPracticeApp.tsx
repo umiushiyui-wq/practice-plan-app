@@ -142,12 +142,12 @@ export function compareMembersByInstrumentAndSection<T extends { id: string; ins
   );
 }
 
+// 奏者のパスワードは共有データに入れない（サーバーでハッシュ化して別管理。設定済みかどうかは passwordMemberIds で分かる）
 export type Member = {
   id: string;
   name: string;
   instrument: string;
   part: string;
-  password?: string;
   slackUserId?: string;
 }
 
@@ -488,11 +488,11 @@ function migrateState(value: unknown): AppState {
 
   const saved = value as LegacyAppState;
   const members = Array.isArray(saved.members)
-    ? saved.members.map((member) => ({
-        ...member,
-        password: typeof member.password === "string" ? member.password : "",
-        slackUserId: typeof member.slackUserId === "string" ? member.slackUserId : ""
-      }))
+    ? saved.members.map((member) => {
+        // 旧データに残っているパスワードは画面側では持たない
+        const { password: _password, ...rest } = member as Member & { password?: unknown };
+        return { ...rest, slackUserId: typeof member.slackUserId === "string" ? member.slackUserId : "" };
+      })
     : defaultState.members;
   const pieces = Array.isArray(saved.pieces) ? saved.pieces.map(normalizePiece) : defaultState.pieces;
   const recentMinutes = saved.recentMinutes ?? {};
@@ -556,6 +556,7 @@ type LocalStatePayload = {
   state: unknown | null;
   updatedAt?: string | null;
   appVersion?: string;
+  passwordMemberIds?: string[];
 };
 
 // 一度でも新しいバージョンを検知したら、再読み込みするまで全体保存を止める（ページを開き直すとリセットされる）
@@ -742,6 +743,8 @@ export function useLocalPracticeState() {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [saveError, setSaveError] = useState("");
   const [serverUpdatedAt, setServerUpdatedAt] = useState<string | null>(null);
+  // パスワード設定済みの奏者（パスワード自体はブラウザに来ない）
+  const [passwordMemberIds, setPasswordMemberIdList] = useState<string[]>([]);
   const [hasLocalMigrationCandidate, setHasLocalMigrationCandidate] = useState(false);
   const [isReloading, setIsReloading] = useState(false);
   const shouldPersistRef = useRef(false);
@@ -788,6 +791,7 @@ export function useLocalPracticeState() {
           setHasLocalMigrationCandidate(readLocalSavedState() !== null);
         }
         rememberServerUpdatedAt(payload.updatedAt ?? null);
+        setPasswordMemberIdList(payload.passwordMemberIds ?? []);
         setSaveError("");
         setSaveStatus("idle");
       } catch {
@@ -870,6 +874,7 @@ export function useLocalPracticeState() {
       try {
         // 未保存の変更があっても新バージョンの検知はしたいので、取得自体は毎回行う
         const payload = await fetchServerState();
+        setPasswordMemberIdList(payload.passwordMemberIds ?? []);
         if (isAppOutdated || shouldPersistRef.current || !payload.state) return;
         if ((payload.updatedAt ?? null) === serverUpdatedAtRef.current) return;
         const migrated = migrateState(payload.state);
@@ -925,6 +930,7 @@ export function useLocalPracticeState() {
       }
 
       rememberServerUpdatedAt(payload.updatedAt ?? null);
+      setPasswordMemberIdList(payload.passwordMemberIds ?? []);
       setSaveStatus("idle");
       setSaveError("");
     } catch {
@@ -1099,6 +1105,8 @@ export function useLocalPracticeState() {
     isReloading,
     reloadServerState,
     migrateLocalStateToServer,
+    passwordMemberIds,
+    setPasswordMemberIds: setPasswordMemberIdList,
     saveAvailabilityPatch,
     savePieceMembership,
     savePieceMembershipPatches,

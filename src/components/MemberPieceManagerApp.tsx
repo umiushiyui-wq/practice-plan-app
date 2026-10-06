@@ -112,7 +112,6 @@ export function MemberPieceManagerApp() {
   function addMember(formData: FormData) {
     const name = String(formData.get("name") ?? "").trim();
     if (!name) return;
-    const password = String(formData.get("password") ?? "").trim();
     const slackUserId = String(formData.get("slackUserId") ?? "").trim();
 
     const member = {
@@ -120,7 +119,6 @@ export function MemberPieceManagerApp() {
       name,
       instrument: String(formData.get("instrument") ?? ""),
       part: "",
-      password,
       slackUserId
     };
 
@@ -160,20 +158,22 @@ export function MemberPieceManagerApp() {
     });
   }
 
-  function resetMemberPassword(memberId: string) {
+  // パスワードはサーバー側で別管理しているので、リセットも専用APIで行う
+  async function resetMemberPassword(memberId: string) {
     const member = state.members.find((item) => item.id === memberId);
     if (!member || !confirm(`${member.name} のパスワードをリセットしますか？`)) return;
 
-    updateState({
-      members: state.members.map((item) =>
-        item.id === memberId
-          ? {
-              ...item,
-              password: "__unset__"
-            }
-          : item
-      )
+    const response = await fetch("/api/local-state/member-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "reset", memberId })
     });
+    const payload = (await response.json().catch(() => null)) as { ok?: boolean; error?: string; passwordMemberIds?: string[] } | null;
+    if (!response.ok || !payload?.ok) {
+      alert(payload?.error ?? "パスワードをリセットできませんでした。");
+      return;
+    }
+    if (payload.passwordMemberIds) localState.setPasswordMemberIds(payload.passwordMemberIds);
   }
 
   function addPracticeDay(formData: FormData) {
@@ -514,7 +514,6 @@ export function MemberPieceManagerApp() {
               ))}
             </select>
             <input name="slackUserId" placeholder={"Slack ID\uff08\u4f8b: U012ABCDEF\uff09"} />
-            <input type="hidden" name="password" value="__unset__" />
             <button type="submit">奏者を追加</button>
           </form>
           <details className="fold-panel" open>
@@ -532,7 +531,7 @@ export function MemberPieceManagerApp() {
                       {getInstrumentLabel(member.instrument)}
                       {member.part ? ` / ${member.part}` : ""}
                     </div>
-                    <div className="muted">{member.password && member.password !== "__unset__" ? "\u30d1\u30b9\u30ef\u30fc\u30c9\u8a2d\u5b9a\u6e08\u307f" : "\u521d\u56de\u30ed\u30b0\u30a4\u30f3\u6642\u306b\u8a2d\u5b9a"}</div>
+                    <div className="muted">{localState.passwordMemberIds.includes(member.id) ? "\u30d1\u30b9\u30ef\u30fc\u30c9\u8a2d\u5b9a\u6e08\u307f" : "\u521d\u56de\u30ed\u30b0\u30a4\u30f3\u6642\u306b\u8a2d\u5b9a"}</div>
                     <div className="muted">{member.slackUserId ? `Slack ID: ${member.slackUserId}` : "Slack ID\u672a\u767b\u9332"}</div>
                   </div>
                   <form

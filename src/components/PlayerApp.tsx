@@ -217,7 +217,8 @@ export function PlayerApp() {
   const selectedInputDay = selected
     ? sortedPracticeDays.find((day) => day.id === selectedInputDayId) ?? sortedPracticeDays[0] ?? null
     : null;
-  const hasUsablePassword = !!selected && !!selected.password && selected.password !== "__unset__";
+  const hasUsablePassword = !!selected && localState.passwordMemberIds.includes(selected.id);
+  const [isCheckingPassword, setIsCheckingPassword] = useState(false);
   const selectedIsReady = !!selected && authenticatedMemberId === selected.id;
   const passwordInputsMatch = memberPassword === memberPasswordConfirmation;
   const canContinueWithPassword = hasUsablePassword
@@ -515,8 +516,20 @@ export function PlayerApp() {
     });
   }
 
-  function handlePasswordContinue() {
-    if (!selected) return;
+  // パスワードはサーバーでハッシュ化して保存・照合する（ブラウザにはパスワード自体を持たない）
+  async function requestMemberPassword(action: "set" | "verify", memberId: string, password: string) {
+    const response = await fetch("/api/local-state/member-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, memberId, password })
+    });
+    const payload = (await response.json().catch(() => null)) as { ok?: boolean; error?: string; passwordMemberIds?: string[] } | null;
+    if (payload?.passwordMemberIds) localState.setPasswordMemberIds(payload.passwordMemberIds);
+    return response.ok && payload?.ok ? null : (payload?.error ?? "パスワードを確認できませんでした。");
+  }
+
+  async function handlePasswordContinue() {
+    if (!selected || isCheckingPassword) return;
 
     if (!memberPassword.trim()) {
       setAuthError("パスワードを入力してください。");
@@ -533,19 +546,13 @@ export function PlayerApp() {
         setAuthError("パスワードが一致していません。");
         return;
       }
+    }
 
-      updateState({
-        members: state.members.map((member) =>
-          member.id === selected.id
-            ? {
-                ...member,
-                password: memberPassword
-              }
-            : member
-        )
-      });
-    } else if (selected.password !== memberPassword) {
-      setAuthError("パスワードが違います。");
+    setIsCheckingPassword(true);
+    const error = await requestMemberPassword(hasUsablePassword ? "verify" : "set", selected.id, memberPassword);
+    setIsCheckingPassword(false);
+    if (error) {
+      setAuthError(error);
       return;
     }
 
@@ -845,8 +852,8 @@ export function PlayerApp() {
                   <p className="error">パスワードが一致していません。</p>
                 ) : null}
                 {authError ? <p className="error">{authError}</p> : null}
-                <button type="button" onClick={handlePasswordContinue} disabled={!canContinueWithPassword}>
-                  {hasUsablePassword ? "確認する" : "保存する"}
+                <button type="button" onClick={handlePasswordContinue} disabled={!canContinueWithPassword || isCheckingPassword}>
+                  {isCheckingPassword ? "確認中..." : hasUsablePassword ? "確認する" : "保存する"}
                 </button>
               </>
             ) : (
