@@ -138,6 +138,17 @@ export function compareMembersByInstrumentAndSection<T extends { id: string; ins
 
   const firstKey = getSectionSortKey(firstSection);
   const secondKey = getSectionSortKey(secondSection);
+
+  // ダンスの人同士は、登録パート順（同じパートの中は番号 → 名前）に並べる
+  if (firstKey.instrumentIndex === DANCE_SECTION_INDEX && secondKey.instrumentIndex === DANCE_SECTION_INDEX) {
+    return (
+      getInstrumentSortIndex(first.instrument) - getInstrumentSortIndex(second.instrument) ||
+      getInstrumentLabel(first.instrument).localeCompare(getInstrumentLabel(second.instrument), "ja") ||
+      firstKey.number - secondKey.number ||
+      first.name.localeCompare(second.name, "ja")
+    );
+  }
+
   return (
     firstKey.instrumentIndex - secondKey.instrumentIndex ||
     firstKey.number - secondKey.number ||
