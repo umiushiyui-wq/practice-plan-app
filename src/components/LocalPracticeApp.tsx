@@ -56,6 +56,7 @@ export function compareMembersByInstrument<T extends { instrument: string; name:
 // ふるぼえ・低音のように1パートに複数楽器がいる場合も、パート内で楽器ごとにまとまるようにするため。
 const CONDUCTOR_SECTION_ALIASES = ["cond", "conductor", "指揮", "指揮者"];
 const ELECTRIC_BASS_SECTION_ALIASES = ["eb", "ebass", "elb", "elbass", "elecbass", "electricbass", "エレキベース", "エレベ", "エレキ"];
+const DANCE_SECTION_ALIASES = ["dance", "dancer", "dancers", "ダンス", "ダンサー", "踊り"];
 const SECTION_INSTRUMENT_ALIASES: string[][] = [
   CONDUCTOR_SECTION_ALIASES,
   ["picc", "pic", "ピッコロ"],
@@ -81,7 +82,8 @@ const SECTION_INSTRUMENT_ALIASES: string[][] = [
   ["tu", "tuba", "チューバ"],
   ["stb", "cb", "kb", "contrabass", "コントラバス", "弦バス"],
   ELECTRIC_BASS_SECTION_ALIASES,
-  ["perc", "timp", "ティンパニ", "パーカッション", "打楽器"]
+  ["perc", "timp", "ティンパニ", "パーカッション", "打楽器"],
+  DANCE_SECTION_ALIASES
 ];
 
 const SECTION_INSTRUMENT_INDEX = new Map(
@@ -89,6 +91,7 @@ const SECTION_INSTRUMENT_INDEX = new Map(
 );
 const CONDUCTOR_SECTION_INDEX = SECTION_INSTRUMENT_ALIASES.indexOf(CONDUCTOR_SECTION_ALIASES);
 const ELECTRIC_BASS_SECTION_INDEX = SECTION_INSTRUMENT_ALIASES.indexOf(ELECTRIC_BASS_SECTION_ALIASES);
+const DANCE_SECTION_INDEX = SECTION_INSTRUMENT_ALIASES.indexOf(DANCE_SECTION_ALIASES);
 
 export function normalizeSectionLabel(section: string) {
   return section.normalize("NFKC").trim().replace(/\s+/g, " ");
@@ -104,13 +107,14 @@ function getSectionSortKey(section: string) {
   };
 }
 
-// 指揮者とエレキベースはパートを横断するので、セクションでパート自体を上書きする。
-// Cond は全パートより上、E.B. は登録パートに関係なく低音パート(St.B の下)に並べる。
+// 指揮者・エレキベース・ダンスはパートを横断するので、セクションでパート自体を上書きする。
+// Cond は全パートより上、E.B. は登録パートに関係なく低音パート(St.B の下)、ダンスは全パートより下に並べる。
 function getEffectivePartSortIndex(instrument: string, section: string) {
   if (section) {
     const { instrumentIndex } = getSectionSortKey(section);
     if (instrumentIndex === CONDUCTOR_SECTION_INDEX) return -1;
     if (instrumentIndex === ELECTRIC_BASS_SECTION_INDEX) return getInstrumentSortIndex("低音");
+    if (instrumentIndex === DANCE_SECTION_INDEX) return Number.MAX_SAFE_INTEGER;
   }
   return getInstrumentSortIndex(instrument);
 }
